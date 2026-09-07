@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.UpdateBannerConfig
 import com.kauth.adapter.web.demoBanner
@@ -26,7 +27,7 @@ internal fun HEAD.adminHead(
     pageTitle: String,
     theme: TenantTheme = TenantTheme.DEFAULT,
 ) {
-    title { +"KotAuth — $pageTitle" }
+    title { +"KotAuth · $pageTitle" }
     meta(charset = "UTF-8")
     meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
     link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
@@ -74,9 +75,6 @@ internal fun HEAD.adminHead(
  * @param loggedInAs  Username for the profile avatar
  * @param showSidebar Whether to render the context sidebar (default true).
  *                    Set to false for single-page sections like Audit Log.
- * @param contentClass CSS class for the scrollable content wrapper.
- *                     Defaults to "content" (legacy). Use "content-outer"
- *                     for new BEM pages (wider padding, no sidebar).
  * @param content     Page content lambda
  */
 internal fun HTML.adminShell(
@@ -87,12 +85,11 @@ internal fun HTML.adminShell(
     workspaceName: String = "KotAuth",
     workspaceSlug: String? = null,
     workspaceLogoUrl: String? = null,
-    apps: List<Pair<String, String>> = emptyList(),
+    apps: List<Pair<String, String>>? = null,
     activeAppSlug: String? = null,
     activeAppSection: String = "overview",
     loggedInAs: String,
     showSidebar: Boolean = true,
-    contentClass: String = "content",
     toastMessage: String? = null,
     content: DIV.() -> Unit,
 ) {
@@ -244,7 +241,7 @@ internal fun HTML.adminShell(
                 if (workspaceSlug != null && showSidebar) {
                     div("sidebar") {
                         when (activeRail) {
-                            "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
+                            "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug, activeAppSection)
                             "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
                             "security" -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
                             "logs" -> renderLogsCtxPanel(workspaceSlug, activeAppSection)
@@ -254,7 +251,7 @@ internal fun HTML.adminShell(
                 }
 
                 div("main") {
-                    div(contentClass) {
+                    div("content-outer") {
                         content()
                     }
                 }
@@ -330,7 +327,7 @@ private fun DIV.railItem(
         }
     } else {
         span("rail__item rail__item--ghost") {
-            attributes["title"] = "$label — select a workspace first"
+            attributes["title"] = "$label. Select a workspace first"
             inlineSvgIcon(iconName, label)
             span("rail__label") { +label }
         }
@@ -353,13 +350,19 @@ private fun DIV.ctxLink(
 
 internal fun DIV.renderAppsCtxPanel(
     workspaceSlug: String?,
-    apps: List<Pair<String, String>>,
+    apps: List<Pair<String, String>>?,
     activeAppSlug: String?,
+    activeAppSection: String = "",
 ) {
     span("sidebar__heading") { +"Applications" }
-    if (apps.isEmpty()) {
+    if (apps == null) {
+        // This page did not load the application list, so it cannot say whether any exist.
+        a("/admin/workspaces/$workspaceSlug", classes = "sidebar__item") {
+            span { +"View applications" }
+        }
+    } else if (apps.isEmpty()) {
         div("ctx-empty") {
-            div("ctx-empty-icon") { +"⊡" }
+            div("ctx-empty-icon") { inlineSvgIcon("rail-apps", "Applications") }
             p("ctx-empty-text") { +"No applications yet." }
             a("/admin/workspaces/$workspaceSlug/applications/new", classes = "ctx-empty-action") {
                 +"+ Create one"
@@ -376,6 +379,9 @@ internal fun DIV.renderAppsCtxPanel(
             }
         }
     }
+    div("sidebar__divider") {}
+    val apisHref = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug/apis" else "/admin"
+    ctxLink(apisHref, "apis", activeAppSection, com.kauth.adapter.web.EnglishStrings.API_NAV_LABEL)
 }
 
 internal fun DIV.renderDirectoryCtxPanel(
@@ -387,6 +393,13 @@ internal fun DIV.renderDirectoryCtxPanel(
     ctxLink("$base/users", "users", activeSection, "Users")
     ctxLink("$base/groups", "groups", activeSection, "Groups")
     ctxLink("$base/roles", "roles", activeSection, "Roles")
+    div("sidebar__divider") {}
+    ctxLink(
+        "$base/provisioning",
+        "provisioning",
+        activeSection,
+        EnglishStrings.SCIM_NAV_LABEL,
+    )
 }
 
 internal fun DIV.renderSecurityCtxPanel(
@@ -430,7 +443,6 @@ internal fun DIV.renderSettingsCtxPanel(
     ctxLink("$base/identity-providers", "identity-providers", activeSection, "Identity Providers")
     div("sidebar__divider") {}
     ctxLink("$base/api-keys", "api-keys", activeSection, "API Keys")
-    ctxLink("$base/apis", "apis", activeSection, "APIs")
     ctxLink("$base/webhooks", "webhooks", activeSection, "Webhooks")
     ctxLink("$base/claim-mappers", "claim-mappers", activeSection, "Claim Mappers")
     div("sidebar__divider") {}

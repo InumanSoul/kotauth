@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.plugin.MaxRequestBodyBytesAttr
 import com.kauth.domain.model.BackupExportV1
 import com.kauth.domain.port.BackupDecryptResult
 import com.kauth.domain.port.BackupDecryptionError
@@ -18,6 +19,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.PayloadTooLargeException
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
@@ -73,7 +75,7 @@ fun Route.adminBackupExportRoutes(
                 passphrase.length < 16 -> "Passphrase must be at least 16 characters."
                 passphrase != confirmPassphrase -> "Passphrases do not match."
                 confirmSlug != workspace.slug ->
-                    "Type the workspace slug exactly to confirm — entered '${confirmSlug ?: ""}'."
+                    "Type the workspace slug exactly to confirm. You entered '${confirmSlug ?: ""}'."
                 else -> null
             }
         if (validationError != null) {
@@ -137,6 +139,9 @@ fun Route.adminBackupImportRoutes(
     backupImporterService: BackupImporterService,
     backupEncryptionPort: BackupEncryptionPort,
     currentSchemaVersion: Int,
+    // Same reasoning as the JSON API import endpoint (AdminBackupRoutes.kt): an uploaded backup
+    // file is an entire tenant export, far larger than any other multipart upload this UI takes.
+    maxImportBodyBytes: Long,
 ) {
     get("/import") {
         val session = call.sessions.get<AdminSession>()!!
@@ -151,6 +156,10 @@ fun Route.adminBackupImportRoutes(
     }
 
     post("/import") {
+        // Must be set before receiveMultipart() below — the size-limit plugin reads this
+        // override lazily, at the moment the body is actually consumed.
+        call.attributes.put(MaxRequestBodyBytesAttr, maxImportBodyBytes)
+
         val session = call.sessions.get<AdminSession>()!!
         val wsPairs =
             tenantRepository.findAll().map {
@@ -186,6 +195,10 @@ fun Route.adminBackupImportRoutes(
                 }
                 part.dispose()
             }
+        } catch (e: PayloadTooLargeException) {
+            // Must reach StatusPages for the real 413, not the generic "malformed upload" 400
+            // below — this is a size condition, not a parse failure.
+            throw e
         } catch (e: Exception) {
             return@post call.respondHtml(
                 HttpStatusCode.BadRequest,
@@ -280,7 +293,7 @@ fun Route.adminBackupImportRoutes(
 private fun decryptErrorMessage(error: BackupDecryptionError): String =
     when (error) {
         is BackupDecryptionError.WrongPassphrase ->
-            "Wrong passphrase or corrupt envelope — cannot decrypt this backup."
+            "This backup cannot be decrypted. The passphrase is wrong or the envelope is corrupt."
         is BackupDecryptionError.MalformedEnvelope ->
             "Backup file is malformed. The file may be truncated or not a Kotauth backup."
         is BackupDecryptionError.UnsupportedVersion ->

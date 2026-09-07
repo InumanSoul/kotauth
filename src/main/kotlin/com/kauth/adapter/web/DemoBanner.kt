@@ -14,29 +14,19 @@ object DemoConfig {
 }
 
 /**
- * Fixed-position banner shown on every page when KAUTH_DEMO_MODE=true.
+ * Thin (2px) amber indicator strip shown on every page when KAUTH_DEMO_MODE=true.
  *
- * Displays demo credentials and a reset notice. Styled by
- * frontend/css/components/demo-banner.css (imported in both admin and auth
- * bundles). The DEMO label reuses the existing .badge .badge--warn component.
+ * Credentials are documented in the separate demo docs repo — not rendered
+ * inline so nothing in the UI drifts when the fixture usernames change.
  *
- * Layout offset is handled via CSS:
- *   Admin — .demo-banner ~ .shell { height: calc(100vh - 36px) }
- *   Auth  — body:has(.demo-banner) { padding-top: 36px }
+ * Styled by frontend/css/components/demo-banner.css (imported in admin and
+ * auth bundles). ARIA label carries the "demo mode" semantics for AT users
+ * since there's no visible text.
  */
 fun BODY.demoBanner() {
     if (!DemoConfig.enabled) return
     div("demo-banner") {
-        span("badge badge--warn") { +"Demo" }
-        span {
-            +"Data resets periodically · Admin: "
-            code { +"admin" }
-            +" / "
-            code { +"Demo1234!" }
-            +" · Acme: "
-            code { +"sarah.chen" }
-            +" / "
-            code { +"Demo1234!" }
-        }
+        attributes["role"] = "status"
+        attributes["aria-label"] = "Demo mode"
     }
 }

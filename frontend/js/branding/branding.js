@@ -101,6 +101,35 @@
     }
   };
 
+  /* ── active preset detection ── */
+
+  // Which preset (if any) the saved theme currently matches. Nothing persists the
+  // choice, so it is derived from the colour fields rather than assumed — otherwise
+  // the page claims "Dark" is active however the workspace is actually themed.
+  const markActivePreset = () => {
+    const group = document.querySelector('[data-preset]')?.closest('.preset-group');
+    if (!group) return;
+    const currentValue = (key) => {
+      if (key === 'radius') return document.getElementById('field-radius')?.value;
+      return document.getElementById(`native-${key}`)?.value;
+    };
+    const matches = (preset) =>
+      Object.entries(preset).every(([key, val]) => {
+        const actual = currentValue(key);
+        if (actual == null) return false;
+        return String(actual).toLowerCase() === String(val).toLowerCase();
+      });
+
+    group.querySelectorAll('.preset-btn').forEach((b) => b.classList.remove('preset-btn--active'));
+    for (const [name, preset] of Object.entries(presets)) {
+      if (!matches(preset)) continue;
+      group.querySelector(`[data-preset="${name}"]`)?.classList.add('preset-btn--active');
+      return;
+    }
+  };
+
+  markActivePreset();
+
   /* ── event wiring ── */
 
   // Theme preset buttons: [data-preset]
@@ -174,5 +203,44 @@
     logoInput.addEventListener('input', () => {
       syncPreviewLogo(logoInput.value);
     });
+  }
+
+  /* ── SPLIT layout live preview ── */
+  const mockEl        = document.getElementById('preview-mock');
+  const panelEl       = document.getElementById('preview-panel-split');
+  const panelTagline  = document.getElementById('preview-panel-tagline');
+  const layoutSelect  = document.getElementById('themeLoginLayout');
+  const taglineInput  = document.getElementById('field-login-tagline');
+  const bgInput       = document.getElementById('field-login-bg');
+
+  const workspaceFallback = panelTagline ? panelTagline.textContent : '';
+
+  const syncLayout = (value) => {
+    if (!mockEl) return;
+    if (value === 'SPLIT') mockEl.classList.add('auth-mock--split');
+    else mockEl.classList.remove('auth-mock--split');
+  };
+  const syncTagline = (value) => {
+    if (!panelTagline) return;
+    panelTagline.textContent = (value && value.trim()) ? value : workspaceFallback;
+  };
+  const syncPanelBg = (value) => {
+    if (!panelEl) return;
+    if (value && /^https?:\/\//i.test(value)) {
+      const safe = value.replace(/'/g, '%27');
+      panelEl.style.backgroundImage = `url('${safe}')`;
+    } else {
+      panelEl.style.backgroundImage = '';
+    }
+  };
+
+  if (layoutSelect) {
+    layoutSelect.addEventListener('change', () => syncLayout(layoutSelect.value));
+  }
+  if (taglineInput) {
+    taglineInput.addEventListener('input', () => syncTagline(taglineInput.value));
+  }
+  if (bgInput) {
+    bgInput.addEventListener('input', () => syncPanelBg(bgInput.value));
   }
 })();

@@ -26,8 +26,14 @@ data class ApiKey(
     val enabled: Boolean = true,
     /** Non-null when provisioned via `KAUTH_BOOTSTRAP_API_KEYS` — admin UI marks these read-only. */
     val bootstrapName: String? = null,
+    /** SCIM wire dialect this key's client speaks; `rfc` is the spec-canonical pass-through. */
+    val scimDialect: String = DEFAULT_SCIM_DIALECT,
     val createdAt: Instant = Instant.now(),
-)
+) {
+    companion object {
+        const val DEFAULT_SCIM_DIALECT = "rfc"
+    }
+}
 
 /**
  * Canonical scope strings for the REST API.
@@ -51,6 +57,12 @@ object ApiScope {
     const val CLAIM_MAPPERS_READ = "claim_mappers:read"
     const val CLAIM_MAPPERS_WRITE = "claim_mappers:write"
 
+    /** List identity provider configurations. The client secret is never returned. */
+    const val IDENTITY_PROVIDERS_READ = "identity_providers:read"
+
+    /** Create, update and delete identity provider configurations. */
+    const val IDENTITY_PROVIDERS_WRITE = "identity_providers:write"
+
     /** Master-tenant only — export a workspace as an encrypted backup. */
     const val TENANTS_EXPORT = "tenants:export"
 
@@ -62,6 +74,34 @@ object ApiScope {
 
     /** Verify an email OTP challenge and exchange it for an authorization code. */
     const val AUTH_VERIFY_OTP = "auth:verify-otp"
+
+    /** Read tenant metadata, sign-in methods, and security/MFA policy. SMTP credentials excluded. */
+    const val WORKSPACE_READ = "workspace:read"
+
+    /** List webhook endpoints (never exposes the signing secret). */
+    const val WEBHOOKS_READ = "webhooks:read"
+
+    /** Create/delete webhook endpoints. */
+    const val WEBHOOKS_WRITE = "webhooks:write"
+
+    /** List and retrieve resource servers (RFC 8707 resource indicators). */
+    const val RESOURCE_SERVERS_READ = "resource_servers:read"
+
+    /** Create, update, delete resource servers; manage client authorization edges. */
+    const val RESOURCE_SERVERS_WRITE = "resource_servers:write"
+
+    /** List API keys for the workspace (never exposes the key hash or raw value). */
+    const val API_KEYS_READ = "api_keys:read"
+
+    /** Create and revoke API keys — meta-circular: includes the authenticating key itself. */
+    const val API_KEYS_WRITE = "api_keys:write"
+
+    /**
+     * Full access to the SCIM 2.0 provisioning surface. Deliberately not split into
+     * read/write: a provisioning connector needs both to function, so a read-only key would
+     * connect successfully and only fail once it attempts its first write.
+     */
+    const val SCIM = "scim"
 
     val ALL =
         listOf(
@@ -80,9 +120,19 @@ object ApiScope {
             USER_ATTRIBUTES_WRITE,
             CLAIM_MAPPERS_READ,
             CLAIM_MAPPERS_WRITE,
+            IDENTITY_PROVIDERS_READ,
+            IDENTITY_PROVIDERS_WRITE,
             TENANTS_EXPORT,
             TENANTS_IMPORT,
             AUTH_SEND_OTP,
             AUTH_VERIFY_OTP,
+            WORKSPACE_READ,
+            WEBHOOKS_READ,
+            WEBHOOKS_WRITE,
+            RESOURCE_SERVERS_READ,
+            RESOURCE_SERVERS_WRITE,
+            API_KEYS_READ,
+            API_KEYS_WRITE,
+            SCIM,
         )
 }

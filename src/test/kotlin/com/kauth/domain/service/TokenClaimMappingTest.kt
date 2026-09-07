@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
@@ -110,6 +111,7 @@ class TokenClaimMappingTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
     private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"

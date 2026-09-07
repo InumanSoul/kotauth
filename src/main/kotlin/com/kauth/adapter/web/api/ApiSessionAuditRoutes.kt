@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.UserId
@@ -23,12 +24,29 @@ internal fun Route.apiSessionAuditRoutes(
         get {
             requireScope(call, ApiScope.SESSIONS_READ) ?: return@get
             val tenantId = call.attributes[TenantIdAttr]
-            val sessions = sessionRepository.findActiveByTenant(tenantId)
+            val params = call.request.queryParameters
+            val userIdFilter = params["user_id"]?.toIntOrNull()?.let { UserId(it) }
+            val applicationIdFilter = params["application_id"]?.toIntOrNull()?.let { ApplicationId(it) }
+            val activeOnly = params["active_only"]?.equals("false", ignoreCase = true) != true
+            if (!activeOnly) {
+                return@get call.respondProblem(
+                    HttpStatusCode.BadRequest,
+                    "Unsupported filter",
+                    "active_only=false is not supported in v1.21.0. Use the audit-logs API to " +
+                        "reconstruct revoked-session history.",
+                )
+            }
+            val limit = params["limit"]?.toIntOrNull()?.coerceIn(1, 200) ?: 50
+            val offset = params["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+
+            val sessions =
+                sessionRepository.findActiveByTenant(tenantId, userIdFilter, applicationIdFilter, limit, offset)
+            val total = sessionRepository.countActiveByTenant(tenantId, userIdFilter, applicationIdFilter)
             call.respond(
                 HttpStatusCode.OK,
                 ApiResponse(
                     data = sessions.map { it.toApiDto() },
-                    meta = ApiMeta(total = sessions.size),
+                    meta = ApiMeta(total = total, offset = offset, limit = limit),
                 ),
             )
         }

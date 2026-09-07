@@ -1,5 +1,6 @@
 package com.kauth.domain.util
 
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.TenantTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -101,5 +102,33 @@ class TenantThemeValidatorTest {
     fun `first failing field is the one reported`() {
         val bad = TenantTheme.DEFAULT.copy(accentColor = "}; evil", borderRadius = "8 px")
         assertEquals("accentColor must be a hex color like \"#1FBCFF\"", validateTenantTheme(bad))
+    }
+
+    @Test
+    fun `validateTenantTheme accepts SPLIT layout with valid https background URL`() {
+        val theme =
+            TenantTheme.DEFAULT.copy(
+                loginLayout = LoginLayout.SPLIT,
+                loginBackgroundUrl = "https://cdn.example.com/hero.jpg",
+                loginTagline = "Welcome back",
+            )
+        assertNull(validateTenantTheme(theme))
+    }
+
+    @Test
+    fun `validateTenantTheme rejects loginBackgroundUrl with javascript scheme`() {
+        listOf("javascript:alert(1)", "data:text/html,evil", "/relative/path", "//evil.com").forEach { bad ->
+            val err = validateTenantTheme(TenantTheme.DEFAULT.copy(loginBackgroundUrl = bad))
+            assertTrue(err != null && "loginBackgroundUrl" in err, "Expected loginBackgroundUrl error for '$bad'")
+        }
+        assertNull(validateTenantTheme(TenantTheme.DEFAULT.copy(loginBackgroundUrl = null)))
+    }
+
+    @Test
+    fun `validateTenantTheme rejects loginTagline longer than 200 chars`() {
+        val tooLong = "a".repeat(201)
+        val err = validateTenantTheme(TenantTheme.DEFAULT.copy(loginTagline = tooLong))
+        assertTrue(err != null && "loginTagline" in err, "Expected loginTagline error, got $err")
+        assertNull(validateTenantTheme(TenantTheme.DEFAULT.copy(loginTagline = "a".repeat(200))))
     }
 }

@@ -50,7 +50,14 @@ enum class AuditEventType {
     ADMIN_CLIENT_SECRET_REGENERATED,
     ADMIN_CLIENT_ENABLED,
     ADMIN_CLIENT_DISABLED,
+    ADMIN_CLIENT_DELETED,
     ADMIN_USER_CREATED,
+
+    /** A user account created by the broker on a first sign-in, with no admin action behind it. */
+    JIT_USER_PROVISIONED,
+
+    /** A brokered sign-in that did not end in a session. See [BrokeredSignInFailure] for details. */
+    SOCIAL_LOGIN_FAILED,
     ADMIN_USER_UPDATED,
     ADMIN_USER_ENABLED,
     ADMIN_USER_DISABLED,

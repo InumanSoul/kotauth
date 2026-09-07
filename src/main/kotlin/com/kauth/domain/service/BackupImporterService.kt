@@ -5,16 +5,18 @@ import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.BackupExportV1
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.GroupBackup
 import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.SecurityConfig
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantKey
 import com.kauth.domain.model.TenantTheme
@@ -156,6 +158,7 @@ class BackupImporterService(
                             emailOtpSignupEnabled = emailOtpSignupEnabled,
                             emailOtpLockoutThreshold = emailOtpLockoutThreshold,
                             emailOtpLoginEnabled = emailOtpLoginEnabled,
+                            loginIdentifierMode = loginIdentifierMode,
                         )
                     },
                 smtpHost = tb.smtp.host,
@@ -186,6 +189,11 @@ class BackupImporterService(
                     logoUrl = logoUrl,
                     faviconUrl = faviconUrl,
                     defaultLocale = defaultLocale,
+                    loginLayout =
+                        runCatching { LoginLayout.valueOf(loginLayout) }
+                            .getOrDefault(LoginLayout.CENTERED),
+                    loginBackgroundUrl = loginBackgroundUrl,
+                    loginTagline = loginTagline,
                 )
             }
         validateTenantTheme(importedTheme)?.let { error("theme: $it") }
@@ -233,14 +241,35 @@ class BackupImporterService(
 
         val appPkByClientId: MutableMap<String, ApplicationId> = mutableMapOf()
         export.applications.forEach { ab ->
+            val accessType = AccessType.fromValue(ab.accessType)
+            // Backups written before grant types existed carry no grantTypes field; derive
+            // the same defaults an in-place upgrade would have assigned for this access type.
+            // An explicit list is trusted as-is — silently dropping an unrecognized value would
+            // restore a client with fewer grants than the backup recorded.
+            val grants =
+                if (ab.grantTypes != null) {
+                    val unknown = ab.grantTypes.filter { GrantType.fromValue(it) == null }
+                    if (unknown.isNotEmpty()) {
+                        error(
+                            "Application '${ab.clientId}' has unrecognized grant type(s): " +
+                                unknown.joinToString(", "),
+                        )
+                    }
+                    ab.grantTypes.mapNotNull { GrantType.fromValue(it) }.toSet()
+                } else {
+                    GrantType.defaultsFor(accessType)
+                }
             val saved =
                 applicationRepository.create(
                     tenantId = createdTenant.id,
                     clientId = ab.clientId,
                     name = ab.name,
                     description = ab.description,
-                    accessType = AccessType.fromValue(ab.accessType).value,
+                    accessType = accessType.value,
                     redirectUris = ab.redirectUris,
+                    grantTypes = grants,
+                    clientSecretHash = null,
+                    audience = null,
                 )
             val finalApp =
                 if (!ab.enabled) {
@@ -308,6 +337,7 @@ class BackupImporterService(
                         description = gb.description,
                         parentGroupId = parentPk,
                         attributes = gb.attributes,
+                        externalId = gb.externalId,
                     ),
                 )
             val savedId = saved.id ?: error("GroupRepository.save returned a group with null id for '${gb.name}'")
@@ -320,14 +350,40 @@ class BackupImporterService(
             }
         }
 
+        // Normalize, then reject rather than rewrite: a restore that silently alters an
+        // identifier can break an integrator's stored references to it. Validated as one pass
+        // over every record before any of them is saved, and reported together, so an operator
+        // restoring hundreds of users sees the full list of offenders in one failure instead of
+        // discovering them one retry at a time.
+        val invalidUserRecords =
+            export.users.mapNotNull { ub ->
+                val normalized = UsernamePolicy.normalize(ub.username)
+                if (UsernamePolicy.isValid(normalized)) {
+                    null
+                } else {
+                    "user record for email '${ub.email}' has username '${ub.username}' which does not " +
+                        "normalize to a valid username (got '$normalized')"
+                }
+            }
+        if (invalidUserRecords.isNotEmpty()) {
+            error(
+                "Backup import rejected: ${invalidUserRecords.size} user record(s) have usernames " +
+                    "that do not normalize to a valid username. Usernames must match " +
+                    "${UsernamePolicy.USERNAME_PATTERN.pattern} and be at most " +
+                    "${UsernamePolicy.MAX_LENGTH} characters after trimming and lowercasing. " +
+                    "Offending records: ${invalidUserRecords.joinToString("; ")}.",
+            )
+        }
+
         val userPkByUsername: MutableMap<String, UserId> = mutableMapOf()
         export.users.forEach { ub ->
+            val normalizedUsername = UsernamePolicy.normalize(ub.username)
             val saved =
                 userRepository.save(
                     User(
                         id = null,
                         tenantId = createdTenant.id,
-                        username = ub.username,
+                        username = normalizedUsername,
                         email = ub.email,
                         fullName = ub.fullName,
                         passwordHash = ub.passwordHash,
@@ -337,9 +393,18 @@ class BackupImporterService(
                         lastPasswordChangeAt = ub.lastPasswordChangeAt?.let(Instant::ofEpochSecond),
                         mfaEnabled = false,
                         createdAt = ub.createdAt?.let(Instant::ofEpochSecond),
+                        externalId = ub.externalId,
+                        givenName = ub.givenName,
+                        familyName = ub.familyName,
                     ),
                 )
-            val savedId = saved.id ?: error("UserRepository.save returned a user with null id for '${ub.username}'")
+            val savedId =
+                saved.id ?: error("UserRepository.save returned a user with null id for '$normalizedUsername'")
+            // Audit events reference the ORIGINAL exported username (pre-normalization), so a
+            // legacy backup with mixed-case usernames must resolve under that key too. Keying on
+            // the original first (see lookup below) avoids two different original usernames that
+            // normalize to the same value from clobbering each other's resolution.
+            userPkByUsername[normalizedUsername] = savedId
             userPkByUsername[ub.username] = savedId
 
             ub.customAttributes.forEach { (key, value) ->
@@ -379,7 +444,9 @@ class BackupImporterService(
         }
 
         export.socialProviders.forEach { sp ->
-            val provider = SocialProvider.fromValueOrNull(sp.provider) ?: return@forEach
+            // Only the compiled-in adapters can be imported. A key with no adapter would persist a
+            // row that no admin page lists and no delete route accepts — an orphan re-exported forever.
+            val provider = ProviderKey.of(sp.provider)?.takeIf { it in ProviderKey.RESERVED } ?: return@forEach
             identityProviderRepository.save(
                 IdentityProvider(
                     id = null,
@@ -396,7 +463,8 @@ class BackupImporterService(
             auditLogPort?.record(
                 AuditEvent(
                     tenantId = createdTenant.id,
-                    userId = ev.username?.let { userPkByUsername[it] },
+                    userId =
+                        ev.username?.let { userPkByUsername[it] ?: userPkByUsername[UsernamePolicy.normalize(it)] },
                     clientId = ev.clientId?.let { appPkByClientId[it] },
                     eventType =
                         runCatching { AuditEventType.valueOf(ev.eventType) }

@@ -3,9 +3,13 @@
  * Data tables for listing resources (users, apps, sessions, etc.).
  *
  * New BEM block: .data-table (used by new page designs)
- *   .data-table__id      — monospace accent link (client IDs, usernames)
+ *   .data-table__id      — monospace accent LINK. Only ever on an <a>: it is coloured and
+ *                          underlines on hover, so on inert text it promises a click that
+ *                          does not exist. A technical value that is not a link is __meta.
  *   .data-table__name    — primary text cell
  *   .data-table__email   — monospace muted email cell
+ *   .data-table__meta    — monospace muted secondary cell (URLs, counts, timestamps)
+ *   .data-table__meta--with-icon — meta cell carrying a trailing .inline-help icon
  *   .data-table__actions — right-aligned action buttons cell
  *
  * Inline filter: .filter-bar (reusable above any data-table)
@@ -66,6 +70,18 @@
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-muted);
+}
+
+.data-table__meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.data-table__meta--with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .data-table__actions {
@@ -183,3 +199,12 @@ tr:hover td      { background: var(--color-row-hover); }
 
 .td-muted { color: var(--color-muted); font-size: 0.78rem; }
 .td-code  { font-family: var(--font-mono); font-size: 0.82rem; color: var(--color-accent); }
+
+/* A boolean cell: present or not, rather than two words dressed as states. */
+.included-mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-green);
+}
+
+.included-mark svg { width: 14px; height: 14px; }

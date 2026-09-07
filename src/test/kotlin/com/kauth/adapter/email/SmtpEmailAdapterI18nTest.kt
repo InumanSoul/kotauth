@@ -30,7 +30,7 @@ class SmtpEmailAdapterI18nTest {
 
         val rendered = adapter.renderVerification("Alice", "https://example.com/verify?t=x", "Acme", englishOnlyTenant)
 
-        assertEquals("Verify your email address — Acme", rendered.subject)
+        assertEquals("Verify your email address (Acme)", rendered.subject)
         assertTrue(rendered.html.contains("Verify your email address"))
         assertTrue(rendered.html.contains("Click the button below to verify"))
         assertTrue(rendered.text.contains("Verify your email address"))
@@ -90,7 +90,7 @@ class SmtpEmailAdapterI18nTest {
 
         val rendered = adapter.renderVerification("Alice", "https://example.com/verify?t=x", "Acme", frTenant)
 
-        assertEquals("Verify your email address — Acme", rendered.subject)
+        assertEquals("Verify your email address (Acme)", rendered.subject)
     }
 
     @Test

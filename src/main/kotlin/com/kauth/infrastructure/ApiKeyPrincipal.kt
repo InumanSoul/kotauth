@@ -7,12 +7,15 @@ import io.ktor.server.auth.*
  * Ktor authentication principal for API key requests.
  *
  * Set by the bearer auth provider after verifying the token starts with "kauth_".
- * Routes call [ApiKeyService.validate()] with tenant context to perform the full
- * DB-backed check and populate [resolvedKey].
  */
 data class ApiKeyPrincipal(
     /** The raw Bearer token extracted from the Authorization header. */
     val rawToken: String,
-    /** Populated by the route after successful tenant-scoped validation. */
+    /**
+     * Vestigial: nothing populates this. The principal is built before tenant resolution and Ktor
+     * principals are immutable, so the resolved key is stamped onto the call as `ApiKeyAttr`
+     * instead. Read that, not this — a derived accessor here would answer for every key with
+     * whatever a null resolves to.
+     */
     val resolvedKey: ApiKey? = null,
 ) : Principal

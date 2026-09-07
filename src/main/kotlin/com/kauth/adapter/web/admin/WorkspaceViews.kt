@@ -5,6 +5,9 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginIdentifierMode
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -25,6 +28,7 @@ internal fun workspaceDetailPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     apps: List<Application> = emptyList(),
     loggedInAs: String,
+    identityProviders: List<IdentityProvider> = emptyList(),
 ): HTML.() -> Unit =
     {
         val appPairs = apps.map { it.clientId to it.name }
@@ -37,8 +41,7 @@ internal fun workspaceDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             apps = appPairs,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -136,8 +139,29 @@ internal fun workspaceDetailPageImpl(
                     classes = "insight-item",
                 ) {
                     span("insight-item__label") { +"Identity Providers" }
-                    span("insight-item__value insight-item__value--muted") { +"None" }
-                    span("insight-item__hint") { +"Password auth only" }
+                    val enabledProviders = identityProviders.filter { it.enabled }
+                    when {
+                        identityProviders.isEmpty() -> {
+                            span("insight-item__value insight-item__value--muted") { +"None" }
+                            span("insight-item__hint") { +"Password auth only" }
+                        }
+                        enabledProviders.isEmpty() -> {
+                            span("insight-item__value insight-item__value--warn") {
+                                +"${identityProviders.size} configured"
+                            }
+                            span("insight-item__hint") { +"None enabled \u2014 password auth only" }
+                        }
+                        else -> {
+                            span("insight-item__value insight-item__value--ok") {
+                                +"${enabledProviders.size} enabled"
+                            }
+                            span("insight-item__hint") {
+                                +enabledProviders.joinToString(" \u00b7 ") { provider ->
+                                    provider.displayName?.takeIf { it.isNotBlank() } ?: provider.provider.value
+                                }
+                            }
+                        }
+                    }
                     span("insight-item__arrow") {
                         +"Add provider"
                         inlineSvgIcon("arrow-small", "arrow")
@@ -182,7 +206,7 @@ internal fun workspaceDetailPageImpl(
                                     style = "width:210px;"
                                     +"Client ID"
                                 }
-                                th { +"Name" }
+                                th { +EnglishStrings.COL_NAME }
                                 th {
                                     style = "width:110px;"
                                     +"Type"
@@ -205,24 +229,8 @@ internal fun workspaceDetailPageImpl(
                                         ) { +app.clientId }
                                     }
                                     td { span("data-table__name") { +app.name } }
-                                    td {
-                                        span("badge badge--public") {
-                                            +app.accessType.label.uppercase()
-                                        }
-                                    }
-                                    td {
-                                        if (app.enabled) {
-                                            span("badge badge--active") {
-                                                span("badge__dot") {}
-                                                +"ACTIVE"
-                                            }
-                                        } else {
-                                            span("badge badge--inactive") {
-                                                span("badge__dot") {}
-                                                +"DISABLED"
-                                            }
-                                        }
-                                    }
+                                    td { accessTypeLabel(app.accessType) }
+                                    td { applicationStatus(app.enabled) }
                                     td {
                                         div("data-table__actions") {
                                             a(
@@ -231,8 +239,7 @@ internal fun workspaceDetailPageImpl(
                                                         "/applications/${app.clientId}",
                                                 classes = "btn btn--ghost btn--sm",
                                             ) {
-                                                +"Open"
-                                                inlineSvgIcon("open-sm", "open")
+                                                +EnglishStrings.ACTION_VIEW_DETAIL
                                             }
                                         }
                                     }
@@ -283,8 +290,7 @@ internal fun createWorkspacePageImpl(
             workspaceName = "KotAuth",
             workspaceSlug = null,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner content-inner--wide") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -311,7 +317,7 @@ internal fun createWorkspacePageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────
@@ -416,7 +422,7 @@ internal fun workspaceSettingsPageImpl(
     {
         val slug = workspace.slug
         adminShell(
-            pageTitle = "General Settings — ${workspace.displayName}",
+            pageTitle = "General Settings · ${workspace.displayName}",
             activeRail = "settings",
             activeAppSection = "general",
             allWorkspaces = allWorkspaces,
@@ -424,9 +430,8 @@ internal fun workspaceSettingsPageImpl(
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_SETTINGS_SAVED else null,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -453,7 +458,7 @@ internal fun workspaceSettingsPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(
@@ -584,7 +589,7 @@ internal fun securityPolicyPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Security Policy — ${workspace.displayName}",
+            pageTitle = "Security Policy · ${workspace.displayName}",
             activeRail = "security",
             activeAppSection = "security",
             allWorkspaces = allWorkspaces,
@@ -592,9 +597,8 @@ internal fun securityPolicyPageImpl(
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
             toastMessage = if (savedParam == "true") EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -620,7 +624,7 @@ internal fun securityPolicyPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Form (wraps both cards) ──────────────────────────────
@@ -752,6 +756,31 @@ internal fun securityPolicyPageImpl(
                     }
                 }
 
+                // ── Sign-In Identifier ───────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_SECTION }
+                    div("radio-group") {
+                        loginIdentifierRow(
+                            workspace.securityConfig.loginIdentifierMode,
+                            LoginIdentifierMode.USERNAME,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_USERNAME_LABEL,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_USERNAME_DESC,
+                        )
+                        loginIdentifierRow(
+                            workspace.securityConfig.loginIdentifierMode,
+                            LoginIdentifierMode.EMAIL,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EMAIL_LABEL,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EMAIL_DESC,
+                        )
+                        loginIdentifierRow(
+                            workspace.securityConfig.loginIdentifierMode,
+                            LoginIdentifierMode.EITHER,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EITHER_LABEL,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EITHER_DESC,
+                        )
+                    }
+                }
+
                 // ── Account Lockout ──────────────────────────────────
                 div("ov-card") {
                     div("ov-card__section-label") { +"Account Lockout" }
@@ -818,7 +847,7 @@ internal fun securityPolicyPageImpl(
                             span("check-row__desc") {
                                 +"Checks new passwords against the Have I Been Pwned breach corpus "
                                 +"using k-Anonymity (only the first 5 chars of the SHA-1 hash leave "
-                                +"the server). Fails open if HIBP is unreachable — registrations "
+                                +"the server). Fails open if HIBP is unreachable, so registrations "
                                 +"will not be blocked by outages."
                             }
                         }
@@ -841,7 +870,7 @@ internal fun brandingPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "Branding — ${workspace.displayName}",
+            pageTitle = "Branding · ${workspace.displayName}",
             activeRail = "settings",
             activeAppSection = "branding",
             allWorkspaces = allWorkspaces,
@@ -849,9 +878,8 @@ internal fun brandingPageImpl(
             workspaceSlug = workspace.slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_BRANDING_SAVED else null,
-) {
+        ) {
             div("content-inner content-inner--wide") {
             val t = workspace.theme
             val slug = workspace.slug
@@ -881,7 +909,7 @@ internal fun brandingPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Two-column layout ──────────────────────────────────
@@ -899,9 +927,10 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-form") {
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
-                            div("edit-row") {
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
+                            div("edit-col") {
                                 span("edit-row__label") { +"Logo URL" }
                                 div {
                                     input(type = InputType.url, name = "themeLogoUrl") {
@@ -916,7 +945,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Favicon URL" }
                                 div {
                                     input(type = InputType.url, name = "themeFaviconUrl") {
@@ -930,14 +959,14 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Accent Color" }
                                 div {
                                     colorField("Accent", "accent", "themeAccentColor", t.accentColor)
                                 }
                             }
                             val eb = workspace.emailBranding
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Support email" }
                                 div {
                                     input(type = InputType.email, name = "emailSupportEmail") {
@@ -952,13 +981,14 @@ internal fun brandingPageImpl(
                             }
                         }
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
-                            div("edit-row") {
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
+                            div("edit-col") {
                                 span("edit-row__label") { +"Theme Preset" }
                                 div("preset-group") {
                                     button(type = ButtonType.button) {
-                                        classes = setOf("preset-btn", "preset-btn--active")
+                                        classes = setOf("preset-btn")
                                         attributes["data-preset"] = "dark"
                                         +"Dark"
                                     }
@@ -974,7 +1004,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Colors" }
                                 div("color-grid") {
                                     colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
@@ -987,7 +1017,7 @@ internal fun brandingPageImpl(
                                     colorField("Text Muted", "muted", "themeTextMuted", t.textMuted)
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Font Family" }
                                 val fontOptions = listOf(
                                     "Inter",
@@ -1008,7 +1038,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Border Radius" }
                                 div {
                                     div("preset-group") {
@@ -1034,7 +1064,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Language" }
                                 div {
                                     select {
@@ -1061,6 +1091,54 @@ internal fun brandingPageImpl(
                                 }
                             }
                         }
+
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_TITLE }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_FIELD }
+                                div {
+                                    select {
+                                        id = "themeLoginLayout"
+                                        name = "themeLoginLayout"
+                                        classes = setOf("edit-row__field")
+                                        LoginLayout.entries.forEach { layout ->
+                                            option {
+                                                value = layout.name
+                                                if (layout == t.loginLayout) selected = true
+                                                +layout.name.lowercase().replaceFirstChar { it.uppercase() }
+                                            }
+                                        }
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_DESC }
+                                }
+                            }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_FIELD }
+                                div {
+                                    input(type = InputType.text, name = "themeLoginTagline") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-login-tagline"
+                                        value = t.loginTagline ?: ""
+                                        placeholder = workspace.displayName
+                                        attributes["maxlength"] = "200"
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_HINT }
+                                }
+                            }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_BG_FIELD }
+                                div {
+                                    input(type = InputType.url, name = "themeLoginBackgroundUrl") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-login-bg"
+                                        value = t.loginBackgroundUrl ?: ""
+                                        placeholder = "https://cdn.example.com/hero.jpg"
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_BG_HINT }
+                                }
+                            }
+                        }
                     }
 
                     // ══════════════════════════════════════════════
@@ -1068,15 +1146,33 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-preview") {
                         div("preview-panel") {
-                            div("preview-panel__header") {
-                                +"Preview"
-                                span("preview-panel__label") { +"Live — updates as you edit" }
-                            }
+                            div("preview-panel__header") { +"Preview" }
                             div("preview-panel__body") {
                                 id = "preview-body"
                                 style = "background:${t.bgDeep};"
 
-                                div("auth-mock") {
+                                div {
+                                    val mockClasses =
+                                        if (t.loginLayout == LoginLayout.SPLIT) {
+                                            "auth-mock auth-mock--split"
+                                        } else {
+                                            "auth-mock"
+                                        }
+                                    classes = setOf(*mockClasses.split(" ").toTypedArray())
+                                    id = "preview-mock"
+
+                                    aside("auth-mock__panel") {
+                                        id = "preview-panel-split"
+                                        val bg = t.loginBackgroundUrl
+                                        if (!bg.isNullOrBlank()) {
+                                            style = "background-image:url('${bg.replace("'", "%27")}');"
+                                        }
+                                        p("auth-mock__panel-tagline") {
+                                            id = "preview-panel-tagline"
+                                            +(t.loginTagline ?: workspace.displayName)
+                                        }
+                                    }
+
                                     div("auth-mock__card") {
                                         id = "preview-card"
                                         style = "--pm-accent:${t.accentColor};--pm-accent-fg:${t.accentForeground};--pm-card:${t.surface};--pm-input:${t.bgInput};--pm-border:${t.borderColor};--pm-text:${t.textPrimary};--pm-muted:${t.textMuted};--pm-radius:${t.borderRadius};"
@@ -1153,6 +1249,26 @@ private fun DIV.colorField(label: String, key: String, formName: String, current
                 maxLength = "7"
                 attributes["data-hex-key"] = key
             }
+        }
+    }
+}
+
+// ── Sign-in identifier row helper ────────────────────────────────────────
+// One radio row in the Sign-In Identifier ov-card, mirroring the MFA policy radio group.
+private fun FlowContent.loginIdentifierRow(
+    current: LoginIdentifierMode,
+    mode: LoginIdentifierMode,
+    label: String,
+    description: String,
+) {
+    label("radio-row") {
+        input(type = InputType.radio, name = "loginIdentifierMode") {
+            value = mode.name
+            if (current == mode) checked = true
+        }
+        div("radio-row__body") {
+            span("radio-row__label") { +label }
+            span("radio-row__desc") { +description }
         }
     }
 }

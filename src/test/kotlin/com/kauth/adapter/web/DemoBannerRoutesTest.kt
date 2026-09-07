@@ -43,8 +43,9 @@ class DemoBannerRoutesTest {
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
             assertTrue(body.contains("demo-banner"), "Banner div should be present")
-            assertTrue(body.contains("badge badge--warn"), "Demo badge should be rendered")
-            assertTrue(body.contains("sarah.chen"), "Acme credentials should appear")
+            assertTrue(body.contains("role=\"status\""), "Banner should announce status via role")
+            assertTrue(body.contains("aria-label=\"Demo mode\""), "Banner should label itself for screen readers")
+            assertFalse(body.contains("sarah.chen"), "Credentials live in the demo docs repo, not the UI")
         }
 
     @Test

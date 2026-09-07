@@ -1,8 +1,11 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -16,7 +19,45 @@ data class ApplicationPrefill(
     val description: String = "",
     val accessType: String = "public",
     val redirectUris: String = "", // newline-separated URIs
+    val grantTypes: Set<GrantType> = setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN),
+    val audience: String = "",
 )
+
+private fun grantTypeHint(grant: GrantType): String =
+    when (grant) {
+        GrantType.AUTHORIZATION_CODE -> EnglishStrings.GRANT_AUTHORIZATION_CODE_HINT
+        GrantType.CLIENT_CREDENTIALS -> EnglishStrings.GRANT_CLIENT_CREDENTIALS_HINT
+        GrantType.REFRESH_TOKEN -> EnglishStrings.GRANT_REFRESH_TOKEN_HINT
+    }
+
+// Grant-type checkbox group shared by the create and edit forms. All grants are selectable
+// regardless of access type — the client_credentials + confidential constraint is stated in
+// its hint and enforced server-side, since disabling the checkbox would block picking
+// "Confidential" and "client_credentials" together in a single submit.
+private fun DIV.grantTypeCheckboxes(
+    formId: String,
+    selected: Set<GrantType>,
+) {
+    div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.GRANT_TYPES_LABEL }
+        div {
+            GrantType.entries.forEach { grant ->
+                label("check-row") {
+                    input(type = InputType.checkBox, name = "grantTypes") {
+                        attributes["form"] = formId
+                        attributes["value"] = grant.value
+                        if (grant in selected) checked = true
+                    }
+                    div("check-row__body") {
+                        span("check-row__label") { +grant.label }
+                        span("check-row__desc") { +grantTypeHint(grant) }
+                    }
+                }
+            }
+            div("edit-row__hint") { +EnglishStrings.GRANT_TYPES_HINT }
+        }
+    }
+}
 
 internal fun applicationDetailPageImpl(
     workspace: Tenant,
@@ -28,11 +69,14 @@ internal fun applicationDetailPageImpl(
     defaultRoles: List<Role> = emptyList(),
     // Tenant-scoped + this app's client-scoped roles, minus those already set.
     availableDefaultRoles: List<Role> = emptyList(),
+    // Null when the resource-server feature is disabled — the card is omitted rather than
+    // linking to a route that doesn't exist.
+    authorizedApis: List<ResourceServer>? = null,
 ): HTML.() -> Unit =
     {
         val appPairs = allApps.map { it.clientId to it.name }
         adminShell(
-            pageTitle = "${application.name} — ${workspace.displayName}",
+            pageTitle = "${application.name} · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -42,8 +86,7 @@ internal fun applicationDetailPageImpl(
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -71,11 +114,7 @@ internal fun applicationDetailPageImpl(
                         }
                         div("page-header__meta") {
                             span("badge badge--id") { +application.clientId }
-                            when (application.accessType) {
-                                AccessType.PUBLIC -> span("badge badge--public") { +"Public" }
-                                AccessType.CONFIDENTIAL -> span("badge badge--confidential") { +"Confidential" }
-                                AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
-                            }
+                            accessTypeLabel(application.accessType)
                         }
                     }
                 }
@@ -93,8 +132,11 @@ internal fun applicationDetailPageImpl(
 
             // ── New secret banner (shown once after regeneration) ────
             if (newSecret != null) {
-                div("notice notice--success") {
-                    p { +"New Client Secret — copy it now. You will not see it again." }
+                notice(modifier = "notice--success", iconName = "check-circle") {
+                    p {
+                        +"New client secret. "
+                        +EnglishStrings.SECRET_SHOWN_ONCE
+                    }
                     div("copy-field") {
                         span("copy-field__value") { +newSecret }
                         button(type = ButtonType.button) {
@@ -118,10 +160,17 @@ internal fun applicationDetailPageImpl(
                     ovRowMuted("Description", application.description)
                 }
                 ovRow("Access Type") {
-                    when (application.accessType) {
-                        AccessType.PUBLIC -> span("badge badge--public") { +"Public" }
-                        AccessType.CONFIDENTIAL -> span("badge badge--confidential") { +"Confidential" }
-                        AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
+                    accessTypeLabel(application.accessType)
+                }
+                ovRow(EnglishStrings.GRANT_TYPES_LABEL) {
+                    if (application.grantTypes.isEmpty()) {
+                        span("ov-card__value--muted") { +"None" }
+                    } else {
+                        div("badge-row") {
+                            application.grantTypes.forEach { grant ->
+                                span("badge badge--muted") { +grant.label }
+                            }
+                        }
                     }
                 }
                 ovRow("Workspace") {
@@ -160,6 +209,41 @@ internal fun applicationDetailPageImpl(
                     application.redirectUris.forEach { uri ->
                         div("ov-card__row") {
                             span("ov-card__value ov-card__value--mono") { +uri }
+                        }
+                    }
+                }
+            }
+
+            // ── Authorized APIs ──────────────────────────────────────
+            if (authorizedApis != null) {
+                val authorizedApisHref =
+                    "/admin/workspaces/${workspace.slug}/applications/" +
+                        "${application.clientId}/authorized-apis"
+                div("ov-card") {
+                    div("ov-card__section-label") {
+                        +EnglishStrings.AUTHORIZED_APIS_CARD_TITLE
+                        a(
+                            href = authorizedApisHref,
+                            classes = "btn btn--ghost btn--sm",
+                        ) { +EnglishStrings.AUTHORIZED_APIS_CARD_ACTION }
+                    }
+                    if (authorizedApis.isEmpty()) {
+                        emptyState(
+                            iconName = "code",
+                            title = EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY_TITLE,
+                            description = EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY,
+                        ) {
+                            a(
+                                href = authorizedApisHref,
+                                classes = "empty-state__cta",
+                            ) { +EnglishStrings.AUTHORIZED_APIS_CARD_ACTION }
+                        }
+                    } else {
+                        authorizedApis.forEach { rs ->
+                            div("ov-card__row") {
+                                span("ov-card__value") { +rs.name }
+                                span("ov-card__value ov-card__value--mono") { +rs.identifier }
+                            }
                         }
                     }
                 }
@@ -215,7 +299,7 @@ internal fun applicationDetailPageImpl(
                 if (defaultRoles.isEmpty()) {
                     p("edit-row__hint") {
                         style = "padding:8px 16px 12px;"
-                        +"No default roles configured — roles added here are granted "
+                        +"No default roles configured. Roles added here are granted "
                         +"automatically to users who self-register through this app."
                     }
                 } else {
@@ -286,11 +370,21 @@ internal fun applicationDetailPageImpl(
 
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
+                div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                 div("danger-zone") {
                     dangerZoneCard(
-                        title = "Disable this application",
-                        description = "All login attempts will be rejected. This can be reversed at any time.",
+                        title =
+                            if (application.enabled) {
+                                "Disable this application"
+                            } else {
+                                "Enable this application"
+                            },
+                        description =
+                            if (application.enabled) {
+                                "All login attempts will be rejected. This can be reversed at any time."
+                            } else {
+                                "Login attempts are being rejected. Enabling accepts them again."
+                            },
                     ) {
                         postButton(
                             action = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/toggle",
@@ -331,7 +425,7 @@ internal fun createApplicationPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "New Application — ${workspace.displayName}",
+            pageTitle = "New Application · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -339,7 +433,6 @@ internal fun createApplicationPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             showSidebar = false,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -370,7 +463,7 @@ internal fun createApplicationPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────
@@ -392,7 +485,7 @@ internal fun createApplicationPageImpl(
                                 placeholder = "my-frontend"
                                 required = true
                                 value = prefill.clientId
-                                attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                                attributes["pattern"] = "[a-z0-9-]+"
                             }
                             div("edit-row__hint") {
                                 +"Unique identifier, e.g. my-frontend. Immutable after creation."
@@ -437,17 +530,17 @@ internal fun createApplicationPageImpl(
                         option {
                             value = "public"
                             selected = (prefill.accessType == "public")
-                            +"Public — browser / SPA / mobile (no secret)"
+                            +"Public (browser, SPA or mobile app, no secret)"
                         }
                         option {
                             value = "confidential"
                             selected = (prefill.accessType == "confidential")
-                            +"Confidential — server-side app with a secret"
+                            +"Confidential (server-side app with a secret)"
                         }
                         option {
                             value = "bearer_only"
                             selected = (prefill.accessType == "bearer_only")
-                            +"Bearer Only — resource server (validates tokens only)"
+                            +"Bearer only (resource server, validates tokens only)"
                         }
                     }
                 }
@@ -467,6 +560,27 @@ internal fun createApplicationPageImpl(
                         div("edit-row__hint") {
                             +"One URI per line. Their origins are automatically CORS-allowed "
                             +"for SPAs in this workspace."
+                        }
+                    }
+                }
+                grantTypeCheckboxes(
+                    formId = "create-app-form",
+                    selected = prefill.grantTypes,
+                )
+                div("edit-row") {
+                    span("edit-row__label") { +EnglishStrings.APPLICATION_AUDIENCE_LABEL }
+                    div {
+                        input(type = InputType.text, name = "audience") {
+                            attributes["form"] = "create-app-form"
+                            classes = setOf("edit-row__field", "edit-row__field--mono")
+                            this.id = "audience"
+                            placeholder = EnglishStrings.APPLICATION_AUDIENCE_PLACEHOLDER
+                            value = prefill.audience
+                        }
+                        div("edit-row__hint") {
+                            +EnglishStrings.APPLICATION_AUDIENCE_HINT_PREFIX
+                            code { +EnglishStrings.APPLICATION_AUDIENCE_HINT_CLAIM }
+                            +EnglishStrings.APPLICATION_AUDIENCE_HINT_SUFFIX
                         }
                     }
                 }
@@ -497,8 +611,7 @@ internal fun editApplicationPageImpl(
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -529,7 +642,7 @@ internal fun editApplicationPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────
@@ -551,7 +664,7 @@ internal fun editApplicationPageImpl(
                                 value = application.clientId
                             }
                             div("edit-row__hint") {
-                                +"Client ID is immutable — it may appear in issued tokens."
+                                +"Client ID is immutable, because it may appear in issued tokens."
                             }
                         }
                     }
@@ -592,17 +705,17 @@ internal fun editApplicationPageImpl(
                         option {
                             value = "public"
                             selected = (application.accessType == AccessType.PUBLIC)
-                            +"Public — browser / SPA / mobile (no secret)"
+                            +"Public (browser, SPA or mobile app, no secret)"
                         }
                         option {
                             value = "confidential"
                             selected = (application.accessType == AccessType.CONFIDENTIAL)
-                            +"Confidential — server-side app with a secret"
+                            +"Confidential (server-side app with a secret)"
                         }
                         option {
                             value = "bearer_only"
                             selected = (application.accessType == AccessType.BEARER_ONLY)
-                            +"Bearer Only — resource server (validates tokens only)"
+                            +"Bearer only (resource server, validates tokens only)"
                         }
                     }
                 }
@@ -625,20 +738,24 @@ internal fun editApplicationPageImpl(
                         }
                     }
                 }
+                grantTypeCheckboxes(
+                    formId = "edit-app-form",
+                    selected = application.grantTypes,
+                )
                 div("edit-row") {
-                    span("edit-row__label") { +"Token Audience" }
+                    span("edit-row__label") { +EnglishStrings.APPLICATION_AUDIENCE_LABEL }
                     div {
                         input(type = InputType.text, name = "audience") {
                             attributes["form"] = "edit-app-form"
                             classes = setOf("edit-row__field", "edit-row__field--mono")
                             this.id = "audience"
-                            placeholder = "https://api.example.com"
+                            placeholder = EnglishStrings.APPLICATION_AUDIENCE_PLACEHOLDER
                             value = application.audience ?: ""
                         }
                         div("edit-row__hint") {
-                            +"Sets the "
-                            code { +"aud" }
-                            +" claim in issued JWTs. Leave blank to use the client ID as the audience."
+                            +EnglishStrings.APPLICATION_AUDIENCE_HINT_PREFIX
+                            code { +EnglishStrings.APPLICATION_AUDIENCE_HINT_CLAIM }
+                            +EnglishStrings.APPLICATION_AUDIENCE_HINT_SUFFIX
                         }
                     }
                 }

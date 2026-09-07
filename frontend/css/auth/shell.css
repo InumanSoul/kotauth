@@ -23,3 +23,92 @@ body {
   overflow: hidden;
   view-transition-name: auth-card;
 }
+
+/* ------- SPLIT layout (v1.21.0) ------- */
+
+.shell--split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  align-items: stretch;
+}
+
+.shell--split .shell__panel {
+  background-color: var(--color-accent);
+  background-size: cover;
+  background-position: center;
+  color: var(--color-accent-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  height: 100%;
+}
+
+.shell--split .shell__panel-inner {
+  max-width: 400px;
+}
+
+.shell--split .shell__tagline {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+}
+
+/* Right column: three rows — brand top, form centered, copyright bottom. */
+.shell--split .shell__form {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 2.5rem 3rem;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.shell--split .shell__form > .brand {
+  text-align: left;
+  margin: 0;
+  align-self: start;
+}
+
+/* The card loses its container chrome — it becomes the panel content itself. */
+.shell--split .shell__form > .card {
+  background: transparent;
+  border: none;
+  padding: 0;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+  align-self: center;
+}
+
+.shell--split .shell__form > .copyright {
+  align-self: end;
+  margin: 0;
+  padding-top: 1.5rem;
+}
+
+/* Responsive collapse: single column on narrow viewports. */
+@media (max-width: 640px) {
+  .shell--split {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .shell--split .shell__panel {
+    min-height: 200px;
+    padding: 2rem 1.5rem;
+    height: auto;
+  }
+
+  .shell--split .shell__form {
+    padding: 2rem 1.5rem;
+    overflow-y: visible;
+    height: auto;
+  }
+}

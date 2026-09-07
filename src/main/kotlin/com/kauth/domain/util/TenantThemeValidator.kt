@@ -29,6 +29,12 @@ fun validateTenantTheme(theme: TenantTheme): String? {
     if (theme.faviconUrl != null && !isHttpUrl(theme.faviconUrl)) {
         return "faviconUrl must be an http or https URL"
     }
+    if (theme.loginBackgroundUrl != null && !isHttpUrl(theme.loginBackgroundUrl)) {
+        return "loginBackgroundUrl must be an http or https URL"
+    }
+    if (theme.loginTagline != null && theme.loginTagline.length > 200) {
+        return "loginTagline must be 200 characters or fewer"
+    }
     if (theme.defaultLocale != null && !LOCALE_PATTERN.matches(theme.defaultLocale)) {
         return "defaultLocale must be a BCP-47 code like \"en\" or \"en-US\""
     }

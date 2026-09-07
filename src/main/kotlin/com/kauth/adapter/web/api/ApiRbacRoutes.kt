@@ -232,6 +232,50 @@ internal fun Route.apiRbacRoutes(
                     call.respond(HttpStatusCode.NoContent, "")
                 }
             }
+
+            route("/roles") {
+                // {roleRef} accepts either a numeric role id or a role name —
+                // see RoleGroupService.resolveRole.
+                post("/{roleRef}") {
+                    requireScope(call, ApiScope.ROLES_WRITE) ?: return@post
+                    val tenantId = call.attributes[TenantIdAttr]
+                    val groupId = call.parseGroupIdOr { return@post } ?: return@post
+                    val roleRef =
+                        call.parameters["roleRef"]
+                            ?: return@post call.respondProblem(HttpStatusCode.BadRequest, "Missing role", "")
+                    when (val resolved = roleGroupService.resolveRole(tenantId, roleRef)) {
+                        is AdminResult.Success ->
+                            when (
+                                val assigned =
+                                    roleGroupService.assignRoleToGroup(groupId, resolved.value.id!!, tenantId)
+                            ) {
+                                is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                                is AdminResult.Failure -> call.respondAdminError(assigned.error)
+                            }
+                        is AdminResult.Failure -> call.respondAdminError(resolved.error)
+                    }
+                }
+
+                delete("/{roleRef}") {
+                    requireScope(call, ApiScope.ROLES_WRITE) ?: return@delete
+                    val tenantId = call.attributes[TenantIdAttr]
+                    val groupId = call.parseGroupIdOr { return@delete } ?: return@delete
+                    val roleRef =
+                        call.parameters["roleRef"]
+                            ?: return@delete call.respondProblem(HttpStatusCode.BadRequest, "Missing role", "")
+                    when (val resolved = roleGroupService.resolveRole(tenantId, roleRef)) {
+                        is AdminResult.Success ->
+                            when (
+                                val removed =
+                                    roleGroupService.unassignRoleFromGroup(groupId, resolved.value.id!!, tenantId)
+                            ) {
+                                is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                                is AdminResult.Failure -> call.respondAdminError(removed.error)
+                            }
+                        is AdminResult.Failure -> call.respondAdminError(resolved.error)
+                    }
+                }
+            }
         }
     }
 }

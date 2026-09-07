@@ -1,6 +1,8 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.admin.resolvedBaseUrl
+import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.ResourceServerRepository
@@ -15,6 +17,7 @@ import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.queryString
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -234,7 +237,7 @@ internal fun Route.oauthProtocolRoutes(
                 val registered = q["registered"] == "true"
                 val enabledProviders =
                     if (tenant != null && identityProviderRepository != null) {
-                        identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                        identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
                     } else {
                         emptyList()
                     }
@@ -251,6 +254,8 @@ internal fun Route.oauthProtocolRoutes(
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
+                        loginIdentifierMode =
+                            tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME,
                     ),
                 )
                 return@get
@@ -299,6 +304,32 @@ internal fun Route.oauthProtocolRoutes(
                     "error" to "invalid_request",
                     "error_description" to "Invalid redirect_uri for client",
                 ),
+            )
+            return@get
+        }
+
+        // RFC 6749 §4.1.2.1: refuse a client that isn't registered for authorization_code
+        // before the login page is ever rendered, instead of collecting the user's password
+        // and MFA only to fail at code issuance.
+        if (!oauthService.clientHasGrant(slug, clientId, GrantType.AUTHORIZATION_CODE)) {
+            if (!redirectUriTrusted) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "invalid_request",
+                        "error_description" to "Invalid redirect_uri for client",
+                    ),
+                )
+                return@get
+            }
+            call.respondRedirect(
+                buildString {
+                    append(redirectUri)
+                    append("?error=unauthorized_client")
+                    append("&error_description=")
+                        .append(encodeParam("Client is not registered for the authorization_code grant"))
+                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+                },
             )
             return@get
         }
@@ -390,7 +421,7 @@ internal fun Route.oauthProtocolRoutes(
                             codeChallengeMethod = codeChallengeMethod,
                             nonce = nonce,
                             state = state,
-                            ipAddress = call.request.local.remoteAddress,
+                            ipAddress = call.request.origin.remoteAddress,
                             authTime = sso.authTime,
                             resources = resolvedResources,
                         )
@@ -438,7 +469,7 @@ internal fun Route.oauthProtocolRoutes(
         val enabledProviders =
             identityProviderRepository
                 ?.findEnabledByTenant(tenant.id)
-                ?.map { it.provider } ?: emptyList()
+                ?.asLoginProviders() ?: emptyList()
 
         call.respondHtml(
             HttpStatusCode.OK,
@@ -452,6 +483,7 @@ internal fun Route.oauthProtocolRoutes(
                 passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                 emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                 passkeysEnabled = tenant.passkeysEnabled,
+                loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
             ),
         )
     }
@@ -460,12 +492,12 @@ internal fun Route.oauthProtocolRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         val userAgent = call.request.headers["User-Agent"]
 
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
             } else {
                 emptyList()
             }
@@ -485,6 +517,8 @@ internal fun Route.oauthProtocolRoutes(
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
+                    loginIdentifierMode =
+                        tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME,
                 ),
             )
         }
@@ -516,6 +550,8 @@ internal fun Route.oauthProtocolRoutes(
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
+                        loginIdentifierMode =
+                            tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME,
                     ),
                 )
             }
@@ -555,6 +591,7 @@ internal fun Route.oauthProtocolRoutes(
                                     passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                                     emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                                     passkeysEnabled = tenant.passkeysEnabled,
+                                    loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
                                 ),
                             )
                         }
@@ -602,6 +639,7 @@ internal fun Route.oauthProtocolRoutes(
                                 passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                                 emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                                 passkeysEnabled = tenant.passkeysEnabled,
+                                loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
                             ),
                         )
                     },
@@ -612,7 +650,7 @@ internal fun Route.oauthProtocolRoutes(
 
     post("/protocol/openid-connect/token") {
         val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
 
         if (!tokenRateLimiter.isAllowed("token:$ipAddress:$slug")) {
             return@post call.respond(
@@ -839,7 +877,7 @@ internal fun Route.oauthProtocolRoutes(
 
             if (bearerToken != null) {
                 val revokeAll = call.request.queryParameters["global_logout"] == "true"
-                oauthService.endSession(bearerToken, revokeAll, call.request.local.remoteAddress)
+                oauthService.endSession(bearerToken, revokeAll, call.request.origin.remoteAddress)
             }
 
             // OIDC end_session must also kill the SSO witness — otherwise the
@@ -862,7 +900,7 @@ internal fun Route.oauthProtocolRoutes(
 
             if (token != null) {
                 val revokeAll = params["global_logout"] == "true"
-                oauthService.endSession(token, revokeAll, call.request.local.remoteAddress)
+                oauthService.endSession(token, revokeAll, call.request.origin.remoteAddress)
             }
 
             call.clearSsoCookie(slug)

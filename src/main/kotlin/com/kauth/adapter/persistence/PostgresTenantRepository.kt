@@ -1,5 +1,7 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.LoginIdentifierMode
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SecurityConfig
@@ -133,6 +135,7 @@ class PostgresTenantRepository(
                     it[emailOtpSignupEnabled] = tenant.securityConfig.emailOtpSignupEnabled
                     it[emailOtpLockoutThreshold] = tenant.securityConfig.emailOtpLockoutThreshold
                     it[emailOtpLoginEnabled] = tenant.securityConfig.emailOtpLoginEnabled
+                    it[loginIdentifierMode] = tenant.securityConfig.loginIdentifierMode.name
                 }
             if (updatedRows == 0) {
                 TenantSecurityConfigTable.insert {
@@ -155,6 +158,7 @@ class PostgresTenantRepository(
                     it[emailOtpSignupEnabled] = tenant.securityConfig.emailOtpSignupEnabled
                     it[emailOtpLockoutThreshold] = tenant.securityConfig.emailOtpLockoutThreshold
                     it[emailOtpLoginEnabled] = tenant.securityConfig.emailOtpLoginEnabled
+                    it[loginIdentifierMode] = tenant.securityConfig.loginIdentifierMode.name
                 }
             }
             tenantJoined
@@ -242,6 +246,8 @@ class PostgresTenantRepository(
             emailOtpSignupEnabled = this[TenantSecurityConfigTable.emailOtpSignupEnabled],
             emailOtpLockoutThreshold = this[TenantSecurityConfigTable.emailOtpLockoutThreshold],
             emailOtpLoginEnabled = this[TenantSecurityConfigTable.emailOtpLoginEnabled],
+            loginIdentifierMode =
+                LoginIdentifierMode.fromStorage(this[TenantSecurityConfigTable.loginIdentifierMode]),
         )
     }
 
@@ -275,6 +281,11 @@ class PostgresTenantRepository(
             logoUrl = this[WorkspaceThemeTable.logoUrl],
             faviconUrl = this[WorkspaceThemeTable.faviconUrl],
             defaultLocale = this[WorkspaceThemeTable.defaultLocale],
+            loginLayout =
+                runCatching { LoginLayout.valueOf(this[WorkspaceThemeTable.loginLayout]) }
+                    .getOrDefault(LoginLayout.CENTERED),
+            loginBackgroundUrl = this[WorkspaceThemeTable.loginBackgroundUrl],
+            loginTagline = this[WorkspaceThemeTable.loginTagline],
         )
     }
 

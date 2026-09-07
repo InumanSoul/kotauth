@@ -1,5 +1,6 @@
 package com.kauth.fakes
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
@@ -89,14 +90,26 @@ class FakeSessionRepository : SessionRepository {
 
     override fun findActiveByTenant(
         tenantId: TenantId,
+        userId: UserId?,
+        applicationId: ApplicationId?,
         limit: Int,
         offset: Int,
     ) = store.values
         .filter { it.tenantId == tenantId && it.isActive }
+        .filter { userId == null || it.userId == userId }
+        .filter { applicationId == null || it.clientId == applicationId }
         .drop(offset)
         .take(limit)
 
-    override fun countActiveByTenant(tenantId: TenantId) = store.values.count { it.tenantId == tenantId && it.isActive }
+    override fun countActiveByTenant(
+        tenantId: TenantId,
+        userId: UserId?,
+        applicationId: ApplicationId?,
+    ) = store.values
+        .filter { it.tenantId == tenantId && it.isActive }
+        .filter { userId == null || it.userId == userId }
+        .filter { applicationId == null || it.clientId == applicationId }
+        .size
 
     override fun countActiveByUser(
         tenantId: TenantId,

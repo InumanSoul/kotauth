@@ -52,7 +52,7 @@ fun DIV.updateChip() {
         attributes["data-dismiss-version"] = version
         span("update-chip__dot") { attributes["aria-hidden"] = "true" }
         span("update-chip__label") {
-            if (isSecurity) +"Security update — v$version" else +"v$version available"
+            if (isSecurity) +"Security update: v$version" else +"v$version available"
         }
         if (url != null) {
             a(

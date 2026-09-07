@@ -243,6 +243,7 @@ class WorkspaceSettingsService(
                     emailOtpSignupEnabled = update.emailOtpSignupEnabled,
                     emailOtpLockoutThreshold = update.emailOtpLockoutThreshold.coerceIn(0, 50),
                     emailOtpLoginEnabled = update.emailOtpLoginEnabled,
+                    loginIdentifierMode = update.loginIdentifierMode,
                 ),
             passkeysEnabled = update.passkeysEnabled,
         )
@@ -302,5 +303,8 @@ class WorkspaceSettingsService(
                     ?.trim()
                     ?.lowercase()
                     ?.takeIf { it.isNotBlank() },
+            loginLayout = theme.loginLayout,
+            loginBackgroundUrl = theme.loginBackgroundUrl?.trim()?.takeIf { it.isNotBlank() },
+            loginTagline = theme.loginTagline?.trim()?.takeIf { it.isNotBlank() },
         )
 }

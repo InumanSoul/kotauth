@@ -1,5 +1,6 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.ThemeRepository
@@ -50,6 +51,9 @@ class PostgresThemeRepository : ThemeRepository {
                     it[logoUrl] = theme.logoUrl
                     it[faviconUrl] = theme.faviconUrl
                     it[defaultLocale] = theme.defaultLocale
+                    it[loginLayout] = theme.loginLayout.name
+                    it[loginBackgroundUrl] = theme.loginBackgroundUrl
+                    it[loginTagline] = theme.loginTagline
                     it[updatedAt] = OffsetDateTime.now()
                 }
             } else {
@@ -69,6 +73,9 @@ class PostgresThemeRepository : ThemeRepository {
                     it[logoUrl] = theme.logoUrl
                     it[faviconUrl] = theme.faviconUrl
                     it[defaultLocale] = theme.defaultLocale
+                    it[loginLayout] = theme.loginLayout.name
+                    it[loginBackgroundUrl] = theme.loginBackgroundUrl
+                    it[loginTagline] = theme.loginTagline
                     it[createdAt] = OffsetDateTime.now()
                     it[updatedAt] = OffsetDateTime.now()
                 }
@@ -92,5 +99,10 @@ class PostgresThemeRepository : ThemeRepository {
             logoUrl = this[WorkspaceThemeTable.logoUrl],
             faviconUrl = this[WorkspaceThemeTable.faviconUrl],
             defaultLocale = this[WorkspaceThemeTable.defaultLocale],
+            loginLayout =
+                runCatching { LoginLayout.valueOf(this[WorkspaceThemeTable.loginLayout]) }
+                    .getOrDefault(LoginLayout.CENTERED),
+            loginBackgroundUrl = this[WorkspaceThemeTable.loginBackgroundUrl],
+            loginTagline = this[WorkspaceThemeTable.loginTagline],
         )
 }

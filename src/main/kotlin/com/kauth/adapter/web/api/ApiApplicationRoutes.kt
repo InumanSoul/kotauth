@@ -2,18 +2,21 @@ package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.ApplicationManagementService
 import com.kauth.domain.service.RoleGroupService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
@@ -55,6 +58,42 @@ internal fun Route.apiApplicationRoutes(
             call.respond(HttpStatusCode.OK, app.toApiDto())
         }
 
+        post {
+            requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@post
+            val tenantId = call.attributes[TenantIdAttr]
+            val body = call.receive<CreateApplicationRequest>()
+            val grantTypes =
+                if (body.grantTypes != null) {
+                    call.parseGrantTypesOrRespondInvalid(body.grantTypes) ?: return@post
+                } else {
+                    setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN)
+                }
+
+            when (
+                val result =
+                    applicationManagementService.createApplication(
+                        tenantId = tenantId,
+                        clientId = body.clientId,
+                        name = body.name,
+                        description = body.description,
+                        accessType = body.accessType,
+                        redirectUris = body.redirectUris,
+                        grantTypes = grantTypes,
+                    )
+            ) {
+                is AdminResult.Failure -> call.respondAdminError(result.error)
+                is AdminResult.Success -> {
+                    call.respond(
+                        HttpStatusCode.Created,
+                        CreateApplicationResponse(
+                            application = result.value.application.toApiDto(),
+                            clientSecret = result.value.plaintextSecret,
+                        ),
+                    )
+                }
+            }
+        }
+
         put("/{appId}") {
             requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@put
             val tenantId = call.attributes[TenantIdAttr]
@@ -62,6 +101,12 @@ internal fun Route.apiApplicationRoutes(
                 call.parameters["appId"]?.toIntOrNull()?.let { ApplicationId(it) }
                     ?: return@put call.respondProblem(HttpStatusCode.BadRequest, "Invalid application ID", "")
             val body = call.receive<UpdateApplicationRequest>()
+            val grantTypes =
+                if (body.grantTypes != null) {
+                    call.parseGrantTypesOrRespondInvalid(body.grantTypes) ?: return@put
+                } else {
+                    null
+                }
             when (
                 val result =
                     applicationManagementService.updateApplication(
@@ -71,6 +116,7 @@ internal fun Route.apiApplicationRoutes(
                         description = body.description,
                         accessType = body.accessType,
                         redirectUris = body.redirectUris,
+                        grantTypes = grantTypes,
                         audience = body.audience,
                     )
             ) {
@@ -87,10 +133,27 @@ internal fun Route.apiApplicationRoutes(
                     ?: return@delete call.respondProblem(
                         HttpStatusCode.BadRequest,
                         "Invalid application ID",
-                        "",
+                        "appId must be an integer.",
                     )
-            when (val result = applicationManagementService.setApplicationEnabled(appId, tenantId, false)) {
+            when (val result = applicationManagementService.deleteApplication(appId, tenantId)) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                is AdminResult.Failure -> call.respondAdminError(result.error)
+            }
+        }
+
+        post("/{appId}/regenerate-secret") {
+            requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@post
+            val tenantId = call.attributes[TenantIdAttr]
+            val appId =
+                call.parameters["appId"]?.toIntOrNull()?.let { ApplicationId(it) }
+                    ?: return@post call.respondProblem(
+                        HttpStatusCode.BadRequest,
+                        "Invalid application ID",
+                        "appId must be an integer.",
+                    )
+            when (val result = applicationManagementService.regenerateClientSecret(appId, tenantId)) {
+                is AdminResult.Success ->
+                    call.respond(HttpStatusCode.Created, ClientSecretResponse(clientSecret = result.value))
                 is AdminResult.Failure -> call.respondAdminError(result.error)
             }
         }
@@ -142,4 +205,24 @@ internal fun Route.apiApplicationRoutes(
             }
         }
     }
+}
+
+/**
+ * Parses raw `grantTypes` strings from a request body into [GrantType]s, or responds 422 and
+ * returns null if any value is unrecognized. Unlike the admin UI form (whose checkboxes only
+ * ever submit values the server itself rendered), a REST caller can send anything — silently
+ * dropping an unrecognized value would create a client with a different grant set than the
+ * caller asked for.
+ */
+private suspend fun ApplicationCall.parseGrantTypesOrRespondInvalid(raw: List<String>): Set<GrantType>? {
+    val unknown = raw.filter { GrantType.fromValue(it) == null }
+    if (unknown.isNotEmpty()) {
+        respondProblem(
+            HttpStatusCode.UnprocessableEntity,
+            "Validation Error",
+            "Unrecognized grant type(s): ${unknown.joinToString(", ")}",
+        )
+        return null
+    }
+    return raw.mapNotNull { GrantType.fromValue(it) }.toSet()
 }

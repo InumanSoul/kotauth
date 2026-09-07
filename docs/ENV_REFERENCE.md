@@ -76,6 +76,30 @@ KAUTH_SECRET_KEY=<openssl rand -hex 32 output>
 
 ---
 
+## Request Limits
+
+### `KAUTH_MAX_REQUEST_BODY_BYTES`
+**Optional.** Default: `2097152` (2 MiB)
+
+Maximum request body size accepted by any endpoint — admin UI, self-service portal, REST API, and SCIM alike. Enforced against the actual bytes read off the wire, not just the `Content-Length` header, so a chunked request (which carries no `Content-Length`) is bounded too. Requests over the limit get `413 Payload Too Large`.
+
+```
+KAUTH_MAX_REQUEST_BODY_BYTES=2097152
+```
+
+---
+
+### `KAUTH_MAX_BACKUP_IMPORT_BODY_BYTES`
+**Optional.** Default: `104857600` (100 MiB)
+
+Separate, higher limit for `POST /admin/api/v1/tenants/import` only — its body is an entire base64-encoded tenant export, which can be far larger than any other JSON payload this server accepts. Every other endpoint still uses `KAUTH_MAX_REQUEST_BODY_BYTES`.
+
+```
+KAUTH_MAX_BACKUP_IMPORT_BODY_BYTES=104857600
+```
+
+---
+
 ## Database
 
 ### `DB_URL`
@@ -159,6 +183,8 @@ DB_PASSWORD=changeme
 **Optional.** Default: `false`
 
 When `true`, Kotauth trusts `X-Forwarded-For` / `X-Forwarded-Proto` headers for client-IP resolution. **Only enable behind a reverse proxy that overwrites these headers** — on a directly-exposed instance, this lets clients spoof their IP to bypass per-IP rate limits on login, token, MFA, and OTP endpoints. The bundled Caddy production setup sets it automatically.
+
+The **last** `X-Forwarded-For` entry is taken as the client address — the one the proxy directly in front observed. Exactly one trusted hop is supported; see [One trusted hop only](deploy/production.md#one-trusted-hop-only).
 
 ```
 KAUTH_TRUSTED_PROXY=true
@@ -289,6 +315,10 @@ KAUTH_DEMO_MODE=true
 | Master (admin console) | `admin` | `Demo1234!` |
 | Acme Corp | `sarah.chen` | `Demo1234!` |
 | Startup Labs | `jordan.lee` | `Demo1234!` |
+
+| M2M client (`client_credentials`) | Client ID | Client secret |
+|---|---|---|
+| Acme Dashboard | `acme-dashboard` | `DemoM2M1234!` |
 
 ---
 

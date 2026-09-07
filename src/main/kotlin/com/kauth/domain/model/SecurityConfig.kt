@@ -37,6 +37,8 @@ data class SecurityConfig(
     // Cross-challenge failed-OTP threshold. 0 disables.
     val emailOtpLockoutThreshold: Int = 5,
     val emailOtpLoginEnabled: Boolean = false,
+    // Which identifier the hosted login form accepts. USERNAME preserves pre-1.24 behaviour.
+    val loginIdentifierMode: LoginIdentifierMode = LoginIdentifierMode.USERNAME,
 ) {
     val isLockoutEnabled: Boolean get() = lockoutMaxAttempts > 0
 }

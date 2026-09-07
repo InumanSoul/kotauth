@@ -8,14 +8,17 @@ import com.kauth.adapter.web.admin.WorkspaceStub
 import com.kauth.adapter.web.admin.adminBackupRoutes
 import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.api.apiRoutes
+import com.kauth.adapter.web.api.respondProblem
 import com.kauth.adapter.web.auth.authRoutes
 import com.kauth.adapter.web.healthRoutes
 import com.kauth.adapter.web.loadAppInfo
 import com.kauth.adapter.web.plugin.buildCspPolicy
+import com.kauth.adapter.web.plugin.requestBodySizeLimitPlugin
 import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.launcherRoutes
 import com.kauth.adapter.web.portal.passkeyPortalRoutes
 import com.kauth.adapter.web.portal.portalRoutes
+import com.kauth.adapter.web.scim.scimAuthError
 import com.kauth.adapter.web.versionCheckRoutes
 import com.kauth.adapter.web.welcomeRoutes
 import com.kauth.config.EnvironmentConfig
@@ -205,6 +208,24 @@ fun main(args: Array<String> = emptyArray()) {
 // Ktor module — plugins + route registration
 // ---------------------------------------------------------------------------
 
+/**
+ * Honors `X-Forwarded-*` from the one hop in front of us, taking the **last** entry.
+ *
+ * Ktor defaults to `useFirstProxy()`, which is the client's own value on any front-end that
+ * *appends* rather than replaces — nginx's `$proxy_add_x_forwarded_for`, most ALBs, Cloudflare —
+ * so every per-IP throttle becomes bypassable by rotating a header. The last entry is the address
+ * the trusted proxy itself observed, which a client cannot forge. Where the proxy replaces the
+ * header instead (the bundled `docker/Caddyfile`) first and last are the same single entry, so
+ * this changes nothing there.
+ *
+ * A chain of more than one trusted hop needs a different offset; see docs/deploy/production.md.
+ *
+ * Shared with the route tests so they exercise the deployed configuration rather than a copy.
+ */
+internal fun Application.installTrustedProxyHeaders() {
+    install(XForwardedHeaders) { useLastProxy() }
+}
+
 fun Application.module(
     s: ServiceGraph,
     appInfo: AppInfo,
@@ -217,7 +238,7 @@ fun Application.module(
     // clients spoof X-Forwarded-For and bypass every per-IP rate limit.
     // Only enable behind a proxy that overwrites these headers (see ENV_REFERENCE).
     if (config.trustedProxy) {
-        install(XForwardedHeaders)
+        installTrustedProxyHeaders()
         startupLog.info("KAUTH_TRUSTED_PROXY=true — honoring X-Forwarded-* headers for client IPs")
     } else {
         startupLog.info("Forwarded headers ignored (KAUTH_TRUSTED_PROXY not set) — using socket peer IPs")
@@ -275,6 +296,11 @@ fun Application.module(
             }
         }
     }
+
+    // Must install before ContentNegotiation — it needs to see the raw body channel before JSON
+    // deserialization consumes it. See RequestBodySizeLimitPlugin.kt for why Content-Length
+    // alone cannot enforce this (chunked requests carry none).
+    install(requestBodySizeLimitPlugin(config.maxRequestBodyBytes))
 
     install(ContentNegotiation) { json() }
 
@@ -336,28 +362,49 @@ fun Application.module(
 
     // -- Error boundary ------------------------------------------------------
     install(StatusPages) {
+        // Kept distinct from the generic Throwable handler below because 413 must use each
+        // surface's own error envelope, not the generic Throwable fallback's OAuth-style JSON —
+        // sending the wrong shape here is the same class of bug already fixed once for passkey
+        // login (see git history: "send publicKey-envelope shape to browser").
+        exception<io.ktor.server.plugins.PayloadTooLargeException> { call, cause ->
+            val path = call.request.path()
+            val detail = cause.message ?: "Request body exceeds the maximum allowed size."
+            when {
+                path.contains("/scim/v2") -> {
+                    val (status, body) = scimAuthError(HttpStatusCode.PayloadTooLarge, detail)
+                    call.respond(status, body)
+                }
+                path.contains("/api/v1") ->
+                    call.respondProblem(HttpStatusCode.PayloadTooLarge, "Payload Too Large", detail)
+                path.startsWith("/admin") ->
+                    call.respondAdminErrorPage(s, HttpStatusCode.PayloadTooLarge)
+                // Portal and auth routes (e.g. /t/{slug}/account, /t/{slug}/login) don't share
+                // /admin's error-page template, but they are still browsers — an oversized form
+                // POST must not render raw JSON in the tab. Checked via Accept, not path, since
+                // these routes don't share a common prefix the way /admin, /api/v1 and /scim/v2 do.
+                call.request.accept()?.contains("text/html", ignoreCase = true) == true ->
+                    call.respondText(
+                        genericBrowserErrorHtml("Payload Too Large", detail),
+                        ContentType.Text.Html,
+                        HttpStatusCode.PayloadTooLarge,
+                    )
+                else ->
+                    call.respond(
+                        HttpStatusCode.PayloadTooLarge,
+                        mapOf(
+                            "error" to "payload_too_large",
+                            "error_description" to detail,
+                        ),
+                    )
+            }
+        }
         exception<Throwable> { call, cause ->
             call.application.log.error(
                 "Unhandled exception at ${call.request.path()}",
                 cause,
             )
             if (call.request.path().startsWith("/admin")) {
-                val session = call.sessions.get<AdminSession>()
-                val workspaces =
-                    try {
-                        s.tenantRepository
-                            .findAll()
-                            .map { WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl) }
-                    } catch (_: Exception) {
-                        emptyList()
-                    }
-                call.respondHtml(
-                    HttpStatusCode.InternalServerError,
-                    AdminView.adminErrorPage(
-                        allWorkspaces = workspaces,
-                        loggedInAs = session?.username ?: "—",
-                    ),
-                )
+                call.respondAdminErrorPage(s, HttpStatusCode.InternalServerError)
             } else {
                 call.respond(
                     HttpStatusCode.InternalServerError,
@@ -413,6 +460,8 @@ fun Application.module(
             otpIpRateLimiter = s.otpIpRateLimiter,
             webAuthnService = s.webAuthnService,
             passkeyRateLimiter = s.passkeyRateLimiter,
+            socialRateLimiter = s.socialRateLimiter,
+            auditLogPort = s.auditLogPort,
         )
 
         portalRoutes(
@@ -456,13 +505,23 @@ fun Application.module(
             roleGroupService = s.roleGroupService,
             accountService = s.accountService,
             adminUserService = s.adminUserService,
+            mfaService = s.mfaService,
             applicationManagementService = s.applicationManagementService,
             userAttributeService = s.userAttributeService,
             claimMapperService = s.claimMapperService,
             emailOtpService = s.emailOtpService,
             otpEmailRateLimiter = s.otpEmailRateLimiter,
             otpIpRateLimiter = s.otpIpRateLimiter,
+            apiWriteRateLimiter = s.apiWriteRateLimiter,
+            apiReadRateLimiter = s.apiReadRateLimiter,
+            webhookService = s.webhookService,
+            resourceServerService = s.resourceServerService,
+            webAuthnService = s.webAuthnService,
+            webAuthnCredentialRepository = s.webAuthnCredentialRepository,
             corsService = s.corsService,
+            transactionRunner = s.transactionRunner,
+            userRepository = s.userRepository,
+            identityProviderService = s.identityProviderService,
         )
 
         adminBackupRoutes(
@@ -474,6 +533,7 @@ fun Application.module(
             auditLogPort = s.auditLogPort,
             currentSchemaVersion = s.flywaySchemaVersion,
             kotauthVersion = appInfo.version,
+            maxImportBodyBytes = config.maxBackupImportBodyBytes,
         )
 
         adminRoutes(
@@ -492,6 +552,8 @@ fun Application.module(
             mfaRepository = s.mfaRepository,
             portalClientProvisioning = s.portalClientProvisioning,
             identityProviderRepository = s.identityProviderRepository,
+            identityProviderService = s.identityProviderService,
+            socialAccountRepository = s.socialAccountRepository,
             apiKeyService = s.apiKeyService,
             webhookService = s.webhookService,
             encryptionService = s.encryptionService,
@@ -508,6 +570,7 @@ fun Application.module(
             backupImporterService = s.backupImporterService,
             backupEncryptionPort = s.backupEncryptionPort,
             flywaySchemaVersion = s.flywaySchemaVersion,
+            maxImportBodyBytes = config.maxBackupImportBodyBytes,
             corsPort = s.corsOriginCache,
             baseUrl = config.baseUrl,
             translationPort = s.translationPort,
@@ -516,6 +579,59 @@ fun Application.module(
             mfaService = s.mfaService,
             auditLogPort = s.auditLogPort,
             securityMethodsService = s.securityMethodsService,
+            identityProviderProbeService = s.identityProviderProbeService,
         )
     }
+}
+
+/**
+ * Minimal, dependency-free HTML error body for browser-facing surfaces that have no shared
+ * error-page template the way `/admin` does (portal, auth login/register/OTP/magic-link) — used
+ * only so a browser doesn't render raw JSON for an oversized form POST.
+ */
+private fun genericBrowserErrorHtml(
+    title: String,
+    detail: String,
+): String {
+    val escapedTitle = title.escapeHtml()
+    val escapedDetail = detail.escapeHtml()
+    return """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head><meta charset="UTF-8"><title>$escapedTitle</title></head>
+        <body>
+        <h1>$escapedTitle</h1>
+        <p>$escapedDetail</p>
+        </body>
+        </html>
+        """.trimIndent()
+}
+
+private fun String.escapeHtml(): String =
+    replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+
+/** Shared admin-UI HTML error page, used by every StatusPages handler that answers a `/admin` request. */
+private suspend fun io.ktor.server.application.ApplicationCall.respondAdminErrorPage(
+    s: ServiceGraph,
+    status: HttpStatusCode,
+) {
+    val session = sessions.get<AdminSession>()
+    val workspaces =
+        try {
+            s.tenantRepository
+                .findAll()
+                .map { WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl) }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    respondHtml(
+        status,
+        AdminView.adminErrorPage(
+            allWorkspaces = workspaces,
+            loggedInAs = session?.username ?: "—",
+        ),
+    )
 }

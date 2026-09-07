@@ -1,5 +1,5 @@
-val ktorVersion = "3.5.1"
-val exposedVersion = "1.3.1"
+val ktorVersion = "3.5.2"
+val exposedVersion = "1.5.0"
 val logbackVersion = "1.5.32"
 val flywayVersion = "12.11.0"
 val logstashEncoderVersion = "8.1"
@@ -8,7 +8,7 @@ val testcontainersVersion = "1.21.0"
 
 plugins {
     kotlin("jvm") version "2.3.20"
-    kotlin("plugin.serialization") version "2.3.20"
+    kotlin("plugin.serialization") version "2.4.0"
     id("io.ktor.plugin") version "3.5.1"
     id("com.gradleup.shadow") version "9.1.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
@@ -21,7 +21,28 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.20.2"
+version = "1.24.0"
+
+// Pin the compile target explicitly rather than letting it follow whichever JDK
+// happens to build. `release`/`-Xjdk-release` also stop a newer build JDK from
+// linking against APIs that do not exist on 17 — bytecode alone would not.
+// Deliberately not a toolchain: that would also pin the JVM tests run on, and
+// CI's [17, 21] matrix exists to check both.
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        freeCompilerArgs.add("-Xjdk-release=17")
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(17)
+}
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -56,7 +77,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
 
-    implementation("org.postgresql:postgresql:42.7.10")
+    implementation("org.postgresql:postgresql:42.7.13")
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("org.flywaydb:flyway-core:$flywayVersion")
     implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
@@ -78,15 +99,17 @@ dependencies {
     // MockK — Kotlin-native mocking (HTTP integration tests only)
     testImplementation("io.mockk:mockk:1.13.16")
     // JUnit 5 engine
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
-    // Testcontainers — Redis integration tests (tagged @Tag("redis"); excluded from `make test`)
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.3")
+    // Testcontainers — Redis/Postgres integration tests (tagged @Tag("redis")/@Tag("postgres");
+    // excluded from `make test`)
     testImplementation("org.testcontainers:testcontainers:$testcontainersVersion")
     testImplementation("org.testcontainers:junit-jupiter:$testcontainersVersion")
+    testImplementation("org.testcontainers:postgresql:$testcontainersVersion")
 }
 
 tasks.test {
     useJUnitPlatform {
-        excludeTags("redis")
+        excludeTags("redis", "postgres")
     }
 }
 
@@ -95,6 +118,24 @@ tasks.register<Test>("redisTest") {
     group = "verification"
     useJUnitPlatform {
         includeTags("redis")
+    }
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+
+    // Forward Docker-related env vars (DOCKER_HOST for OrbStack/Colima/etc.,
+    // DOCKER_API_VERSION to override docker-java's stale default).
+    listOf("DOCKER_HOST", "DOCKER_API_VERSION", "TESTCONTAINERS_RYUK_DISABLED").forEach { name ->
+        System.getenv(name)?.let { environment(name, it) }
+    }
+    // docker-java reads `api.version` as a JVM system property (env var alone is not honored).
+    System.getenv("DOCKER_API_VERSION")?.let { systemProperty("api.version", it) }
+}
+
+tasks.register<Test>("postgresTest") {
+    description = "Runs Postgres-backed integration tests (Testcontainers, Docker required)"
+    group = "verification"
+    useJUnitPlatform {
+        includeTags("postgres")
     }
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath

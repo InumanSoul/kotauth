@@ -117,6 +117,7 @@ class BackupExporterService(
                             emailOtpSignupEnabled = emailOtpSignupEnabled,
                             emailOtpLockoutThreshold = emailOtpLockoutThreshold,
                             emailOtpLoginEnabled = emailOtpLoginEnabled,
+                            loginIdentifierMode = loginIdentifierMode,
                         )
                     },
                 theme =
@@ -136,6 +137,9 @@ class BackupExporterService(
                             logoUrl = logoUrl,
                             faviconUrl = faviconUrl,
                             defaultLocale = defaultLocale,
+                            loginLayout = loginLayout.name,
+                            loginBackgroundUrl = loginBackgroundUrl,
+                            loginTagline = loginTagline,
                         )
                     },
                 portalConfig = PortalConfigBackup(layout = tenant.portalConfig.layout.name),
@@ -171,6 +175,7 @@ class BackupExporterService(
                     enabled = app.enabled,
                     redirectUris = app.redirectUris,
                     tokenExpiryOverride = app.tokenExpiryOverride,
+                    grantTypes = app.grantTypes.map { it.value },
                 )
             }
 
@@ -216,6 +221,7 @@ class BackupExporterService(
                         group.id?.let { gid ->
                             groupRepository.findRoleIdsForGroup(gid).mapNotNull { rolesByPk[it]?.name }
                         } ?: emptyList(),
+                    externalId = group.externalId,
                 )
             }
 
@@ -239,6 +245,9 @@ class BackupExporterService(
                     customAttributes = attributes,
                     roleNames = userRoles.map { it.name },
                     groupPaths = userGroups.mapNotNull { it.id?.let { gid -> groupPath(gid, groupsByPk) } },
+                    externalId = user.externalId,
+                    givenName = user.givenName,
+                    familyName = user.familyName,
                 )
             }
 

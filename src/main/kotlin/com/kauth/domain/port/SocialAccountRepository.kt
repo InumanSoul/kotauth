@@ -1,7 +1,7 @@
 package com.kauth.domain.port
 
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.SocialAccount
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 
@@ -16,7 +16,7 @@ interface SocialAccountRepository {
      */
     fun findByProviderIdentity(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
         providerUserId: String,
     ): SocialAccount?
 
@@ -29,6 +29,6 @@ interface SocialAccountRepository {
     /** Removes a social account link (user unlinks a provider). */
     fun delete(
         userId: UserId,
-        provider: SocialProvider,
+        provider: ProviderKey,
     )
 }

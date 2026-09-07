@@ -1,5 +1,6 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.TenantRepository
 
@@ -50,15 +51,21 @@ class PortalClientProvisioning(
                     description = "Built-in client for the tenant self-service portal (profile, password, MFA)",
                     accessType = "public",
                     redirectUris = listOf(callbackUri),
+                    grantTypes = setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN),
+                    clientSecretHash = null,
+                    audience = null,
                 )
             } else if (portalClient.redirectUris != listOf(callbackUri)) {
-                // Only update when the URI has actually changed to avoid unnecessary writes
+                // Only update when the URI has actually changed to avoid unnecessary writes.
+                // Grants are passed through unchanged — an operator may have deliberately
+                // narrowed them, and recomputing from access type would silently widen them back.
                 applicationRepository.update(
                     appId = portalClient.id,
                     name = portalClient.name,
                     description = portalClient.description,
                     accessType = portalClient.accessType.value,
                     redirectUris = listOf(callbackUri),
+                    grantTypes = portalClient.grantTypes,
                 )
             }
         }

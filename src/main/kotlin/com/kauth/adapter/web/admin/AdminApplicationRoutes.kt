@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.port.ApplicationRepository
@@ -53,6 +54,17 @@ fun Route.adminApplicationRoutes(
                     ?.lines()
                     ?.map { it.trim() }
                     ?.filter { it.isNotBlank() } ?: emptyList()
+            // Dropping unrecognized values here is safe: these are checkboxes this same
+            // server rendered, so an unrecognized value can only come from a tampered
+            // request, not an operator's honest selection (unlike the REST API, where a
+            // caller-supplied grant list must be validated strictly).
+            val grantTypes =
+                params
+                    .getAll("grantTypes")
+                    .orEmpty()
+                    .mapNotNull { GrantType.fromValue(it) }
+                    .toSet()
+            val audience = params["audience"]
             val prefill =
                 ApplicationPrefill(
                     clientId = clientId,
@@ -60,38 +72,43 @@ fun Route.adminApplicationRoutes(
                     description = desc ?: "",
                     accessType = accessType,
                     redirectUris = params["redirectUris"] ?: "",
+                    grantTypes = grantTypes,
+                    audience = audience ?: "",
                 )
-            val error =
-                when {
-                    clientId.isBlank() -> "Client ID is required."
-                    !clientId.matches(
-                        Regex("[a-z0-9-]+"),
-                    ) -> "Client ID may only contain lowercase letters, numbers, and hyphens."
-                    applicationRepository.existsByClientId(
-                        workspace.id,
-                        clientId,
-                    ) -> "Client ID '$clientId' already exists."
-                    name.isBlank() -> "Name is required."
-                    redirectUris.isEmpty() ->
-                        "At least one redirect URI is required. The authorization code flow needs a registered URI to bind to."
-                    else -> null
+            when (
+                val result =
+                    applicationManagementService.createApplication(
+                        tenantId = workspace.id,
+                        clientId = clientId,
+                        name = name,
+                        description = desc,
+                        accessType = accessType,
+                        redirectUris = redirectUris,
+                        grantTypes = grantTypes,
+                        audience = audience,
+                    )
+            ) {
+                is AdminResult.Failure -> {
+                    val wsPairs = call.attributes[WsPairsAttr]
+                    call.respondHtml(
+                        HttpStatusCode.UnprocessableEntity,
+                        AdminView.createApplicationPage(
+                            workspace,
+                            wsPairs,
+                            session.username,
+                            error = result.error.message,
+                            prefill = prefill,
+                        ),
+                    )
                 }
-            if (error != null) {
-                val wsPairs = call.attributes[WsPairsAttr]
-                return@post call.respondHtml(
-                    HttpStatusCode.UnprocessableEntity,
-                    AdminView.createApplicationPage(
-                        workspace,
-                        wsPairs,
-                        session.username,
-                        error = error,
-                        prefill = prefill,
-                    ),
-                )
+                is AdminResult.Success -> {
+                    val flashToken = result.value.plaintextSecret?.let { FlashStore.put(it) }
+                    val suffix = if (flashToken != null) "?flash=$flashToken" else ""
+                    call.respondRedirect(
+                        "/admin/workspaces/$slug/applications/${result.value.application.clientId}$suffix",
+                    )
+                }
             }
-            applicationRepository.create(workspace.id, clientId, name, desc, accessType, redirectUris)
-            corsPort?.invalidate(workspace.slug)
-            call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
         }
 
         route("/{clientId}") {
@@ -122,6 +139,7 @@ fun Route.adminApplicationRoutes(
                             role.id !in defaultRoleIds &&
                                 (role.scope == RoleScope.TENANT || role.clientId == app.id)
                         }
+                val authorizedApis = resourceServerService?.listAuthorized(app.id)
 
                 call.respondHtml(
                     HttpStatusCode.OK,
@@ -134,6 +152,7 @@ fun Route.adminApplicationRoutes(
                         newSecret,
                         defaultRoles,
                         availableDefaultRoles,
+                        authorizedApis,
                     ),
                 )
             }
@@ -172,6 +191,15 @@ fun Route.adminApplicationRoutes(
                         ?.lines()
                         ?.map { it.trim() }
                         ?.filter { it.isNotBlank() } ?: emptyList()
+                // See the comment on the create-form grantTypes parsing above: dropping
+                // unrecognized values is safe here because they come from server-rendered
+                // checkboxes, not an untrusted caller-supplied list.
+                val grantTypes =
+                    params
+                        .getAll("grantTypes")
+                        .orEmpty()
+                        .mapNotNull { GrantType.fromValue(it) }
+                        .toSet()
                 val launcherUrl = params["launcherUrl"]?.trim().orEmpty()
                 val iconUrl = params["iconUrl"]?.trim().orEmpty()
                 val launcherVisible = params["launcherVisible"] == "true"
@@ -187,6 +215,7 @@ fun Route.adminApplicationRoutes(
                             description = desc,
                             accessType = accessType,
                             redirectUris = redirectUris,
+                            grantTypes = grantTypes,
                             launcherUrl = launcherUrl,
                             iconUrl = iconUrl,
                             launcherVisible = launcherVisible,

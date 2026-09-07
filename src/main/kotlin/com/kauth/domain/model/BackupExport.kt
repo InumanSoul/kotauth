@@ -107,6 +107,7 @@ data class SecurityConfigBackup(
     val emailOtpSignupEnabled: Boolean = false,
     val emailOtpLockoutThreshold: Int = 5,
     val emailOtpLoginEnabled: Boolean = false,
+    val loginIdentifierMode: LoginIdentifierMode = LoginIdentifierMode.USERNAME,
 )
 
 @Serializable
@@ -125,6 +126,9 @@ data class ThemeBackup(
     val logoUrl: String?,
     val faviconUrl: String?,
     val defaultLocale: String?,
+    val loginLayout: String = "CENTERED",
+    val loginBackgroundUrl: String? = null,
+    val loginTagline: String? = null,
 )
 
 @Serializable
@@ -153,6 +157,8 @@ data class ApplicationBackup(
     val enabled: Boolean,
     val redirectUris: List<String>,
     val tokenExpiryOverride: Int?,
+    /** Null in backups written before grant types existed; the importer derives them from accessType. */
+    val grantTypes: List<String>? = null,
 )
 
 @Serializable
@@ -195,6 +201,10 @@ data class UserBackup(
     val roleNames: List<String>,
     /** Group names by qualified path: `parent/child` for nested groups. */
     val groupPaths: List<String>,
+    // Null for backups taken before SCIM provisioning fields existed.
+    val externalId: String? = null,
+    val givenName: String? = null,
+    val familyName: String? = null,
 )
 
 @Serializable
@@ -219,6 +229,8 @@ data class GroupBackup(
     val parentGroupPath: String?,
     val attributes: Map<String, String>,
     val roleNames: List<String>,
+    // Null for backups taken before SCIM provisioning fields existed.
+    val externalId: String? = null,
 )
 
 @Serializable

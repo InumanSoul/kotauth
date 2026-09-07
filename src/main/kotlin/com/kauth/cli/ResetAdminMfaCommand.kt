@@ -5,6 +5,7 @@ import com.kauth.adapter.persistence.MfaRecoveryCodesTable
 import com.kauth.adapter.persistence.TenantsTable
 import com.kauth.adapter.persistence.UsersTable
 import com.kauth.config.DbConfig
+import com.kauth.domain.service.UsernamePolicy
 import com.kauth.infrastructure.DatabaseFactory
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.jdbc.*
@@ -13,7 +14,9 @@ import kotlin.system.exitProcess
 
 object ResetAdminMfaCommand {
     fun execute(args: List<String>) {
-        val username = parseUsername(args)
+        // Usernames are always stored normalized (see UsernamePolicy) — this break-glass lookup
+        // must match the same way, or an operator's `USER=Admin` fails after V66 rewrites the row.
+        val username = parseUsername(args)?.let { UsernamePolicy.normalize(it) }
         if (username == null) {
             System.err.println("Usage: cli reset-admin-mfa --username=<admin-username>")
             exitProcess(1)

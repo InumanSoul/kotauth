@@ -38,6 +38,7 @@ object ClientsTable : Table("clients") {
     val launcherVisible = bool("launcher_visible").default(true)
     val launcherDisplayOrder = integer("launcher_display_order").default(0)
     val audience = varchar("audience", 200).nullable()
+    val isDeleted = bool("is_deleted").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -48,4 +49,11 @@ object ClientRedirectUrisTable : Table("client_redirect_uris") {
     val uri = varchar("uri", 500)
 
     override val primaryKey = PrimaryKey(id)
+}
+
+object ClientGrantTypesTable : Table("client_grant_types") {
+    val clientId = integer("client_id") references ClientsTable.id
+    val grantType = varchar("grant_type", 40)
+
+    override val primaryKey = PrimaryKey(clientId, grantType)
 }

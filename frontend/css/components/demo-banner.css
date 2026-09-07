@@ -1,14 +1,13 @@
 /* frontend/css/components/demo-banner.css
  *
- * Fixed top banner for demo/showcase deployments (KAUTH_DEMO_MODE=true).
+ * Thin (2px) amber indicator strip for demo/showcase deployments
+ * (KAUTH_DEMO_MODE=true). No visible text — credentials live in the
+ * separate demo docs repo. ARIA label on the element carries the
+ * "demo mode" semantics for assistive technology.
  *
  * Rendered by DemoBanner.kt — only present when DemoConfig.enabled is true.
- * Layout impact:
- *   Admin shell     — .demo-banner ~ .shell shrinks to fill remaining viewport
- *   Portal sidebar  — .demo-banner ~ .portal-sidebar offsets fixed sidebar
- *   Portal centered — .demo-banner ~ .portal-topbar offsets sticky bars
- *   Welcome shell   — .demo-banner ~ .welcome-shell adjusts min-height
- *   Auth pages      — body:has(.demo-banner) gets padding-top offset
+ * Layout impact: every shell shrinks by 2px, and the auth body picks up a
+ * 2px padding-top so nothing sits under the strip.
  */
 
 .demo-banner {
@@ -17,73 +16,40 @@
   left: 0;
   right: 0;
   z-index: 9999;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2, 8px);
-  background: var(--color-amber-bg, rgba(251, 191, 36, 0.09));
-  border-bottom: 1px solid var(--color-amber-border, rgba(251, 191, 36, 0.22));
-  font-size: var(--text-sm, 12px);
-  color: var(--color-amber, #fbbf24);
-}
-
-/* Scoped badge — self-contained so it doesn't depend on badge.css loading */
-.demo-banner .badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px var(--space-2, 8px);
-  border-radius: 0;
-  font-size: var(--text-sm, 12px);
-  font-weight: var(--weight-medium, 500);
-  letter-spacing: var(--tracking-normal, 0);
-  border: 0.5px solid;
-  background: var(--color-amber-bg, rgba(251, 191, 36, 0.09));
-  color: var(--color-amber, #fbbf24);
-  border-color: var(--color-amber-border, rgba(251, 191, 36, 0.22));
-}
-
-.demo-banner code {
-  background: rgba(251, 191, 36, 0.12);
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-family: var(--font-mono, 'Inconsolata', monospace);
-  font-size: var(--text-sm, 12px);
-  color: var(--color-amber, #fbbf24);
+  height: 2px;
+  background: var(--color-amber, #fbbf24);
+  pointer-events: none;
 }
 
 /* ── Layout offsets ──────────────────────────────────────────────────────── */
 
-/* Admin shell — sibling combinator shrinks the shell to remaining viewport */
 .demo-banner ~ .shell {
-  height: calc(100dvh - 36px);
+  height: calc(100dvh - 2px);
 }
 
 /* Centered portal — offset sticky topbar + tabnav */
 .demo-banner ~ .portal-topbar {
-  top: 36px;
+  top: 2px;
 }
 .demo-banner ~ .portal-topbar ~ .portal-tabnav {
-  top: calc(48px + 36px);
+  top: calc(48px + 2px);
 }
 
-/* Sidebar portal — fixed sidebar + offset main content area */
+/* Sidebar portal */
 .demo-banner ~ .portal-sidebar {
-  top: 36px;
+  top: 2px;
   bottom: 0;
 }
 .demo-banner ~ .portal-main-wrap {
-  min-height: calc(100dvh - 36px);
+  min-height: calc(100dvh - 2px);
 }
 
-/* Welcome shell — same sibling offset for the welcome page */
 .demo-banner ~ .welcome-shell {
-  min-height: calc(100dvh - 36px);
+  min-height: calc(100dvh - 2px);
 }
 
-/* Auth / portal / welcome pages — push body content below the banner */
 body:has(.demo-banner) {
-  padding-top: 36px;
+  padding-top: 2px;
 }
 
 /* Prevent double offset on pages where shells handle their own height */

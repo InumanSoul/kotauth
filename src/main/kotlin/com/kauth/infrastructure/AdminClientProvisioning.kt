@@ -1,5 +1,6 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.TenantRepository
@@ -48,14 +49,20 @@ class AdminClientProvisioning(
                 description = "Built-in OAuth client for the admin console — Authorization Code + PKCE",
                 accessType = "public",
                 redirectUris = listOf(callbackUri),
+                grantTypes = setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN),
+                clientSecretHash = null,
+                audience = null,
             )
         } else if (adminClient.redirectUris != listOf(callbackUri)) {
+            // Preserve the client's existing grants — an operator may have deliberately
+            // narrowed them, and recomputing from access type would silently widen them back.
             applicationRepository.update(
                 appId = adminClient.id,
                 name = adminClient.name,
                 description = adminClient.description,
                 accessType = adminClient.accessType.value,
                 redirectUris = listOf(callbackUri),
+                grantTypes = adminClient.grantTypes,
             )
         }
     }

@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -11,8 +12,10 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -114,6 +117,7 @@ class SsoCookieTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
     @BeforeTest
@@ -142,6 +146,8 @@ class SsoCookieTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             sessionRepository = sessionRepo,
+            identifierResolver = UserIdentifierResolver(userRepo),
+            collisionCheck = IdentifierCollisionCheck(userRepo),
         )
 
     private fun oauthService() =
@@ -366,6 +372,46 @@ class SsoCookieTest {
             val payload = parseSsoCookie(ssoValue)
             assertEquals(alice.id.value, payload.userId)
             assertEquals(true, payload.mfaCompleted, "MFA-completed login must record mfaCompleted=true")
+        }
+
+    @Test
+    fun `an MFA pending cookie minted for another tenant issues no session here`() =
+        testApplication {
+            application(appBlock())
+
+            every { mfaService.verifyTotp(UserId(42), "123456") } returns
+                com.kauth.domain.service.MfaResult
+                    .Success(true)
+
+            // Signed by us, unexpired, and answered with a code the holder really owns — only the
+            // slug says it was minted somewhere else, and nothing compared it until now.
+            val mfaCookie = encryptionService.signCookie("${alice.id!!.value}|otherco|${System.currentTimeMillis()}")
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/mfa-challenge",
+                    formParameters =
+                        Parameters.build {
+                            append("code", "123456")
+                        },
+                ) {
+                    header(
+                        "Cookie",
+                        listOf(
+                            "KOTAUTH_AUTH_CONTEXT=${buildAuthContextCookie()}",
+                            "KOTAUTH_MFA_PENDING=$mfaCookie",
+                        ).joinToString("; "),
+                    )
+                }
+
+            val setCookie = response.headers.getAll("Set-Cookie") ?: emptyList()
+            assertEquals(
+                null,
+                extractCookie(setCookie, "KOTAUTH_SSO"),
+                "A pending challenge from another tenant must leave no session: $setCookie",
+            )
+            assertEquals("/t/acme/authorize", response.headers["Location"])
         }
 
     @Test

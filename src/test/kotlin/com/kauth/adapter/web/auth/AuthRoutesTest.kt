@@ -4,7 +4,10 @@ import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
@@ -14,9 +17,11 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -29,6 +34,7 @@ import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.EnglishOnlyTranslation
 import com.kauth.infrastructure.InMemoryRateLimiter
+import com.kauth.installTrustedProxyHeaders
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
@@ -124,6 +130,7 @@ class AuthRoutesTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
     private val confidentialApp =
@@ -136,6 +143,7 @@ class AuthRoutesTest {
             accessType = AccessType.CONFIDENTIAL,
             enabled = true,
             redirectUris = listOf("https://backend.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.CONFIDENTIAL),
         )
 
     private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
@@ -182,6 +190,8 @@ class AuthRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             sessionRepository = sessionRepo,
+            identifierResolver = UserIdentifierResolver(userRepo),
+            collisionCheck = IdentifierCollisionCheck(userRepo),
         )
 
     private fun buildOAuthService() =
@@ -396,7 +406,7 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.Unauthorized, response.status)
             val body = response.bodyAsText()
             assertTrue(
-                body.contains("Invalid username or password"),
+                body.contains("Invalid sign-in details"),
                 "Expired-password path must show the generic message, was: ${body.take(300)}",
             )
             assertFalse(body.contains("expired", ignoreCase = true), "Must not leak the expired state")
@@ -816,6 +826,66 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.TooManyRequests, response.status)
         }
 
+    @Test
+    fun `the login limiter and the audit log key on the forwarded client address`() =
+        testApplication {
+            resetFixtures()
+            val tightLoginLimiter = InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60)
+
+            application {
+                install(ContentNegotiation) { json() }
+                installTrustedProxyHeaders()
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = tightLoginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            suspend fun attempt(clientIp: String) =
+                client.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "wrong-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                    header("X-Forwarded-For", clientIp)
+                }
+
+            attempt("203.0.113.1")
+            val second = attempt("203.0.113.2")
+
+            // Behind a proxy the connection address is the proxy's for every request: keying on it
+            // makes this a deployment-wide cap and writes one IP into every audit row.
+            assertEquals(
+                HttpStatusCode.Unauthorized,
+                second.status,
+                "A second client behind the same proxy must have its own login budget",
+            )
+            assertEquals(
+                listOf("203.0.113.1", "203.0.113.2"),
+                auditLog.events.filter { it.eventType == AuditEventType.LOGIN_FAILED }.map { it.ipAddress },
+                "Every login event must record the client's address, not the proxy's",
+            )
+        }
+
     // =========================================================================
     // GET /t/{slug}/mfa-challenge — cookie guard
     // =========================================================================
@@ -893,6 +963,77 @@ class AuthRoutesTest {
                 location.contains("/authorize"),
                 "Must redirect to login when MFA pending cookie has invalid signature",
             )
+        }
+
+    @Test
+    fun `GET mfa-challenge refuses a pending cookie minted for another tenant`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            // Our signature, our format, another tenant's slug — the challenge page must not
+            // render for a cookie this tenant never minted.
+            val cookieValue = encryptionService.signCookie("10|otherco|${System.currentTimeMillis()}")
+
+            val response =
+                createClient { followRedirects = false }.get("/t/acme/mfa-challenge") {
+                    header("Cookie", "KOTAUTH_MFA_PENDING=$cookieValue")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/authorize", response.headers["Location"])
+        }
+
+    @Test
+    fun `GET mfa-challenge refuses a pending cookie of another shape`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            // A fourth field means this is not the format this reader was written for. The POST
+            // refuses it on the field count; the GET must agree, or the next field added to the
+            // payload is read as something else by one of the two.
+            val cookieValue = encryptionService.signCookie("10|acme|${System.currentTimeMillis()}|extra")
+
+            val response =
+                createClient { followRedirects = false }.get("/t/acme/mfa-challenge") {
+                    header("Cookie", "KOTAUTH_MFA_PENDING=$cookieValue")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/authorize", response.headers["Location"])
         }
 
     @Test
@@ -1134,6 +1275,120 @@ class AuthRoutesTest {
                 "Untrusted redirect_uri with invalid resource must return 400, not a redirect",
             )
             assertEquals(null, response.headers["Location"], "Must not redirect to untrusted redirect_uri")
+        }
+
+    @Test
+    fun `GET authorize redirects with unauthorized_client when client lacks the authorization_code grant`() =
+        testApplication {
+            resetFixtures()
+            val m2mOnlyApp =
+                Application(
+                    id = ApplicationId(3),
+                    tenantId = TenantId(1),
+                    clientId = "m2m-only",
+                    name = "M2M Only",
+                    description = null,
+                    accessType = AccessType.CONFIDENTIAL,
+                    enabled = true,
+                    redirectUris = listOf("https://m2m.example.com/callback"),
+                    grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+                )
+            appRepo.add(m2mOnlyApp, secretHash = hasher.hash("m2m-secret"))
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code" +
+                        "&client_id=m2m-only" +
+                        "&redirect_uri=https://m2m.example.com/callback" +
+                        "&scope=openid" +
+                        "&state=xyz",
+                )
+
+            assertEquals(
+                HttpStatusCode.Found,
+                response.status,
+                "Client not registered for authorization_code must be refused before the login page renders",
+            )
+            val location = response.headers["Location"]
+            assertNotNull(location)
+            assertTrue(location.startsWith("https://m2m.example.com/callback"))
+            assertTrue(location.contains("error=unauthorized_client"))
+            assertTrue(location.contains("state=xyz"))
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("KOTAUTH_AUTH_CONTEXT") },
+                "Must not set up an auth context for a client that can never complete this flow",
+            )
+        }
+
+    @Test
+    fun `GET authorize returns 400 when redirect_uri is untrusted and client lacks the authorization_code grant`() =
+        testApplication {
+            resetFixtures()
+            val m2mOnlyApp =
+                Application(
+                    id = ApplicationId(3),
+                    tenantId = TenantId(1),
+                    clientId = "m2m-only",
+                    name = "M2M Only",
+                    description = null,
+                    accessType = AccessType.CONFIDENTIAL,
+                    enabled = true,
+                    redirectUris = listOf("https://m2m.example.com/callback"),
+                    grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+                )
+            appRepo.add(m2mOnlyApp, secretHash = hasher.hash("m2m-secret"))
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code" +
+                        "&client_id=m2m-only" +
+                        "&redirect_uri=https://evil.attacker.com/steal" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals(null, response.headers["Location"], "Must not redirect to an unregistered redirect_uri")
         }
 
     // =========================================================================
@@ -3348,6 +3603,192 @@ class AuthRoutesTest {
             val stored = authCodeRepo.findByCode(code)
             assertNotNull(stored, "Issued code must be persisted in the repository")
             assertEquals(listOf("https://api.example.com"), stored.resources)
+        }
+
+    // =========================================================================
+    // GET /t/{slug}/authorize — login identifier field per workspace mode (Task 9)
+    // =========================================================================
+
+    @Test
+    fun `GET authorize labels identifier field for email as email address`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.clear()
+            tenantRepo.add(
+                tenant.copy(
+                    securityConfig = tenant.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Email address"), "EMAIL mode must label the field 'Email address'")
+            assertTrue(body.contains("""type="email""""), "EMAIL mode must render an email input")
+            // Tenant default has passkeys enabled, so the base "email" autocomplete value
+            // gets the " webauthn" suffix appended, per the existing passkey behaviour.
+            assertTrue(body.contains("""autocomplete="email webauthn""""), "EMAIL mode must set autocomplete=email")
+            assertTrue(body.contains("""name="username""""), "Form field name must remain 'username'")
+        }
+
+    @Test
+    fun `GET authorize labels identifier field for either as username or email`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.clear()
+            tenantRepo.add(
+                tenant.copy(
+                    securityConfig = tenant.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EITHER),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Username or email"), "EITHER mode must label the field 'Username or email'")
+            assertTrue(
+                !body.contains("""type="email""""),
+                "EITHER mode must stay type=text so a real username is not blocked by native validation",
+            )
+            assertTrue(body.contains("""name="username""""), "Form field name must remain 'username'")
+        }
+
+    @Test
+    fun `GET authorize renders unchanged username label in default USERNAME mode`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains(">Username<"), "USERNAME mode must keep the plain 'Username' label")
+            assertTrue(body.contains("""name="username""""), "Form field name must remain 'username'")
+            assertTrue(
+                !body.contains("""type="email""""),
+                "USERNAME mode identifier field must not be type=email",
+            )
+        }
+
+    @Test
+    fun `POST authorize with wrong password renders the shared generic message`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "wrong-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Invalid sign-in details."), "Must show the mode-agnostic failure message")
+            assertTrue(
+                !body.contains("Invalid username or password."),
+                "Old username-specific wording must not appear",
+            )
         }
 
     // Utility

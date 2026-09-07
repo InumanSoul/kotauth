@@ -1,8 +1,13 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminError
+import com.kauth.domain.service.ApiKeyError
 import com.kauth.domain.service.AttributeResult
+import com.kauth.domain.service.ResourceServerError
+import com.kauth.domain.service.WebAuthnError
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -53,6 +58,62 @@ internal suspend fun ApplicationCall.respondProblem(
             detail = detail,
         ),
     )
+}
+
+/** Responds 429 for a write request that exceeded the per-key/per-tenant write rate limit. */
+internal suspend fun ApplicationCall.respondRateLimited(retryAfterSeconds: Long) {
+    response.headers.append(HttpHeaders.ContentType, "application/problem+json")
+    response.headers.append("Retry-After", retryAfterSeconds.toString())
+    respond(
+        HttpStatusCode.TooManyRequests,
+        ProblemDetail(
+            type = "https://kotauth.dev/errors/429",
+            title = "Rate limit exceeded",
+            status = HttpStatusCode.TooManyRequests.value,
+            detail =
+                "API write rate limit exceeded for this key in this workspace. " +
+                    "Retry after $retryAfterSeconds seconds.",
+        ),
+    )
+}
+
+/** Responds 429 for a GET/HEAD/OPTIONS request that exceeded the per-key/per-tenant read rate limit. */
+internal suspend fun ApplicationCall.respondReadRateLimited(retryAfterSeconds: Long) {
+    response.headers.append(HttpHeaders.ContentType, "application/problem+json")
+    response.headers.append("Retry-After", retryAfterSeconds.toString())
+    respond(
+        HttpStatusCode.TooManyRequests,
+        ProblemDetail(
+            type = "https://kotauth.dev/errors/429",
+            title = "Rate limit exceeded",
+            status = HttpStatusCode.TooManyRequests.value,
+            detail =
+                "API read rate limit exceeded for this key in this workspace. " +
+                    "Retry after $retryAfterSeconds seconds.",
+        ),
+    )
+}
+
+/** Parses the `{userId}` path parameter, or replies 400 and invokes [bail] if it's missing/invalid. */
+internal suspend inline fun ApplicationCall.parseUserIdOr(bail: () -> Nothing): UserId? {
+    val raw = parameters["userId"]?.toIntOrNull()
+    return if (raw == null) {
+        respondProblem(HttpStatusCode.BadRequest, "Invalid user ID", "userId must be an integer.")
+        bail()
+    } else {
+        UserId(raw)
+    }
+}
+
+/** Parses the `{groupId}` path parameter, or replies 400 and invokes [bail] if it's missing/invalid. */
+internal suspend inline fun ApplicationCall.parseGroupIdOr(bail: () -> Nothing): GroupId? {
+    val raw = parameters["groupId"]?.toIntOrNull()
+    return if (raw == null) {
+        respondProblem(HttpStatusCode.BadRequest, "Invalid group ID", "groupId must be an integer.")
+        bail()
+    } else {
+        GroupId(raw)
+    }
 }
 
 internal suspend fun ApplicationCall.respondAdminError(error: AdminError): Unit =
@@ -111,6 +172,74 @@ internal suspend fun ApplicationCall.respondAttributeError(result: AttributeResu
             )
     }
 
+internal suspend fun ApplicationCall.respondResourceServerError(error: ResourceServerError): Unit =
+    when (error) {
+        is ResourceServerError.InvalidIdentifier ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid identifier", error.reason)
+        ResourceServerError.InvalidName ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "Validation Error", "Name cannot be blank.")
+        ResourceServerError.IdentifierAlreadyExists ->
+            respondProblem(
+                HttpStatusCode.Conflict,
+                "Conflict",
+                "A resource server with this identifier already exists.",
+            )
+        ResourceServerError.NotFound ->
+            respondProblem(HttpStatusCode.NotFound, "Not Found", "Resource server not found.")
+        ResourceServerError.CrossTenant ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "Cross-tenant",
+                "Resource does not belong to this workspace.",
+            )
+    }
+
+internal suspend fun ApplicationCall.respondApiKeyError(error: ApiKeyError): Unit =
+    when (error) {
+        is ApiKeyError.NotFound -> respondProblem(HttpStatusCode.NotFound, "Not Found", error.message)
+        is ApiKeyError.Validation ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "Validation Error", error.message)
+    }
+
+/**
+ * Maps [WebAuthnError] to Problem+JSON responses for the passkey admin API. The
+ * last branch handles error variants that are only ever produced by the
+ * auth-flow challenge/verify endpoints (never by list/revoke) — included so the
+ * `when` stays exhaustive on the sealed hierarchy.
+ */
+internal suspend fun ApplicationCall.respondWebAuthnError(error: WebAuthnError): Unit =
+    when (error) {
+        WebAuthnError.CredentialNotFound ->
+            respondProblem(HttpStatusCode.NotFound, "Not Found", "Passkey credential not found.")
+        WebAuthnError.CannotRevokeLast ->
+            respondProblem(
+                HttpStatusCode.Conflict,
+                "Cannot revoke last passkey",
+                "This is the user's last passkey and password login is disabled. Enable password login " +
+                    "or add another passkey before revoking this one.",
+            )
+        WebAuthnError.TenantMismatch ->
+            respondProblem(HttpStatusCode.NotFound, "Not Found", "Passkey does not belong to this workspace.")
+        WebAuthnError.TenantDisabled, WebAuthnError.PasskeysDisabledForTenant ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "Passkeys disabled",
+                "Passkeys are not enabled for this workspace.",
+            )
+        WebAuthnError.UserDisabled ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "User disabled", "The user is not enabled.")
+        WebAuthnError.InvalidChallenge,
+        WebAuthnError.CounterReplayDetected,
+        is WebAuthnError.VerificationFailed,
+        is WebAuthnError.RateLimited,
+        ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "WebAuthn error",
+                "Unexpected WebAuthn error. This endpoint doesn't produce challenge/auth flows.",
+            )
+    }
+
 // -- Response envelope --------------------------------------------------------
 
 @Serializable
@@ -137,7 +266,8 @@ data class ProblemDetail(
 // -- Request bodies -----------------------------------------------------------
 
 @Serializable data class CreateUserRequest(
-    val username: String,
+    /** Omit or leave blank to have Kotauth generate one from the name and email. */
+    val username: String? = null,
     val email: String,
     val fullName: String,
     val password: String,
@@ -146,6 +276,7 @@ data class ProblemDetail(
 @Serializable data class UpdateUserRequest(
     val email: String? = null,
     val fullName: String? = null,
+    val username: String? = null,
 )
 
 @Serializable data class CreateRoleRequest(
@@ -170,11 +301,22 @@ data class ProblemDetail(
     val description: String? = null,
 )
 
+@Serializable data class CreateApplicationRequest(
+    val clientId: String,
+    val name: String,
+    val description: String? = null,
+    val accessType: String = "public",
+    val redirectUris: List<String>,
+    val grantTypes: List<String>? = null,
+)
+
 @Serializable data class UpdateApplicationRequest(
     val name: String? = null,
     val description: String? = null,
     val accessType: String? = null,
     val redirectUris: List<String>? = null,
+    /** Omit to leave grants unchanged. Pass an explicit list — including `[]` — to replace them. */
+    val grantTypes: List<String>? = null,
     val audience: String? = null,
 )
 
@@ -192,7 +334,8 @@ data class ProblemDetail(
  * Requires SMTP to be configured on the tenant.
  */
 @Serializable data class InviteUserRequest(
-    val username: String,
+    /** Omit or leave blank to have Kotauth generate one from the name and email. */
+    val username: String? = null,
     val email: String,
     val fullName: String,
 )
@@ -215,6 +358,36 @@ data class ProblemDetail(
     val includeInId: Boolean = false,
 )
 
+@Serializable data class CreateWebhookRequest(
+    val url: String,
+    val description: String = "",
+    val events: List<String>,
+)
+
+@Serializable data class CreateResourceServerRequest(
+    val identifier: String,
+    val name: String,
+    val description: String? = null,
+    val scopes: List<String> = emptyList(),
+)
+
+@Serializable data class UpdateResourceServerRequest(
+    val name: String,
+    val description: String? = null,
+    val scopes: List<String> = emptyList(),
+)
+
+@Serializable data class SetAuthorizedResourceServersRequest(
+    val resourceServerIds: List<Int>,
+)
+
+@Serializable data class CreateApiKeyRequest(
+    val name: String,
+    val scopes: List<String>,
+    /** Optional ISO-8601 timestamp. Null = never expires. */
+    val expiresAt: String? = null,
+)
+
 // -- Response DTOs ------------------------------------------------------------
 
 @Serializable data class UserDto(
@@ -225,6 +398,9 @@ data class ProblemDetail(
     val emailVerified: Boolean,
     val enabled: Boolean,
     val mfaEnabled: Boolean,
+    val requiredActions: List<String>,
+    val isLocked: Boolean,
+    val createdAt: String? = null,
 )
 
 @Serializable data class RoleDto(
@@ -251,7 +427,29 @@ data class ProblemDetail(
     val accessType: String,
     val enabled: Boolean,
     val redirectUris: List<String>,
+    val grantTypes: List<String>,
     val audience: String? = null,
+)
+
+/**
+ * Response body for `POST /applications`. `clientSecret` is the raw secret and
+ * is returned exactly once, present only when `application.accessType ==
+ * "confidential"`. Callers MUST persist it before the response is discarded;
+ * there is no way to retrieve it again.
+ */
+@Serializable data class CreateApplicationResponse(
+    val application: ApplicationDto,
+    val clientSecret: String? = null,
+)
+
+/**
+ * Response body for `POST /applications/{id}/regenerate-secret`. The
+ * `clientSecret` field is the raw secret and is returned exactly once —
+ * callers MUST persist it before the response is discarded; there is no way
+ * to retrieve it again.
+ */
+@Serializable data class ClientSecretResponse(
+    val clientSecret: String,
 )
 
 @Serializable data class SessionDto(
@@ -289,6 +487,127 @@ data class ProblemDetail(
     val mappers: List<ClaimMapperDto>,
 )
 
+/** Response for `POST /users/{id}/revoke-sessions` — count of sessions revoked (0 if the user had none). */
+@Serializable data class RevokeSessionsResponse(
+    val revoked: Int,
+)
+
+/**
+ * Read-only workspace configuration: tenant metadata, enabled sign-in methods, security/password
+ * policy, MFA policy, and magic-link/email-OTP limits. SMTP credentials are NEVER included — SMTP
+ * is configured and inspected exclusively via the admin UI. Not editable via API in v1.21.0.
+ */
+@Serializable data class WorkspaceDto(
+    val id: Int,
+    val slug: String,
+    val displayName: String,
+    val issuerUrl: String? = null,
+    val tokenExpirySeconds: Long,
+    val refreshTokenExpirySeconds: Long,
+    val registrationEnabled: Boolean,
+    val emailVerificationRequired: Boolean,
+    val passkeysEnabled: Boolean,
+    val maxConcurrentSessions: Int? = null,
+    val signInMethods: WorkspaceSignInMethodsDto,
+    val passwordPolicy: WorkspacePasswordPolicyDto,
+    val mfaPolicy: String,
+    val lockoutMaxAttempts: Int,
+    val lockoutDurationMinutes: Int,
+    val magicLinkTtlMinutes: Int,
+    val emailOtpSignupEnabled: Boolean,
+    val emailOtpLockoutThreshold: Int,
+    val corsAllowCredentials: Boolean,
+    val portalLayout: String,
+)
+
+@Serializable data class WorkspaceSignInMethodsDto(
+    val password: Boolean,
+    val passkey: Boolean,
+    val magicLink: Boolean,
+    val emailOtp: Boolean,
+)
+
+@Serializable data class WorkspacePasswordPolicyDto(
+    val minLength: Int,
+    val requireSpecial: Boolean,
+    val requireUppercase: Boolean,
+    val requireNumber: Boolean,
+    val historyCount: Int,
+    val maxAgeDays: Int,
+    val blacklistEnabled: Boolean,
+    val hibpCheckEnabled: Boolean,
+)
+
+@Serializable data class WebhookEndpointDto(
+    val id: Int,
+    val url: String,
+    val description: String,
+    val events: List<String>,
+    val enabled: Boolean,
+    val createdAt: String,
+)
+
+/**
+ * Response for POST /webhooks. Contains the created endpoint metadata plus
+ * the HMAC signing secret in plaintext. The secret is returned exactly
+ * ONCE — the server stores it and uses it to sign delivery payloads;
+ * clients that need to verify incoming webhooks must persist it now.
+ */
+@Serializable data class CreateWebhookResponse(
+    val endpoint: WebhookEndpointDto,
+    val secret: String,
+)
+
+@Serializable data class ResourceServerDto(
+    val id: Int,
+    val identifier: String,
+    val name: String,
+    val description: String? = null,
+    val enabled: Boolean,
+    val scopes: List<String>,
+    val createdAt: String,
+)
+
+@Serializable data class ApiKeyDto(
+    val id: Int,
+    val name: String,
+    val keyPrefix: String,
+    val scopes: List<String>,
+    val expiresAt: String? = null,
+    val lastUsedAt: String? = null,
+    val enabled: Boolean,
+    val bootstrapName: String? = null,
+    val createdAt: String,
+)
+
+/**
+ * Response for POST /api-keys. The `rawKey` field is the plaintext value —
+ * returned exactly ONCE. Persist it now; the server retains only a hash.
+ */
+@Serializable data class CreateApiKeyResponse(
+    val apiKey: ApiKeyDto,
+    val rawKey: String,
+)
+
+/**
+ * Passkey credential summary. Deliberately excludes `publicKeyCose` (raw COSE
+ * public-key bytes — internal), `signCounter` (WebAuthn replay-protection
+ * state — internal), `tenantId`, and `userId` (redundant with URL context on
+ * GET, internal for DELETE).
+ */
+@Serializable data class PasskeyDto(
+    val id: Long,
+    val credentialId: String,
+    val name: String,
+    /** AAGUID as UUID string, or null when the authenticator did not report one. */
+    val aaguid: String? = null,
+    val transports: List<String>,
+    val backupEligible: Boolean,
+    val backupState: Boolean,
+    val createdAt: String,
+    val lastUsedAt: String? = null,
+)
+
 // -- Domain → DTO mappers ----------------------------------------------------
 
 internal fun com.kauth.domain.model.User.toApiDto() =
@@ -300,6 +619,9 @@ internal fun com.kauth.domain.model.User.toApiDto() =
         emailVerified = emailVerified,
         enabled = enabled,
         mfaEnabled = mfaEnabled,
+        requiredActions = requiredActions.map { it.name },
+        isLocked = lockedUntil?.isAfter(java.time.Instant.now()) == true,
+        createdAt = createdAt?.let { isoFormatter.format(it) },
     )
 
 internal fun com.kauth.domain.model.Role.toApiDto() =
@@ -329,6 +651,7 @@ internal fun com.kauth.domain.model.Application.toApiDto() =
         accessType = accessType.name.lowercase(),
         enabled = enabled,
         redirectUris = redirectUris,
+        grantTypes = grantTypes.map { it.value },
         audience = audience,
     )
 
@@ -360,3 +683,92 @@ internal fun com.kauth.domain.model.TenantClaimMapper.toApiDto() =
         includeInAccess = includeInAccess,
         includeInId = includeInId,
     )
+
+internal fun com.kauth.domain.model.WebhookEndpoint.toApiDto(): WebhookEndpointDto =
+    WebhookEndpointDto(
+        id = id!!,
+        url = url,
+        description = description,
+        events = events.map { it.value }.sorted(),
+        enabled = enabled,
+        createdAt = isoFormatter.format(createdAt),
+    )
+
+internal fun com.kauth.domain.model.ResourceServer.toApiDto(): ResourceServerDto =
+    ResourceServerDto(
+        id = id!!.value,
+        identifier = identifier,
+        name = name,
+        description = description,
+        enabled = enabled,
+        scopes = scopes,
+        createdAt = isoFormatter.format(createdAt),
+    )
+
+internal fun com.kauth.domain.model.ApiKey.toApiDto(): ApiKeyDto =
+    ApiKeyDto(
+        id = id!!,
+        name = name,
+        keyPrefix = keyPrefix,
+        scopes = scopes,
+        expiresAt = expiresAt?.let { isoFormatter.format(it) },
+        lastUsedAt = lastUsedAt?.let { isoFormatter.format(it) },
+        enabled = enabled,
+        bootstrapName = bootstrapName,
+        createdAt = isoFormatter.format(createdAt),
+    )
+
+internal fun com.kauth.domain.model.WebAuthnCredential.toApiDto(): PasskeyDto =
+    PasskeyDto(
+        id = id!!,
+        credentialId = credentialId,
+        name = name,
+        aaguid = aaguid?.toString(),
+        transports = transports,
+        backupEligible = backupEligible,
+        backupState = backupState,
+        createdAt = isoFormatter.format(createdAt),
+        lastUsedAt = lastUsedAt?.let { isoFormatter.format(it) },
+    )
+
+internal fun com.kauth.domain.model.Tenant.toWorkspaceApiDto(): WorkspaceDto {
+    val sc = securityConfig
+    return WorkspaceDto(
+        id = id.value,
+        slug = slug,
+        displayName = displayName,
+        issuerUrl = issuerUrl,
+        tokenExpirySeconds = tokenExpirySeconds,
+        refreshTokenExpirySeconds = refreshTokenExpirySeconds,
+        registrationEnabled = registrationEnabled,
+        emailVerificationRequired = emailVerificationRequired,
+        passkeysEnabled = passkeysEnabled,
+        maxConcurrentSessions = maxConcurrentSessions,
+        signInMethods =
+            WorkspaceSignInMethodsDto(
+                password = sc.passwordLoginEnabled,
+                passkey = passkeysEnabled,
+                magicLink = sc.magicLinkEnabled,
+                emailOtp = sc.emailOtpLoginEnabled,
+            ),
+        passwordPolicy =
+            WorkspacePasswordPolicyDto(
+                minLength = sc.passwordMinLength,
+                requireSpecial = sc.passwordRequireSpecial,
+                requireUppercase = sc.passwordRequireUppercase,
+                requireNumber = sc.passwordRequireNumber,
+                historyCount = sc.passwordHistoryCount,
+                maxAgeDays = sc.passwordMaxAgeDays,
+                blacklistEnabled = sc.passwordBlacklistEnabled,
+                hibpCheckEnabled = sc.hibpCheckEnabled,
+            ),
+        mfaPolicy = sc.mfaPolicy,
+        lockoutMaxAttempts = sc.lockoutMaxAttempts,
+        lockoutDurationMinutes = sc.lockoutDurationMinutes,
+        magicLinkTtlMinutes = sc.magicLinkTokenTtlMinutes,
+        emailOtpSignupEnabled = sc.emailOtpSignupEnabled,
+        emailOtpLockoutThreshold = sc.emailOtpLockoutThreshold,
+        corsAllowCredentials = sc.corsAllowCredentials,
+        portalLayout = portalConfig.layout.name,
+    )
+}

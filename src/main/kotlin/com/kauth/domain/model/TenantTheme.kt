@@ -35,6 +35,11 @@ data class TenantTheme(
      * a stale value referring to an unmounted bundle silently falls back to English.
      */
     val defaultLocale: String? = null,
+    val loginLayout: LoginLayout = LoginLayout.CENTERED,
+    /** Optional URL for the SPLIT layout's left-panel background image. */
+    val loginBackgroundUrl: String? = null,
+    /** Optional tagline text shown on the SPLIT layout's left panel. Falls back to the workspace name. */
+    val loginTagline: String? = null,
 ) {
     /**
      * Emits a CSS :root block injected as an inline <style> tag before the auth

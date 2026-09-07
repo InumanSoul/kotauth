@@ -51,13 +51,6 @@
   line-height: var(--leading-relaxed);
 }
 
-/* ── Table inside ov-card (flush edges, no double border) ──────────────── */
-
-.ov-card > .data-table {
-  border: none;
-  border-top: 0.5px solid var(--color-border);
-}
-
 /* ── User cell helpers ───────────────────────────────────────────────── */
 
 .mfa-user-id {
