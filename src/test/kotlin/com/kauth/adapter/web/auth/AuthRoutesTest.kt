@@ -2253,6 +2253,42 @@ class AuthRoutesTest {
     // =========================================================================
 
     @Test
+    fun `GET openid-configuration advertises none as a token endpoint auth method`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/.well-known/openid-configuration")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            val methods = Regex(""""token_endpoint_auth_methods_supported"\s*:\s*\[([^\]]*)\]""").find(body)
+            assertNotNull(methods, "token_endpoint_auth_methods_supported must be present")
+            val listed = methods.groupValues[1]
+            // Public clients call the token endpoint with no secret; a conforming library
+            // configured as one refuses to start if this list does not say so.
+            assertTrue(listed.contains("\"none\""), "must advertise none, got: $listed")
+            assertTrue(listed.contains("\"client_secret_post\""), "must keep client_secret_post, got: $listed")
+            assertTrue(listed.contains("\"client_secret_basic\""), "must keep client_secret_basic, got: $listed")
+        }
+
+    @Test
     fun `GET openid-configuration authorization_endpoint value contains canonical authorize path`() =
         testApplication {
             resetFixtures()

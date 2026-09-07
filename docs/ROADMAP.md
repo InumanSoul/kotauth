@@ -395,6 +395,7 @@ Recorded ADRs live in [`docs/adr/`](adr/). This table is generated from those fi
 | [ADR-19](adr/ADR-19-merged-scim-resource.md) | `MergedScimResource` — a PATCH body reaches persistence only through the merge engine |
 | [ADR-20](adr/ADR-20-scim-dialects-selected-per-key.md) | A SCIM dialect is selected per API key, never sniffed from the request |
 | [ADR-21](adr/ADR-21-just-in-time-provisioning.md) | Just-in-time provisioning only creates; linking happens before the gate |
+| [ADR-22](adr/ADR-22-rfc8252-loopback-redirect-matching.md) | Loopback redirect URIs match on any port, for public clients only |
 
 ### Decisions without an ADR
 

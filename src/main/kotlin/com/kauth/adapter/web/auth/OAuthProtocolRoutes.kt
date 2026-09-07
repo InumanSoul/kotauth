@@ -120,6 +120,10 @@ internal fun Route.oauthProtocolRoutes(
                     buildJsonArray {
                         add("client_secret_post")
                         add("client_secret_basic")
+                        // Public clients authenticate with no secret at all (RFC 6749 §2.1,
+                        // OIDC Core §9). The server has always supported it; omitting it here
+                        // made conforming libraries refuse to start against a public client.
+                        add("none")
                     },
                 )
                 val baselineScopes = listOf("openid", "profile", "email")
