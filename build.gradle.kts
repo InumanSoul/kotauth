@@ -23,6 +23,27 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 group = "com.kauth"
 version = "1.24.0"
 
+// Pin the compile target explicitly rather than letting it follow whichever JDK
+// happens to build. `release`/`-Xjdk-release` also stop a newer build JDK from
+// linking against APIs that do not exist on 17 — bytecode alone would not.
+// Deliberately not a toolchain: that would also pin the JVM tests run on, and
+// CI's [17, 21] matrix exists to check both.
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        freeCompilerArgs.add("-Xjdk-release=17")
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(17)
+}
+
 application {
     mainClass.set("com.kauth.ApplicationKt")
 }
