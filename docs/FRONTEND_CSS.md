@@ -673,39 +673,19 @@ tasks.named("processResources") {
 ## Dockerfile Integration
 
 ```
-Stage 1  css-build     — node:20-slim + npm ci + lightningcss-cli
-Stage 2  kotlin-build  — gradle:8-jdk17 (copies CSS from Stage 1, skips all CSS tasks)
-Stage 3  runtime       — eclipse-temurin:17-jre, no Node, no build tools (~85 MB total)
+Stage 1  frontend-build — node:26-slim + npm ci + lightningcss-cli
+Stage 2  kotlin-build   — eclipse-temurin:17-jdk (copies CSS from Stage 1, skips all CSS tasks)
+Stage 3  runtime        — eclipse-temurin:25-jre, no Node, no build tools
 ```
 
-```dockerfile
-# Stage 1: CSS compilation
-FROM node:20-slim AS css-build
-WORKDIR /build
-# Install from lockfile — layer cached until package-lock.json changes
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
-# Copy source and compile
-COPY frontend/css ./css
-RUN ./node_modules/.bin/lightningcss --bundle --minify --targets '>= 0.5%' \
-    css/index-admin.css -o /build/kotauth-admin.css
-RUN ./node_modules/.bin/lightningcss --bundle --minify --targets '>= 0.5%' \
-    css/index-auth.css  -o /build/kotauth-auth.css
+The build compiles the CSS bundles in a Node stage, copies the output into the Kotlin stage,
+and runs Gradle with the CSS tasks excluded — so the runtime image carries no Node.js, no npm
+and no LightningCSS.
 
-# Stage 2: Kotlin build (CSS already compiled — skip all three CSS tasks)
-FROM gradle:8-jdk17 AS kotlin-build
-WORKDIR /home/gradle/src
-COPY --chown=gradle:gradle . .
-COPY --from=css-build /build/kotauth-admin.css src/main/resources/static/kotauth-admin.css
-COPY --from=css-build /build/kotauth-auth.css  src/main/resources/static/kotauth-auth.css
-RUN gradle buildFatJar -x installCssDeps -x compileCssAdmin -x compileCssAuth --no-daemon
+The authoritative version is the [`Dockerfile`](../Dockerfile) at the repository root. It is not
+reproduced here: a second copy drifts from the first, and this document previously described a
+`gradle:8-jdk17` build stage and an 85 MB runtime that had not been accurate for several releases.
 
-# Stage 3: Runtime — no Node.js, no npm, no LightningCSS
-FROM eclipse-temurin:17-jre
-COPY --from=kotlin-build /home/gradle/src/build/libs/*.jar /app/kauth.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/kauth.jar"]
-```
 
 ---
 
