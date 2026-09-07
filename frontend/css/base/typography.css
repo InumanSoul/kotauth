@@ -38,6 +38,7 @@ h3, .text-base {
 
 .text-sm  { font-size: var(--text-sm); }
 .text-xs  { font-size: var(--text-xs); }
+.text-muted { color: var(--color-muted); }
 
 /* ── Section / label typography ────────────────────────────────────────── */
 

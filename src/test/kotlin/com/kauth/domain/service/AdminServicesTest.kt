@@ -5,6 +5,7 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
@@ -83,6 +84,9 @@ class AdminServicesTest {
             emailBrandingRepository = emailBranding,
         )
 
+    private val collisionCheck = IdentifierCollisionCheck(users)
+    private val usernameGenerator = UsernameGenerator(users)
+
     private val userSvc =
         AdminUserService(
             tenantRepository = tenants,
@@ -91,6 +95,8 @@ class AdminServicesTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             credentialFlowService = credentialFlowService,
+            collisionCheck = collisionCheck,
+            usernameGenerator = usernameGenerator,
             passwordPolicy = passwordPolicy,
             emailPort = emailPort,
         )
@@ -222,11 +228,26 @@ class AdminServicesTest {
     }
 
     @Test
-    fun `createUser - blank username`() {
+    fun `createUser generates a username when none is supplied`() {
         val result =
             userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "  ",
+                email = "ana@company-a.com",
+                fullName = "Ana Ruiz",
+                password = "password123",
+                givenName = "Ana",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertTrue(result.value.username.startsWith("ana"), "got ${result.value.username}")
+    }
+
+    @Test
+    fun `createUser - invalid username characters`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "bad user!",
                 email = "bob@x.com",
                 fullName = "Bob",
                 password = "password123",
@@ -236,11 +257,37 @@ class AdminServicesTest {
     }
 
     @Test
-    fun `createUser - invalid username characters`() {
+    fun `createUser - email-shaped username is accepted`() {
         val result =
             userSvc.createUser(
                 tenantId = TenantId(1),
-                username = "bad user!",
+                username = "ada.lovelace@example.com",
+                email = "ada@x.com",
+                fullName = "Ada",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `createUser - plus-addressed username is accepted`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "ada+scim@example.com",
+                email = "ada2@x.com",
+                fullName = "Ada",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `createUser - username with slash is rejected`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "bob/smith",
                 email = "bob@x.com",
                 fullName = "Bob",
                 password = "password123",
@@ -322,6 +369,95 @@ class AdminServicesTest {
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_CREATED))
     }
 
+    @Test
+    fun `createUser rejects a username equal to another users email`() {
+        users.add(alice.copy(id = UserId(50), username = "bob", email = "carol@example.com"))
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "carol@example.com",
+                email = "newperson@example.com",
+                fullName = "New Person",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser rejects an email equal to another users username`() {
+        users.add(alice.copy(id = UserId(51), username = "dave@example.com", email = "dave-alt@example.com"))
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "eve",
+                email = "dave@example.com",
+                fullName = "Eve",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser allows a username equal to the same users own email`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "frank@example.com",
+                email = "frank@example.com",
+                fullName = "Frank",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `createUser rejects an email equal to another users username in different case`() {
+        // Production never stores a mixed-case username (see UsernamePolicy) — the case
+        // difference this test exercises comes from the NEW request's email instead, which
+        // createUser itself lowercases before the collision check runs.
+        users.add(alice.copy(id = UserId(52), username = "dave2@example.com", email = "dave-alt2@example.com"))
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "gail",
+                email = "Dave2@Example.com",
+                fullName = "Gail",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser rejects a username equal to another users email in different case`() {
+        users.add(alice.copy(id = UserId(53), username = "harold", email = "Carol2@Example.com"))
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "carol2@example.com",
+                email = "newperson2@example.com",
+                fullName = "New Person 2",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser allows a username equal to the same users own email in different case`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "Frank2@Example.com",
+                email = "frank2@example.com",
+                fullName = "Frank Two",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
     // =========================================================================
     // createUser — invite mode
     // =========================================================================
@@ -391,6 +527,85 @@ class AdminServicesTest {
         assertIs<AdminResult.Success<User>>(result)
         assertEquals(0, emailPort.sent.size, "No email should be sent when SMTP is not configured")
         assertTrue(!auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
+    }
+
+    @Test
+    fun `createUser invite - dispatchInvite=false suppresses the inline send`() {
+        // Used by SCIM provisioning, which must not hold a DB transaction open across the
+        // SMTP round-trip — see dispatchPendingInvite below.
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+                dispatchInvite = false,
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertTrue(RequiredAction.SET_PASSWORD in result.value.requiredActions, "still an invite-style user")
+        assertEquals(0, emailPort.sent.size)
+        assertTrue(!auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
+    }
+
+    @Test
+    fun `dispatchPendingInvite - sends the invite a suppressed createUser deferred`() {
+        val created =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+                dispatchInvite = false,
+            )
+        assertIs<AdminResult.Success<User>>(created)
+
+        val result = userSvc.dispatchPendingInvite(created.value.id!!, TenantId(1), "http://localhost:8080")
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(1, emailPort.sent.size)
+        assertEquals("invite", emailPort.sent[0].type)
+        assertTrue(auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
+    }
+
+    @Test
+    fun `dispatchPendingInvite - no-op when the user has no pending invite`() {
+        val result = userSvc.dispatchPendingInvite(alice.id!!, TenantId(1), "http://localhost:8080")
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(0, emailPort.sent.size)
+    }
+
+    @Test
+    fun `dispatchPendingInvite - no-op when SMTP is not configured`() {
+        val noSmtpTenant = tenant.copy(id = TenantId(2), slug = "no-smtp", smtpHost = null, smtpEnabled = false)
+        tenants.add(noSmtpTenant)
+        val created =
+            userSvc.createUser(
+                tenantId = TenantId(2),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+                dispatchInvite = false,
+            )
+        assertIs<AdminResult.Success<User>>(created)
+
+        val result = userSvc.dispatchPendingInvite(created.value.id!!, TenantId(2), "http://localhost:8080")
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(0, emailPort.sent.size)
+    }
+
+    @Test
+    fun `dispatchPendingInvite - not found for a user in another tenant`() {
+        val result = userSvc.dispatchPendingInvite(alice.id!!, TenantId(2), "http://localhost:8080")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
     }
 
     @Test
@@ -500,6 +715,230 @@ class AdminServicesTest {
         assertIs<AdminResult.Success<User>>(result)
         assertEquals("alice@example.com", result.value.email)
         assertEquals("Alice Test", result.value.fullName)
+    }
+
+    @Test
+    fun `updateUser - changes the username`() {
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "alice.new")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice.new", result.value.username)
+        assertEquals("alice.new", users.findById(UserId(10), TenantId(1))!!.username)
+        assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_UPDATED))
+    }
+
+    @Test
+    fun `updateUser - rejects a username that is another user's email`() {
+        users.add(alice.copy(id = UserId(20), username = "zoe", email = "taken@example.com"))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "taken@example.com")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateUser - rejects a username already taken as another user's username`() {
+        users.add(alice.copy(id = UserId(20), username = "zoe", email = "zoe@example.com"))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "zoe")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Conflict>(result.error)
+    }
+
+    @Test
+    fun `updateUser rejects an email equal to another user's username even when no rename is requested`() {
+        users.add(alice.copy(id = UserId(20), username = "bob@example.com", email = "bob@other.com"))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), email = "bob@example.com")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `replaceUserProfile rejects an email equal to another user's username even when no rename is requested`() {
+        users.add(alice.copy(id = UserId(20), username = "bob@example.com", email = "bob@other.com"))
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "bob@example.com",
+                fullName = "Alice Test",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+                username = null,
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateUser allows a fullName-only change when the user's OWN stored email already collides`() {
+        // Alice's stored email happens to equal another user's username — a pre-existing,
+        // already-tolerated pair. It must not block an update that never touches the email.
+        users.add(alice.copy(id = UserId(20), username = "alice@example.com", email = "other@example.com"))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("Alice Renamed", result.value.fullName)
+        assertEquals("alice@example.com", result.value.email)
+    }
+
+    @Test
+    fun `updateUser still rejects a NEWLY set email that collides with another user's username`() {
+        users.add(alice.copy(id = UserId(20), username = "newname@example.com", email = "other@example.com"))
+        val result =
+            userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), email = "newname@example.com")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `replaceUserProfile allows a fullName-only change when the user's OWN stored email already collides`() {
+        users.add(alice.copy(id = UserId(20), username = "alice@example.com", email = "other@example.com"))
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "alice@example.com",
+                fullName = "Alice Renamed",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+                username = null,
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("Alice Renamed", result.value.fullName)
+    }
+
+    @Test
+    fun `updateUser - allows setting the username to the user's own email`() {
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "alice@example.com")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice@example.com", result.value.username)
+    }
+
+    @Test
+    fun `updateUser - rejects an invalid username format`() {
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "not valid!")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateUser - null username leaves the existing username untouched`() {
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice", result.value.username)
+    }
+
+    @Test
+    fun `updateUser - audit records the new username only when it actually changed`() {
+        auditLog.clear()
+        userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "alice.renamed")
+        val event = auditLog.events.last { it.eventType == AuditEventType.ADMIN_USER_UPDATED }
+        assertEquals("alice.renamed", event.details["newUsername"])
+    }
+
+    @Test
+    fun `updateUser - audit omits newUsername when the username is unchanged`() {
+        auditLog.clear()
+        userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
+        val event = auditLog.events.last { it.eventType == AuditEventType.ADMIN_USER_UPDATED }
+        assertTrue(!event.details.containsKey("newUsername"))
+    }
+
+    @Test
+    fun `replaceUserProfile - username null leaves the existing username untouched`() {
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "alice@example.com",
+                fullName = "Alice Test",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice", result.value.username)
+    }
+
+    @Test
+    fun `replaceUserProfile - renames the username when provided`() {
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "alice@example.com",
+                fullName = "Alice Test",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+                username = "alice.renamed",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice.renamed", result.value.username)
+    }
+
+    @Test
+    fun `updateUser - unrelated fields updatable for a stored username that predates format validation`() {
+        users.add(alice.copy(username = "john doe"))
+        val result =
+            userSvc.updateUser(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "newalice@example.com",
+                fullName = "Alice Updated",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("john doe", result.value.username)
+        assertEquals("newalice@example.com", result.value.email)
+        assertEquals("Alice Updated", result.value.fullName)
+    }
+
+    @Test
+    fun `updateUser - renaming a stored non-conforming username to an invalid format still fails`() {
+        users.add(alice.copy(username = "john doe"))
+        val result =
+            userSvc.updateUser(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                username = "not valid!",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+        assertEquals("john doe", users.findById(UserId(10), TenantId(1))!!.username)
+    }
+
+    @Test
+    fun `replaceUserProfile - unrelated fields updatable for a stored username that predates format validation`() {
+        users.add(alice.copy(username = "john doe"))
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "newalice@example.com",
+                fullName = "Alice Updated",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("john doe", result.value.username)
+        assertEquals("newalice@example.com", result.value.email)
+        assertEquals("Alice Updated", result.value.fullName)
+    }
+
+    @Test
+    fun `updateUser - a pre-existing colliding pair can still have unrelated fields updated`() {
+        // Legal before this feature existed: user 10's username equals user 20's email.
+        users.add(alice.copy(username = "taken@example.com"))
+        users.add(alice.copy(id = UserId(20), username = "zoe", email = "taken@example.com"))
+        val result =
+            userSvc.updateUser(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                fullName = "Alice Updated",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("Alice Updated", result.value.fullName)
+        assertEquals("taken@example.com", result.value.username)
     }
 
     // =========================================================================
@@ -1176,6 +1615,7 @@ class AdminServicesTest {
             emailOtpLockoutThreshold = 5,
             emailOtpLoginEnabled = false,
             passkeysEnabled = true,
+            loginIdentifierMode = LoginIdentifierMode.USERNAME,
         )
 
     @Test

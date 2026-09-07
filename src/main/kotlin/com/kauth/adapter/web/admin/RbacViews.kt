@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.Role
@@ -17,7 +18,7 @@ internal fun rolesListPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Roles — ${workspace.displayName}",
+            pageTitle = "Roles · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -25,8 +26,7 @@ internal fun rolesListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -58,9 +58,9 @@ internal fun rolesListPageImpl(
                 table("data-table") {
                     thead {
                         tr {
-                            th { +"Name" }
+                            th { +EnglishStrings.COL_NAME }
                             th { +"Scope" }
-                            th { +"Description" }
+                            th { +EnglishStrings.COL_DESCRIPTION }
                             th { +"Composite" }
                             th { style = "width:70px;" }
                         }
@@ -76,8 +76,8 @@ internal fun rolesListPageImpl(
                                 }
                                 td {
                                     val isWorkspace = role.scope.value == "tenant"
-                                    span(if (isWorkspace) "badge badge--active" else "badge badge--confidential") {
-                                        +(if (isWorkspace) "workspace" else "application")
+                                    span("data-table__meta") {
+                                        +(if (isWorkspace) "Workspace" else "Application")
                                     }
                                 }
                                 td { span("data-table__name") { +(role.description ?: "\u2014") } }
@@ -91,7 +91,7 @@ internal fun rolesListPageImpl(
                                         a(
                                             href = "/admin/workspaces/$slug/roles/${role.id?.value}",
                                             classes = "btn btn--ghost btn--sm",
-                                        ) { +"Open" }
+                                        ) { +EnglishStrings.ACTION_VIEW_DETAIL }
                                     }
                                 }
                             }
@@ -114,7 +114,7 @@ internal fun createRolePageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "New Role — ${workspace.displayName}",
+            pageTitle = "New Role · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -122,8 +122,7 @@ internal fun createRolePageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -149,7 +148,7 @@ internal fun createRolePageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(
@@ -244,7 +243,7 @@ internal fun roleDetailPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "${role.name} — Roles",
+            pageTitle = "${role.name} · Roles",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -252,7 +251,6 @@ internal fun roleDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -391,8 +389,8 @@ internal fun roleDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Username" }
-                                th { +"Email" }
+                                th { +EnglishStrings.COL_USERNAME }
+                                th { +EnglishStrings.COL_EMAIL }
                                 th { style = "width:80px;" }
                             }
                         }
@@ -405,7 +403,7 @@ internal fun roleDetailPageImpl(
                                             classes = "data-table__name",
                                         ) { +u.username }
                                     }
-                                    td { +u.email }
+                                    td { span("data-table__email") { +u.email } }
                                     td {
                                         form(
                                             action = "/admin/workspaces/$slug/roles/${role.id?.value}/unassign-user",
@@ -449,7 +447,7 @@ internal fun groupsListPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Groups — ${workspace.displayName}",
+            pageTitle = "Groups · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -457,8 +455,7 @@ internal fun groupsListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -490,10 +487,10 @@ internal fun groupsListPageImpl(
                 table("data-table") {
                     thead {
                         tr {
-                            th { +"Name" }
+                            th { +EnglishStrings.COL_NAME }
                             th { +"Parent" }
-                            th { +"Roles" }
-                            th { +"Description" }
+                            th { +EnglishStrings.COL_ROLES }
+                            th { +EnglishStrings.COL_DESCRIPTION }
                             th { style = "width:70px;" }
                         }
                     }
@@ -523,7 +520,7 @@ internal fun groupsListPageImpl(
                                         a(
                                             href = "/admin/workspaces/$slug/groups/${group.id?.value}",
                                             classes = "btn btn--ghost btn--sm",
-                                        ) { +"Open" }
+                                        ) { +EnglishStrings.ACTION_VIEW_DETAIL }
                                     }
                                 }
                             }
@@ -546,7 +543,7 @@ internal fun createGroupPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "New Group — ${workspace.displayName}",
+            pageTitle = "New Group · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -554,8 +551,7 @@ internal fun createGroupPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -581,7 +577,7 @@ internal fun createGroupPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(
@@ -643,12 +639,14 @@ internal fun groupDetailPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     toastMessage: String? = null,
+    error: String? = null,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
+        val childGroups = allGroups.filter { it.parentGroupId == group.id }
 
         adminShell(
-            pageTitle = "${group.name} — Groups",
+            pageTitle = "${group.name} · Groups",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -656,7 +654,6 @@ internal fun groupDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -670,7 +667,12 @@ internal fun groupDetailPageImpl(
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
-                        h1("page-header__title") { +group.name }
+                        div("page-header__title-row") {
+                            h1("page-header__title") { +group.name }
+                            if (group.externalId != null) {
+                                idpManagedBadge()
+                            }
+                        }
                         p("page-header__sub") {
                             val parent = allGroups.find { it.id == group.parentGroupId }
                             +(if (parent != null) "Child of ${parent.name}" else "Top-level group")
@@ -690,11 +692,35 @@ internal fun groupDetailPageImpl(
                     ) {
                         button(type = ButtonType.submit) {
                             classes = setOf("btn", "btn--danger")
-                            attributes["data-confirm"] = "Delete group ${group.name}?"
-                            +"Delete"
+                            if (childGroups.isEmpty()) {
+                                attributes["data-confirm"] = EnglishStrings.groupDeleteConfirm(group.name)
+                            } else {
+                                disabled = true
+                                title = EnglishStrings.GROUP_DELETE_BLOCKED_TITLE
+                            }
+                            +EnglishStrings.GROUP_DELETE
                         }
                     }
                 }
+            }
+
+            if (error != null) {
+                errorNotice(error)
+            }
+
+            if (childGroups.isNotEmpty()) {
+                notice(modifier = "notice--warn") {
+                    span("notice__title") {
+                        +EnglishStrings.groupDeleteBlockedBySubgroups(group.name, childGroups)
+                    }
+                }
+            }
+
+            // ── Identity provider ────────────────────────────────────
+            // Roles ride along as the editable exception: SCIM carries no roles, so this page is
+            // the only place they are ever set.
+            group.externalId?.let {
+                idpManagedCard(it, alsoEditable = EnglishStrings.SCIM_IDP_MANAGED_ROLES_EDITABLE)
             }
 
             // ── Edit name/description ────────────────────────────────
@@ -748,7 +774,7 @@ internal fun groupDetailPageImpl(
                                 tr {
                                     td { span("data-table__name") { +(r?.name ?: "#${rid.value}") } }
                                     td {
-                                        span("badge badge--active") { +(r?.scope?.value ?: "?") }
+                                        span("data-table__meta") { +(r?.scope?.value ?: "\u2014") }
                                     }
                                     td {
                                         form(
@@ -808,16 +834,23 @@ internal fun groupDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Username" }
-                                th { +"Email" }
+                                th { +EnglishStrings.COL_USERNAME }
+                                th { +EnglishStrings.COL_EMAIL }
                                 th { style = "width:80px;" }
                             }
                         }
                         tbody {
                             members.forEach { u ->
                                 tr {
-                                    td { span("data-table__name") { +u.username } }
-                                    td { span("data-table__meta") { +u.email } }
+                                    // Every other table reaches the user record from the
+                                    // username; this one alone left it inert.
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/$slug/users/${u.id?.value}",
+                                            classes = "data-table__name",
+                                        ) { +u.username }
+                                    }
+                                    td { span("data-table__email") { +u.email } }
                                     td {
                                         form(
                                             action = "/admin/workspaces/$slug/groups/${group.id?.value}/remove-member",

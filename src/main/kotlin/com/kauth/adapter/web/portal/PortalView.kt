@@ -6,7 +6,9 @@ import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.adapter.web.providerIconName
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.SocialAccount
@@ -88,6 +90,7 @@ object PortalView {
         slug: String,
         ctx: ViewContext,
         error: String?,
+        loginIdentifierMode: LoginIdentifierMode,
     ): HTML.() -> Unit =
         {
             head { authPageHead("${ctx.workspaceName} | ${ctx.t("PORTAL_LOGIN_SUBMIT")}", ctx.theme) }
@@ -109,15 +112,36 @@ object PortalView {
                         encType = FormEncType.applicationXWwwFormUrlEncoded,
                         method = FormMethod.post,
                     ) {
+                        val identifierLabel =
+                            when (loginIdentifierMode) {
+                                LoginIdentifierMode.USERNAME -> ctx.t("PORTAL_LOGIN_USERNAME")
+                                LoginIdentifierMode.EMAIL -> ctx.t("LOGIN_IDENTIFIER_EMAIL")
+                                LoginIdentifierMode.EITHER -> ctx.t("LOGIN_IDENTIFIER_EITHER")
+                            }
+                        val identifierPlaceholder =
+                            when (loginIdentifierMode) {
+                                LoginIdentifierMode.USERNAME -> ctx.t("PORTAL_LOGIN_USERNAME_PLACEHOLDER")
+                                LoginIdentifierMode.EMAIL -> ctx.t("LOGIN_IDENTIFIER_EMAIL_PLACEHOLDER")
+                                LoginIdentifierMode.EITHER -> ctx.t("LOGIN_IDENTIFIER_EITHER_PLACEHOLDER")
+                            }
+                        // EITHER stays type=text: type=email would let native validation
+                        // block a legitimate username from being submitted at all.
+                        val identifierType =
+                            if (loginIdentifierMode == LoginIdentifierMode.EMAIL) InputType.email else InputType.text
+                        val autocompleteBase =
+                            if (loginIdentifierMode == LoginIdentifierMode.EMAIL) "email" else "username"
                         div("field") {
                             label {
                                 htmlFor = "username"
-                                +ctx.t("PORTAL_LOGIN_USERNAME")
+                                +identifierLabel
                             }
-                            input(type = InputType.text, name = "username") {
+                            input(type = identifierType, name = "username") {
                                 id = "username"
-                                placeholder = ctx.t("PORTAL_LOGIN_USERNAME_PLACEHOLDER")
-                                attributes["autocomplete"] = "username"
+                                placeholder = identifierPlaceholder
+                                attributes["autocomplete"] = autocompleteBase
+                                if (loginIdentifierMode == LoginIdentifierMode.EMAIL) {
+                                    attributes["inputmode"] = "email"
+                                }
                                 required = true
                                 attributes["autofocus"] = "true"
                             }
@@ -269,13 +293,13 @@ object PortalView {
                                         div(classes = "social-accounts-list__provider") {
                                             span(classes = "social-accounts-list__icon") {
                                                 inlineSvgIcon(
-                                                    iconName = "${account.provider.value}-logo",
-                                                    ariaLabel = account.provider.displayName,
+                                                    iconName = providerIconName(account.provider),
+                                                    ariaLabel = EnglishStrings.providerDisplayName(account.provider),
                                                 )
                                             }
                                             div(classes = "social-accounts-list__info") {
                                                 span(classes = "social-accounts-list__name") {
-                                                    +account.provider.displayName
+                                                    +EnglishStrings.providerDisplayName(account.provider)
                                                 }
                                                 if (!account.providerEmail.isNullOrBlank()) {
                                                     span(classes = "social-accounts-list__email") {

@@ -368,6 +368,12 @@ class ApiClaimMapperRoutesTest {
                         passwordHasher = hasher,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
                         credentialFlowService = buildFakeSelfService(),
+                        collisionCheck =
+                            com.kauth.domain.service
+                                .IdentifierCollisionCheck(userRepo),
+                        usernameGenerator =
+                            com.kauth.domain.service
+                                .UsernameGenerator(userRepo),
                     ),
                 mfaService =
                     com.kauth.domain.service.MfaService(
@@ -390,6 +396,7 @@ class ApiClaimMapperRoutesTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = AlwaysAllowLimiter(),
+                apiReadRateLimiter = AlwaysAllowLimiter(),
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =
@@ -401,6 +408,8 @@ class ApiClaimMapperRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
+                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
     }

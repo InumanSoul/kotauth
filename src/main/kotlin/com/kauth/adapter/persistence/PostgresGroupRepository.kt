@@ -34,13 +34,28 @@ class PostgresGroupRepository : GroupRepository {
                 ?.toGroup()
         }
 
-    override fun findByTenantId(tenantId: TenantId): List<Group> =
+    override fun findByTenantId(
+        tenantId: TenantId,
+        limit: Int,
+        offset: Int,
+        loadRoles: Boolean,
+    ): List<Group> =
         transaction {
             GroupsTable
                 .selectAll()
                 .where { GroupsTable.tenantId eq tenantId.value }
                 .orderBy(GroupsTable.name)
-                .map { it.toGroup() }
+                .limit(limit)
+                .offset(offset.toLong())
+                .map { it.toGroup(loadRoles = loadRoles) }
+        }
+
+    override fun countByTenantId(tenantId: TenantId): Long =
+        transaction {
+            GroupsTable
+                .selectAll()
+                .where { GroupsTable.tenantId eq tenantId.value }
+                .count()
         }
 
     override fun findByName(
@@ -72,6 +87,20 @@ class PostgresGroupRepository : GroupRepository {
                 .map { it.toGroup() }
         }
 
+    override fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): Group? =
+        transaction {
+            GroupsTable
+                .selectAll()
+                .where {
+                    (GroupsTable.tenantId eq tenantId.value) and
+                        (GroupsTable.externalId eq externalId)
+                }.singleOrNull()
+                ?.toGroup()
+        }
+
     override fun save(group: Group): Group =
         transaction {
             val id =
@@ -79,6 +108,7 @@ class PostgresGroupRepository : GroupRepository {
                     it[tenantId] = group.tenantId.value
                     it[name] = group.name
                     it[description] = group.description
+                    it[externalId] = group.externalId
                     it[parentGroupId] = group.parentGroupId?.value
                     it[attributes] = serializeAttributes(group.attributes)
                     it[createdAt] = OffsetDateTime.now(ZoneOffset.UTC)
@@ -92,6 +122,7 @@ class PostgresGroupRepository : GroupRepository {
             GroupsTable.update({ GroupsTable.id eq group.id!!.value }) {
                 it[name] = group.name
                 it[description] = group.description
+                it[externalId] = group.externalId
                 it[parentGroupId] = group.parentGroupId?.value
                 it[attributes] = serializeAttributes(group.attributes)
             }
@@ -171,12 +202,36 @@ class PostgresGroupRepository : GroupRepository {
                 .map { it.toGroup() }
         }
 
+    override fun findGroupsForUsers(userIds: List<UserId>): Map<UserId, List<Group>> =
+        if (userIds.isEmpty()) {
+            emptyMap()
+        } else {
+            transaction {
+                (UserGroupsTable innerJoin GroupsTable)
+                    .selectAll()
+                    .where { UserGroupsTable.userId inList userIds.map { it.value } }
+                    .groupBy({ UserId(it[UserGroupsTable.userId]) }, { it.toGroup() })
+            }
+        }
+
     override fun findUserIdsInGroup(groupId: GroupId): List<UserId> =
         transaction {
             UserGroupsTable
                 .selectAll()
                 .where { UserGroupsTable.groupId eq groupId.value }
                 .map { UserId(it[UserGroupsTable.userId]) }
+        }
+
+    override fun findUserIdsForGroups(groupIds: List<GroupId>): Map<GroupId, List<UserId>> =
+        if (groupIds.isEmpty()) {
+            emptyMap()
+        } else {
+            transaction {
+                UserGroupsTable
+                    .selectAll()
+                    .where { UserGroupsTable.groupId inList groupIds.map { it.value } }
+                    .groupBy({ GroupId(it[UserGroupsTable.groupId]) }, { UserId(it[UserGroupsTable.userId]) })
+            }
         }
 
     // -------------------------------------------------------------------------
@@ -210,20 +265,25 @@ class PostgresGroupRepository : GroupRepository {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private fun ResultRow.toGroup(): Group {
+    private fun ResultRow.toGroup(loadRoles: Boolean = true): Group {
         val gid = this[GroupsTable.id]
         return Group(
             id = GroupId(gid),
             tenantId = TenantId(this[GroupsTable.tenantId]),
             name = this[GroupsTable.name],
             description = this[GroupsTable.description],
+            externalId = this[GroupsTable.externalId],
             parentGroupId = this[GroupsTable.parentGroupId]?.let { GroupId(it) },
             attributes = parseAttributes(this[GroupsTable.attributes]),
             roleIds =
-                GroupRolesTable
-                    .selectAll()
-                    .where { GroupRolesTable.groupId eq gid }
-                    .map { RoleId(it[GroupRolesTable.roleId]) },
+                if (!loadRoles) {
+                    emptyList()
+                } else {
+                    GroupRolesTable
+                        .selectAll()
+                        .where { GroupRolesTable.groupId eq gid }
+                        .map { RoleId(it[GroupRolesTable.roleId]) }
+                },
             createdAt = this[GroupsTable.createdAt].toInstant(),
         )
     }

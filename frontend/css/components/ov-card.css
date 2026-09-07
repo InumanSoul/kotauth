@@ -21,20 +21,36 @@
   background: var(--color-card);
   border: 0.5px solid var(--color-border-md);
   border-radius: 0;
-  overflow: hidden;
+  /* A card holding a wide table used to clip it, so at a narrow viewport the last
+   * columns were unreachable rather than merely off-screen. The card scrolls on the
+   * one axis that can overflow; the vertical clip is unchanged. */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
-form+.ov-card { margin-top: var(--space-5); }
-.ov-card + .ov-card { margin-top: var(--space-5); }
+
+/* ── Nested surfaces ───────────────────────────────────────────────────── */
+
+.ov-card > .data-table,
+.ov-card > .method-table,
+.ov-card > .notice {
+  border: none;
+  margin-bottom: 0;
+}
+
+/* A table filling the card meets its edges, so its own outer rules are redundant. */
+.ov-card > .data-table tbody tr:last-child td { border-bottom: none; }
 
 /* ── Section label (divider heading row) ───────────────────────────────── */
 
+/* Sentence case, brighter and a size up from `th`. The two were the same 10px uppercase
+ * subtle grey on the same ground, so a card heading sitting directly above a table's
+ * column headers read as a second header row rather than as the thing that names them. */
 .ov-card__section-label {
-  font-size: var(--text-xs);
+  font-size: var(--text-base);
   font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-subtle);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
   padding: var(--space-3) var(--space-4);
   border-bottom: 0.5px solid var(--color-border-md);
   background: rgba(255, 255, 255, 0.02);
@@ -128,4 +144,14 @@ form+.ov-card { margin-top: var(--space-5); }
   align-items: center;
   gap: var(--space-2);
   background: rgba(255, 255, 255, 0.02);
+}
+
+/* The lead-in of a prose row: names what the sentence below it is about, without
+ * borrowing the label column that a value row uses. */
+.ov-card__prose-term {
+  display: block;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
 }

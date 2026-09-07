@@ -38,6 +38,9 @@ class ApiKeyService(
      * @param name      Human-readable label (e.g. "CI pipeline").
      * @param scopes    List of [ApiScope] strings. Unknown scopes are silently dropped.
      * @param expiresAt Optional absolute expiry — null means the key never expires.
+     * @param scimDialect Wire dialect for the SCIM surface. The registry of dialect ids lives in
+     *        the web adapter, so the caller resolves the id and this service stores what it is
+     *        handed; blank falls back to [ApiKey.DEFAULT_SCIM_DIALECT].
      *
      * @return [ApiKeyResult.Created] with the persisted [ApiKey] and the one-time [rawKey].
      *         The [rawKey] is never stored — the caller MUST surface it to the user immediately.
@@ -47,6 +50,7 @@ class ApiKeyService(
         name: String,
         scopes: List<String>,
         expiresAt: Instant? = null,
+        scimDialect: String = ApiKey.DEFAULT_SCIM_DIALECT,
     ): ApiKeyResult<CreatedApiKey> {
         if (name.isBlank()) {
             return ApiKeyResult.Failure(ApiKeyError.Validation("API key name is required."))
@@ -81,6 +85,7 @@ class ApiKeyService(
                     scopes = validScopes,
                     expiresAt = expiresAt,
                     enabled = true,
+                    scimDialect = scimDialect.trim().ifBlank { ApiKey.DEFAULT_SCIM_DIALECT },
                 ),
             )
 
@@ -131,6 +136,28 @@ class ApiKeyService(
         id: Int,
         tenantId: TenantId,
     ): ApiKey? = apiKeyRepository.findById(id, tenantId)
+
+    /**
+     * Corrects the SCIM wire dialect on an existing key.
+     *
+     * The dialect registry lives in the web adapter, so the caller resolves the id first and this
+     * service stores what it is handed — the same contract as [create]. Nothing else on the key
+     * moves: key material, scopes, expiry, and the enabled flag each carry their own decision.
+     */
+    fun updateScimDialect(
+        id: Int,
+        tenantId: TenantId,
+        scimDialect: String,
+    ): ApiKeyResult<Unit> {
+        apiKeyRepository.findById(id, tenantId)
+            ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("API key not found."))
+        apiKeyRepository.updateScimDialect(
+            id,
+            tenantId,
+            scimDialect.trim().ifBlank { ApiKey.DEFAULT_SCIM_DIALECT },
+        )
+        return ApiKeyResult.Success(Unit)
+    }
 
     fun revoke(
         id: Int,

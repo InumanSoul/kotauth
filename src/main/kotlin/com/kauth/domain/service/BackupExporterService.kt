@@ -117,6 +117,7 @@ class BackupExporterService(
                             emailOtpSignupEnabled = emailOtpSignupEnabled,
                             emailOtpLockoutThreshold = emailOtpLockoutThreshold,
                             emailOtpLoginEnabled = emailOtpLoginEnabled,
+                            loginIdentifierMode = loginIdentifierMode,
                         )
                     },
                 theme =
@@ -220,6 +221,7 @@ class BackupExporterService(
                         group.id?.let { gid ->
                             groupRepository.findRoleIdsForGroup(gid).mapNotNull { rolesByPk[it]?.name }
                         } ?: emptyList(),
+                    externalId = group.externalId,
                 )
             }
 
@@ -243,6 +245,9 @@ class BackupExporterService(
                     customAttributes = attributes,
                     roleNames = userRoles.map { it.name },
                     groupPaths = userGroups.mapNotNull { it.id?.let { gid -> groupPath(gid, groupsByPk) } },
+                    externalId = user.externalId,
+                    givenName = user.givenName,
+                    familyName = user.familyName,
                 )
             }
 

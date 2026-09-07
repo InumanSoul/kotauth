@@ -7,6 +7,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebAuthnCredential
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -153,6 +154,10 @@ class PasskeyAuthRoutesTest {
                             passwordHasher = hasher,
                             auditLog = auditLog,
                             sessionRepository = sessions,
+                            identifierResolver = UserIdentifierResolver(userRepo),
+                            collisionCheck =
+                                com.kauth.domain.service
+                                    .IdentifierCollisionCheck(userRepo),
                         ),
                     oauthService = buildOAuthService(),
                     tenantRepository = tenantRepo,

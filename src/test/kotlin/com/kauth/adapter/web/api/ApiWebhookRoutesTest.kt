@@ -132,6 +132,12 @@ class ApiWebhookRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             credentialFlowService = accountSelfService,
+            collisionCheck =
+                com.kauth.domain.service
+                    .IdentifierCollisionCheck(userRepo),
+            usernameGenerator =
+                com.kauth.domain.service
+                    .UsernameGenerator(userRepo),
         )
 
     private val mfaService =
@@ -513,6 +519,7 @@ class ApiWebhookRoutesTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = AlwaysAllowLimiter(),
+                apiReadRateLimiter = AlwaysAllowLimiter(),
                 webhookService = webhookService,
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =
@@ -524,6 +531,8 @@ class ApiWebhookRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
+                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
     }

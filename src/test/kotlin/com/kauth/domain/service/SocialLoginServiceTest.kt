@@ -1,8 +1,9 @@
 package com.kauth.domain.service
 
+import com.kauth.config.StaticSocialProviderResolver
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.IdentityProvider
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
@@ -39,8 +40,8 @@ class SocialLoginServiceTest {
     private val tokens = FakeTokenPort()
     private val hasher = FakePasswordHasher()
     private val auditLog = FakeAuditLogPort()
-    private val googleAdapter = FakeSocialProviderPort(SocialProvider.GOOGLE)
-    private val githubAdapter = FakeSocialProviderPort(SocialProvider.GITHUB)
+    private val googleAdapter = FakeSocialProviderPort(ProviderKey.GOOGLE)
+    private val githubAdapter = FakeSocialProviderPort(ProviderKey.GITHUB)
 
     private val svc =
         SocialLoginService(
@@ -52,11 +53,14 @@ class SocialLoginServiceTest {
             tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
-            providerAdapters =
-                mapOf(
-                    SocialProvider.GOOGLE to googleAdapter,
-                    SocialProvider.GITHUB to githubAdapter,
+            providerResolver =
+                StaticSocialProviderResolver(
+                    mapOf(
+                        ProviderKey.GOOGLE to googleAdapter,
+                        ProviderKey.GITHUB to githubAdapter,
+                    ),
                 ),
+            collisionCheck = IdentifierCollisionCheck(users),
         )
 
     private val tenant =
@@ -71,7 +75,7 @@ class SocialLoginServiceTest {
     private val googleIdp =
         IdentityProvider(
             tenantId = TenantId(1),
-            provider = SocialProvider.GOOGLE,
+            provider = ProviderKey.GOOGLE,
             clientId = "google-client-id",
             clientSecret = "google-secret",
             enabled = true,
@@ -135,14 +139,14 @@ class SocialLoginServiceTest {
 
     @Test
     fun `buildRedirectUrl - tenant not found`() {
-        val result = svc.buildRedirectUrl("unknown", SocialProvider.GOOGLE, "state123", "http://localhost")
+        val result = svc.buildRedirectUrl("unknown", ProviderKey.GOOGLE, "state123", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.TenantNotFound, result.error)
     }
 
     @Test
     fun `buildRedirectUrl - provider not configured for tenant`() {
-        val result = svc.buildRedirectUrl("acme", SocialProvider.GITHUB, "state123", "http://localhost")
+        val result = svc.buildRedirectUrl("acme", ProviderKey.GITHUB, "state123", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.ProviderNotConfigured, result.error)
     }
@@ -152,20 +156,20 @@ class SocialLoginServiceTest {
         idpRepo.add(
             IdentityProvider(
                 tenantId = TenantId(1),
-                provider = SocialProvider.GITHUB,
+                provider = ProviderKey.GITHUB,
                 clientId = "gh-id",
                 clientSecret = "gh-secret",
                 enabled = false,
             ),
         )
-        val result = svc.buildRedirectUrl("acme", SocialProvider.GITHUB, "state123", "http://localhost")
+        val result = svc.buildRedirectUrl("acme", ProviderKey.GITHUB, "state123", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.ProviderNotConfigured, result.error)
     }
 
     @Test
     fun `buildRedirectUrl - success returns authorization URL`() {
-        val result = svc.buildRedirectUrl("acme", SocialProvider.GOOGLE, "state123", "http://localhost")
+        val result = svc.buildRedirectUrl("acme", ProviderKey.GOOGLE, "state123", "http://localhost")
         assertIs<SocialLoginResult.Success<String>>(result)
         assertTrue(result.value.contains("client_id=google-client-id"))
         assertTrue(result.value.contains("state=state123"))
@@ -178,14 +182,14 @@ class SocialLoginServiceTest {
 
     @Test
     fun `handleCallback - tenant not found`() {
-        val result = svc.handleCallback("unknown", SocialProvider.GOOGLE, "code", "http://localhost")
+        val result = svc.handleCallback("unknown", ProviderKey.GOOGLE, "code", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.TenantNotFound, result.error)
     }
 
     @Test
     fun `handleCallback - provider not configured`() {
-        val result = svc.handleCallback("acme", SocialProvider.GITHUB, "code", "http://localhost")
+        val result = svc.handleCallback("acme", ProviderKey.GITHUB, "code", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.ProviderNotConfigured, result.error)
     }
@@ -193,7 +197,7 @@ class SocialLoginServiceTest {
     @Test
     fun `handleCallback - provider exchange fails`() {
         googleAdapter.shouldFail = true
-        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "bad-code", "http://localhost")
+        val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "bad-code", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertIs<SocialLoginError.ProviderError>(result.error)
     }
@@ -201,14 +205,14 @@ class SocialLoginServiceTest {
     @Test
     fun `handleCallback - provider returns no email`() {
         googleAdapter.profileToReturn = googleProfile.copy(email = null)
-        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
+        val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.EmailNotProvided, result.error)
     }
 
     @Test
     fun `handleCallback - existing user via email match auto-links and issues tokens`() {
-        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost", "1.2.3.4")
+        val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost", "1.2.3.4")
         assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
         assertEquals("alice", result.value.user.username)
         assertNotNull(result.value.tokens.access_token)
@@ -223,13 +227,13 @@ class SocialLoginServiceTest {
             com.kauth.domain.model.SocialAccount(
                 userId = UserId(10),
                 tenantId = TenantId(1),
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "google-uid-123",
                 providerEmail = "alice@example.com",
                 providerName = "Alice",
             ),
         )
-        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
+        val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost")
         assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
         assertEquals("alice", result.value.user.username)
     }
@@ -238,7 +242,7 @@ class SocialLoginServiceTest {
     fun `handleCallback - disabled user returns UserDisabled`() {
         googleAdapter.profileToReturn =
             googleProfile.copy(email = "disabled@example.com", providerUserId = "google-disabled")
-        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
+        val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.UserDisabled, result.error)
         assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_FAILED))
@@ -253,11 +257,11 @@ class SocialLoginServiceTest {
                 name = "New User",
                 emailVerified = true,
             )
-        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
+        val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost")
         assertIs<SocialLoginResult.NeedsRegistration>(result)
         assertEquals("newuser@example.com", result.data.email)
         assertEquals("new-google-uid", result.data.providerUserId)
-        assertEquals(SocialProvider.GOOGLE, result.data.provider)
+        assertEquals(ProviderKey.GOOGLE, result.data.provider)
     }
 
     // =========================================================================
@@ -269,7 +273,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "unknown",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "uid",
                 email = "new@example.com",
                 providerName = "New",
@@ -288,7 +292,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "uid",
                 email = "new@example.com",
                 providerName = "New",
@@ -305,7 +309,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "uid",
                 email = "new@example.com",
                 providerName = "New",
@@ -322,7 +326,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "uid",
                 email = "new@example.com",
                 providerName = "New",
@@ -340,7 +344,7 @@ class SocialLoginServiceTest {
             com.kauth.domain.model.SocialAccount(
                 userId = UserId(10),
                 tenantId = TenantId(1),
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "race-uid",
                 providerEmail = "alice@example.com",
                 providerName = "Alice",
@@ -349,7 +353,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "race-uid",
                 email = "alice@example.com",
                 providerName = "Alice",
@@ -366,7 +370,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "new-uid",
                 email = "alice@example.com",
                 providerName = "Alice",
@@ -384,7 +388,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "brand-new-uid",
                 email = "brand-new@example.com",
                 providerName = "Brand New",
@@ -397,11 +401,49 @@ class SocialLoginServiceTest {
     }
 
     @Test
+    fun `completeSocialRegistration - chosen username equal to a different user's email is rejected`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "brand-new-uid",
+                email = "brand-new@example.com",
+                providerName = "Brand New",
+                avatarUrl = null,
+                emailVerified = true,
+                // Collides with alice's email, not her username.
+                chosenUsername = "alice@example.com",
+            )
+        assertIs<SocialLoginResult.Failure>(result)
+        assertIs<SocialLoginError.InvalidUsername>(result.error)
+        assertEquals(null, users.findByEmail(TenantId(1), "brand-new@example.com"), "No account should be created")
+    }
+
+    @Test
+    fun `completeSocialRegistration - email equal to a different user's username is rejected`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "brand-new-uid",
+                // "alice" is an existing user's username, not their email.
+                email = "alice",
+                providerName = "Brand New",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "brandnewname",
+            )
+        assertIs<SocialLoginResult.Failure>(result)
+        assertIs<SocialLoginError.InvalidUsername>(result.error)
+        assertEquals(false, users.existsByUsername(TenantId(1), "brandnewname"), "No account should be created")
+    }
+
+    @Test
     fun `completeSocialRegistration - success creates user and social link`() {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "new-uid-999",
                 email = "brand-new@example.com",
                 providerName = "Brand New User",
@@ -425,9 +467,28 @@ class SocialLoginServiceTest {
     }
 
     @Test
+    fun `completeSocialRegistration - normalizes a mixed-case chosen username to lowercase`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "new-uid-1000",
+                email = "another-new@example.com",
+                providerName = "Another New User",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "BrandNew",
+                ipAddress = "1.2.3.4",
+                userAgent = "TestAgent",
+            )
+        assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
+        assertEquals("brandnew", result.value.user.username)
+    }
+
+    @Test
     fun `handleCallback - email matches existing user but provider says unverified rejects link`() {
         googleAdapter.profileToReturn = googleProfile.copy(emailVerified = false, providerUserId = "imposter-uid")
-        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
+        val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.LinkRequiresEmailVerification, result.error)
         assertEquals(0, socialAccounts.all().size, "No link must be created when provider has not verified the email")
@@ -440,14 +501,14 @@ class SocialLoginServiceTest {
             com.kauth.domain.model.SocialAccount(
                 userId = UserId(10),
                 tenantId = TenantId(1),
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "google-uid-123",
                 providerEmail = "alice@example.com",
                 providerName = "Alice",
             ),
         )
         googleAdapter.profileToReturn = googleProfile.copy(emailVerified = false)
-        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
+        val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost")
         assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
         assertEquals("alice", result.value.user.username)
     }
@@ -457,7 +518,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "imposter-uid",
                 email = "alice@example.com",
                 providerName = "Imposter",
@@ -475,7 +536,7 @@ class SocialLoginServiceTest {
         val result =
             svc.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "unverified-uid",
                 email = "unverified@example.com",
                 providerName = "Unverified",

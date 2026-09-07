@@ -22,8 +22,7 @@ internal fun workspaceListPageImpl(
             workspaceName = "KotAuth",
             workspaceSlug = null,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner content-inner--wide") {
             div("page-header") {
                 div("page-header__left") {
@@ -57,7 +56,7 @@ internal fun workspaceListPageImpl(
                         thead {
                             tr {
                                 th { style = "width:200px;"; +"Slug" }
-                                th { +"Name" }
+                                th { +EnglishStrings.COL_NAME }
                                 th { style = "width:130px;"; +"Registration" }
                                 th { style = "width:70px;" }
                             }
@@ -72,17 +71,13 @@ internal fun workspaceListPageImpl(
                                         ) { +ws.slug }
                                     }
                                     td { span("data-table__name") { +ws.displayName } }
+                                    // Open registration is the default, so only a closed
+                                    // workspace is worth a badge.
                                     td {
                                         if (ws.registrationEnabled) {
-                                            span("badge badge--active") {
-                                                span("badge__dot") {}
-                                                +"Enabled"
-                                            }
+                                            span("data-table__meta") { +"Open" }
                                         } else {
-                                            span("badge badge--inactive") {
-                                                span("badge__dot") {}
-                                                +"Disabled"
-                                            }
+                                            span("badge badge--warn") { +"Closed" }
                                         }
                                     }
                                     td {
@@ -91,8 +86,7 @@ internal fun workspaceListPageImpl(
                                                 href = "/admin/workspaces/${ws.slug}",
                                                 classes = "btn btn--ghost btn--sm",
                                             ) {
-                                                +"Open"
-                                                inlineSvgIcon("open-sm", "open")
+                                                +EnglishStrings.ACTION_VIEW_DETAIL
                                             }
                                         }
                                     }

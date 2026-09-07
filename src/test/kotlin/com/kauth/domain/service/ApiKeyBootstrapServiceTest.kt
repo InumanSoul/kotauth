@@ -16,6 +16,12 @@ class ApiKeyBootstrapServiceTest {
     private val tenants = FakeTenantRepository()
     private val service = ApiKeyBootstrapService(apiKeys, tenants)
 
+    // Named from the registry rather than spelled out: the vendor ids live in one package.
+    private val nonDefaultDialect =
+        com.kauth.adapter.web.scim.scimDialects
+            .last()
+            .id
+
     private lateinit var tenant: Tenant
 
     @BeforeTest
@@ -173,5 +179,73 @@ class ApiKeyBootstrapServiceTest {
                 ),
             )
         assertTrue(result is ApiKeyBootstrapService.Result.Failure)
+    }
+
+    @Test
+    fun `provisions a key with the SCIM dialect the entry names`() {
+        service.ensureBootstrapped(
+            listOf(
+                ApiKeyBootstrapService.Entry(
+                    tenantSlug = "zion",
+                    name = "zion-scim",
+                    scopes = listOf(ApiScope.SCIM),
+                    keyHash = "hash-v1",
+                    scimDialect = nonDefaultDialect,
+                ),
+            ),
+        )
+
+        assertEquals(nonDefaultDialect, apiKeys.findByTenantAndName(tenant.id, "zion-scim")!!.scimDialect)
+    }
+
+    @Test
+    fun `an entry naming no dialect leaves the key on the RFC default`() {
+        service.ensureBootstrapped(
+            listOf(
+                ApiKeyBootstrapService.Entry(
+                    tenantSlug = "zion",
+                    name = "zion-scim",
+                    scopes = listOf(ApiScope.SCIM),
+                    keyHash = "hash-v1",
+                ),
+            ),
+        )
+
+        assertEquals(ApiKey.DEFAULT_SCIM_DIALECT, apiKeys.findByTenantAndName(tenant.id, "zion-scim")!!.scimDialect)
+    }
+
+    @Test
+    fun `a changed dialect is re-applied to an existing bootstrapped key`() {
+        val entry =
+            ApiKeyBootstrapService.Entry(
+                tenantSlug = "zion",
+                name = "zion-scim",
+                scopes = listOf(ApiScope.SCIM),
+                keyHash = "hash-v1",
+            )
+        service.ensureBootstrapped(listOf(entry))
+
+        val restarted = service.ensureBootstrapped(listOf(entry.copy(scimDialect = nonDefaultDialect)))
+
+        assertTrue(restarted is ApiKeyBootstrapService.Result.Provisioned)
+        assertEquals(ApiKeyBootstrapService.Action.UPDATED, restarted.applied.single().action)
+        assertEquals(nonDefaultDialect, apiKeys.findByTenantAndName(tenant.id, "zion-scim")!!.scimDialect)
+    }
+
+    @Test
+    fun `dropping the dialect from the entry restores the default on the next boot`() {
+        val entry =
+            ApiKeyBootstrapService.Entry(
+                tenantSlug = "zion",
+                name = "zion-scim",
+                scopes = listOf(ApiScope.SCIM),
+                keyHash = "hash-v1",
+                scimDialect = nonDefaultDialect,
+            )
+        service.ensureBootstrapped(listOf(entry))
+
+        service.ensureBootstrapped(listOf(entry.copy(scimDialect = null)))
+
+        assertEquals(ApiKey.DEFAULT_SCIM_DIALECT, apiKeys.findByTenantAndName(tenant.id, "zion-scim")!!.scimDialect)
     }
 }

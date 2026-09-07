@@ -58,7 +58,7 @@ internal fun Route.apiUserRoutes(
                 val result =
                     adminUserService.createUser(
                         tenantId = tenantId,
-                        username = body.username,
+                        username = body.username ?: "",
                         email = body.email,
                         fullName = body.fullName,
                         password = body.password,
@@ -85,7 +85,7 @@ internal fun Route.apiUserRoutes(
                 val result =
                     adminUserService.createUser(
                         tenantId = tenantId,
-                        username = body.username,
+                        username = body.username ?: "",
                         email = body.email,
                         fullName = body.fullName,
                         password = null,
@@ -122,7 +122,10 @@ internal fun Route.apiUserRoutes(
                 val userId = call.parseUserIdOr { return@put } ?: return@put
                 val body = call.receive<UpdateUserRequest>()
 
-                when (val result = adminUserService.updateUser(userId, tenantId, body.email, body.fullName)) {
+                when (
+                    val result =
+                        adminUserService.updateUser(userId, tenantId, body.email, body.fullName, body.username)
+                ) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.OK, result.value.toApiDto())
                     is AdminResult.Failure -> call.respondAdminError(result.error)
                 }

@@ -77,6 +77,23 @@ internal suspend fun ApplicationCall.respondRateLimited(retryAfterSeconds: Long)
     )
 }
 
+/** Responds 429 for a GET/HEAD/OPTIONS request that exceeded the per-key/per-tenant read rate limit. */
+internal suspend fun ApplicationCall.respondReadRateLimited(retryAfterSeconds: Long) {
+    response.headers.append(HttpHeaders.ContentType, "application/problem+json")
+    response.headers.append("Retry-After", retryAfterSeconds.toString())
+    respond(
+        HttpStatusCode.TooManyRequests,
+        ProblemDetail(
+            type = "https://kotauth.dev/errors/429",
+            title = "Rate limit exceeded",
+            status = HttpStatusCode.TooManyRequests.value,
+            detail =
+                "API read rate limit exceeded for this key in this workspace. " +
+                    "Retry after $retryAfterSeconds seconds.",
+        ),
+    )
+}
+
 /** Parses the `{userId}` path parameter, or replies 400 and invokes [bail] if it's missing/invalid. */
 internal suspend inline fun ApplicationCall.parseUserIdOr(bail: () -> Nothing): UserId? {
     val raw = parameters["userId"]?.toIntOrNull()
@@ -198,7 +215,7 @@ internal suspend fun ApplicationCall.respondWebAuthnError(error: WebAuthnError):
             respondProblem(
                 HttpStatusCode.Conflict,
                 "Cannot revoke last passkey",
-                "This is the user's last passkey and password login is disabled — enable password login " +
+                "This is the user's last passkey and password login is disabled. Enable password login " +
                     "or add another passkey before revoking this one.",
             )
         WebAuthnError.TenantMismatch ->
@@ -219,7 +236,7 @@ internal suspend fun ApplicationCall.respondWebAuthnError(error: WebAuthnError):
             respondProblem(
                 HttpStatusCode.UnprocessableEntity,
                 "WebAuthn error",
-                "Unexpected WebAuthn error — this endpoint doesn't produce challenge/auth flows.",
+                "Unexpected WebAuthn error. This endpoint doesn't produce challenge/auth flows.",
             )
     }
 
@@ -249,7 +266,8 @@ data class ProblemDetail(
 // -- Request bodies -----------------------------------------------------------
 
 @Serializable data class CreateUserRequest(
-    val username: String,
+    /** Omit or leave blank to have Kotauth generate one from the name and email. */
+    val username: String? = null,
     val email: String,
     val fullName: String,
     val password: String,
@@ -258,6 +276,7 @@ data class ProblemDetail(
 @Serializable data class UpdateUserRequest(
     val email: String? = null,
     val fullName: String? = null,
+    val username: String? = null,
 )
 
 @Serializable data class CreateRoleRequest(
@@ -315,7 +334,8 @@ data class ProblemDetail(
  * Requires SMTP to be configured on the tenant.
  */
 @Serializable data class InviteUserRequest(
-    val username: String,
+    /** Omit or leave blank to have Kotauth generate one from the name and email. */
+    val username: String? = null,
     val email: String,
     val fullName: String,
 )

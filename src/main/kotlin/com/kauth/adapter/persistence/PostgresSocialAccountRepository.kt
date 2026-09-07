@@ -1,7 +1,7 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.SocialAccount
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SocialAccountRepository
@@ -17,7 +17,7 @@ import java.time.ZoneOffset
 class PostgresSocialAccountRepository : SocialAccountRepository {
     override fun findByProviderIdentity(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
         providerUserId: String,
     ): SocialAccount? =
         transaction {
@@ -36,7 +36,7 @@ class PostgresSocialAccountRepository : SocialAccountRepository {
             SocialAccountsTable
                 .selectAll()
                 .where { SocialAccountsTable.userId eq userId.value }
-                .map { it.toSocialAccount() }
+                .mapNotNull { it.toSocialAccount() }
         }
 
     override fun save(account: SocialAccount): SocialAccount =
@@ -57,12 +57,12 @@ class PostgresSocialAccountRepository : SocialAccountRepository {
                 .selectAll()
                 .where { SocialAccountsTable.id eq insertedId }
                 .single()
-                .toSocialAccount()
+                .toSocialAccount()!!
         }
 
     override fun delete(
         userId: UserId,
-        provider: SocialProvider,
+        provider: ProviderKey,
     ) = transaction {
         SocialAccountsTable.deleteWhere {
             (SocialAccountsTable.userId eq userId.value) and
@@ -75,16 +75,20 @@ class PostgresSocialAccountRepository : SocialAccountRepository {
     // Mapping helper
     // ------------------------------------------------------------------
 
-    private fun ResultRow.toSocialAccount(): SocialAccount =
-        SocialAccount(
+    // A row whose provider no longer parses as a key is skipped rather than thrown on, so one
+    // malformed link cannot take down a user's whole account list.
+    private fun ResultRow.toSocialAccount(): SocialAccount? {
+        val providerKey = ProviderKey.of(this[SocialAccountsTable.provider]) ?: return null
+        return SocialAccount(
             id = this[SocialAccountsTable.id],
             userId = UserId(this[SocialAccountsTable.userId]),
             tenantId = TenantId(this[SocialAccountsTable.tenantId]),
-            provider = SocialProvider.fromValue(this[SocialAccountsTable.provider]),
+            provider = providerKey,
             providerUserId = this[SocialAccountsTable.providerUserId],
             providerEmail = this[SocialAccountsTable.providerEmail],
             providerName = this[SocialAccountsTable.providerName],
             avatarUrl = this[SocialAccountsTable.avatarUrl],
             linkedAt = this[SocialAccountsTable.linkedAt].toInstant(),
         )
+    }
 }

@@ -10,12 +10,14 @@ import com.kauth.domain.model.BackupExportV1
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.SecurityConfig
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.SecurityConfigBackup
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
@@ -38,6 +40,7 @@ import com.kauth.fakes.FakeThemeRepository
 import com.kauth.fakes.FakeTransactionRunner
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
+import kotlinx.serialization.decodeFromString
 import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -257,7 +260,7 @@ class BackupExportImportTest {
             IdentityProvider(
                 id = null,
                 tenantId = tenant.id,
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 clientId = "google-real-client-id",
                 clientSecret = "PLAINTEXT-SECRET-MUST-NEVER-LEAK",
                 enabled = true,
@@ -468,6 +471,101 @@ class BackupExportImportTest {
     }
 
     @Test
+    fun `SCIM external id and name fields survive an export and import round trip`() {
+        val tenantId = sourceTenants.findBySlug("acme")!!.id
+        sourceUsers.add(
+            User(
+                id = null,
+                tenantId = tenantId,
+                username = "carol",
+                email = "carol@acme.example.com",
+                fullName = "Carol Chen",
+                passwordHash = "\$2a\$10\$CCCCCCCCCCCCCCCCCCCCCC",
+                externalId = "idp-user-42",
+                givenName = "Carol",
+                familyName = "Chen",
+            ),
+        )
+        sourceGroups.add(
+            Group(id = null, tenantId = tenantId, name = "support", externalId = "idp-group-7"),
+        )
+
+        val export = exportSuccessful(ExportOptions())
+        val carolBackup = export.users.first { it.username == "carol" }
+        assertEquals("idp-user-42", carolBackup.externalId)
+        assertEquals("Carol", carolBackup.givenName)
+        assertEquals("Chen", carolBackup.familyName)
+        val supportBackup = export.groups.first { it.name == "support" }
+        assertEquals("idp-group-7", supportBackup.externalId)
+
+        val r = importer().import(export, newSlug = "acme-scim", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+        val newTenantId = destTenants.findBySlug(summary.newTenantSlug)!!.id
+
+        val restoredCarol = destUsers.findByExternalId(newTenantId, "idp-user-42")
+        assertNotNull(restoredCarol)
+        assertEquals("carol", restoredCarol.username)
+        assertEquals("Carol", restoredCarol.givenName)
+        assertEquals("Chen", restoredCarol.familyName)
+
+        val restoredSupport = destGroups.findByExternalId(newTenantId, "idp-group-7")
+        assertNotNull(restoredSupport)
+        assertEquals("support", restoredSupport.name)
+    }
+
+    @Test
+    fun `a backup lacking the SCIM external id and name fields still imports with them null`() {
+        val tenantId = sourceTenants.findBySlug("acme")!!.id
+        sourceUsers.add(
+            User(
+                id = null,
+                tenantId = tenantId,
+                username = "carol",
+                email = "carol@acme.example.com",
+                fullName = "Carol Chen",
+                passwordHash = "\$2a\$10\$CCCCCCCCCCCCCCCCCCCCCC",
+                externalId = "idp-user-42",
+                givenName = "Carol",
+                familyName = "Chen",
+            ),
+        )
+        sourceGroups.add(
+            Group(id = null, tenantId = tenantId, name = "support", externalId = "idp-group-7"),
+        )
+
+        // Simulates a pre-SCIM backup: the exporter never wrote these keys, so decoding
+        // falls back to the field defaults exactly as it would for a real legacy payload.
+        val export = exportSuccessful(ExportOptions())
+        val legacyExport =
+            export.copy(
+                users =
+                    export.users.map {
+                        if (it.username == "carol") {
+                            it.copy(externalId = null, givenName = null, familyName = null)
+                        } else {
+                            it
+                        }
+                    },
+                groups = export.groups.map { if (it.name == "support") it.copy(externalId = null) else it },
+            )
+
+        val r = importer().import(legacyExport, newSlug = "acme-legacy-scim", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+        val newTenantId = destTenants.findBySlug(summary.newTenantSlug)!!.id
+
+        val restoredCarol =
+            destUsers
+                .findByTenantId(newTenantId, search = null, limit = 100, offset = 0)
+                .first { it.username == "carol" }
+        assertNull(restoredCarol.externalId)
+        assertNull(restoredCarol.givenName)
+        assertNull(restoredCarol.familyName)
+
+        val restoredSupport = destGroups.findByTenantId(newTenantId).first { it.name == "support" }
+        assertNull(restoredSupport.externalId)
+    }
+
+    @Test
     fun `import preserves OTP security config fields and email branding`() {
         val export = exportSuccessful(ExportOptions())
         importer().import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
@@ -485,6 +583,75 @@ class BackupExportImportTest {
     }
 
     @Test
+    fun `backup round-trips loginIdentifierMode`() {
+        val source = sourceTenants.findBySlug("acme")!!
+        sourceTenants.update(
+            source.copy(
+                securityConfig = source.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+
+        val export = exportSuccessful(ExportOptions())
+        val r = importer().import(export, newSlug = "acme-identifier", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+        val restored = destTenants.findBySlug(summary.newTenantSlug)!!
+
+        assertEquals(LoginIdentifierMode.EITHER, restored.securityConfig.loginIdentifierMode)
+    }
+
+    @Test
+    fun `backup without loginIdentifierMode defaults to USERNAME`() {
+        val legacy =
+            SecurityConfigBackup(
+                passwordMinLength = 8,
+                passwordRequireSpecial = false,
+                passwordRequireUppercase = false,
+                passwordRequireNumber = false,
+                passwordHistoryCount = 0,
+                passwordMaxAgeDays = 0,
+                passwordBlacklistEnabled = false,
+                mfaPolicy = "optional",
+                lockoutMaxAttempts = 0,
+                lockoutDurationMinutes = 15,
+                corsAllowCredentials = false,
+                hibpCheckEnabled = false,
+                magicLinkEnabled = false,
+            )
+        assertEquals(LoginIdentifierMode.USERNAME, legacy.loginIdentifierMode)
+    }
+
+    @Test
+    fun `a real pre-1_24 backup JSON payload missing loginIdentifierMode still decodes to USERNAME`() {
+        // A pre-1.24 backup's JSON never had a "loginIdentifierMode" key at all — it didn't
+        // exist yet. Unlike the constructor-based test above (which only proves the Kotlin
+        // default-parameter mechanism works), this decodes a literal JSON string through the
+        // exact `Json { ignoreUnknownKeys = true }` instance the importer itself uses, so it
+        // proves an actual archived backup file still imports.
+        val legacyJson =
+            """
+            {
+                "passwordMinLength": 8,
+                "passwordRequireSpecial": false,
+                "passwordRequireUppercase": false,
+                "passwordRequireNumber": false,
+                "passwordHistoryCount": 0,
+                "passwordMaxAgeDays": 0,
+                "passwordBlacklistEnabled": false,
+                "mfaPolicy": "optional",
+                "lockoutMaxAttempts": 0,
+                "lockoutDurationMinutes": 15,
+                "corsAllowCredentials": false,
+                "hibpCheckEnabled": false,
+                "magicLinkEnabled": false
+            }
+            """.trimIndent()
+
+        val decoded = backupJson().decodeFromString<SecurityConfigBackup>(legacyJson)
+
+        assertEquals(LoginIdentifierMode.USERNAME, decoded.loginIdentifierMode)
+    }
+
+    @Test
     fun `import imports social providers without their secret and disabled`() {
         val export = exportSuccessful(ExportOptions())
         importer().import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
@@ -494,6 +661,39 @@ class BackupExportImportTest {
         assertEquals("google-real-client-id", idps[0].clientId)
         assertEquals("", idps[0].clientSecret, "Imported social provider must have empty secret — operator re-enters")
         assertFalse(idps[0].enabled, "Imported social provider must be disabled until secret is re-entered")
+    }
+
+    @Test
+    fun `import skips a social provider whose key has no compiled-in adapter`() {
+        val export =
+            exportSuccessful(ExportOptions()).copy(
+                socialProviders =
+                    listOf(
+                        com.kauth.domain.model.SocialProviderBackup(
+                            provider = "oriana",
+                            clientId = "oriana-client-id",
+                            enabled = true,
+                        ),
+                        com.kauth.domain.model.SocialProviderBackup(
+                            provider = "github",
+                            clientId = "github-client-id",
+                            enabled = true,
+                        ),
+                    ),
+            )
+
+        importer().import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
+
+        val newTenantId = destTenants.findBySlug("acme-staging")!!.id
+        val imported = destIdps.findAllByTenant(newTenantId).map { it.provider }
+        // Naming the cause: asserting only the row count would also pass if the importer had
+        // dropped github instead. A persisted "oriana" row is invisible in the admin UI, rejected by
+        // the delete route, and re-emitted on every later export — a permanent orphan.
+        assertEquals(listOf(ProviderKey.GITHUB), imported)
+        assertFalse(
+            imported.any { it.value == "oriana" },
+            "A provider key with no compiled-in adapter must not survive an import",
+        )
     }
 
     @Test

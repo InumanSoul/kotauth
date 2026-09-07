@@ -14,6 +14,10 @@ class RedisRateLimiter(
     override val maxRequests: Int,
     override val windowSeconds: Long,
     private val keyPrefix: String,
+    // Every limiter on the auth path (and writes) must fail closed — this default preserves
+    // that for every existing call site. Only the read limiter opts in to failing open; see the
+    // comment where it's constructed in ServiceGraph for why that asymmetry is intentional.
+    private val failOpen: Boolean = false,
 ) : RateLimiterPort {
     private val log = LoggerFactory.getLogger(RedisRateLimiter::class.java)
 
@@ -31,8 +35,13 @@ class RedisRateLimiter(
             val result = evalSlidingWindow(redisKey, now, member)
             result[0] == 1L
         } catch (e: RedisException) {
-            log.warn("Redis unreachable, failing closed: {}", e.message)
-            false
+            if (failOpen) {
+                log.warn("Redis unreachable, failing open: {}", e.message)
+                true
+            } else {
+                log.warn("Redis unreachable, failing closed: {}", e.message)
+                false
+            }
         }
     }
 

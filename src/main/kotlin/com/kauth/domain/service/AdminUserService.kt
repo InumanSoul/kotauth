@@ -3,6 +3,7 @@ package com.kauth.domain.service
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
@@ -21,6 +22,8 @@ class AdminUserService(
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val credentialFlowService: CredentialFlowService,
+    private val collisionCheck: IdentifierCollisionCheck,
+    private val usernameGenerator: UsernameGenerator,
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailPort: EmailPort? = null,
 ) {
@@ -32,22 +35,46 @@ class AdminUserService(
         password: String? = null,
         sendInvite: Boolean = false,
         baseUrl: String = "",
+        externalId: String? = null,
+        givenName: String? = null,
+        familyName: String? = null,
+        // False lets a caller that holds this create inside its own DB transaction (SCIM's
+        // create-then-enable/disable pair) defer the SMTP round-trip until after it commits,
+        // via dispatchPendingInvite. Every other caller keeps the send-inline default.
+        dispatchInvite: Boolean = true,
     ): AdminResult<User> {
         val tenant =
             tenantRepository.findById(tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
 
-        if (username.isBlank()) {
-            return AdminResult.Failure(AdminError.Validation("Username is required."))
-        }
-        if (!username.matches(Regex("[a-zA-Z0-9._-]+"))) {
-            return AdminResult.Failure(
-                AdminError.Validation("Username may only contain letters, digits, dots, underscores, and hyphens."),
-            )
-        }
         if (email.isBlank() || !email.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
+        val resolvedEmail = email.trim().lowercase()
+
+        val resolvedUsername =
+            if (username.isBlank()) {
+                usernameGenerator.generate(tenantId, givenName, resolvedEmail)
+            } else {
+                UsernamePolicy.normalize(username)
+            }
+        when (UsernamePolicy.validate(resolvedUsername)) {
+            UsernamePolicy.Violation.INVALID_FORMAT ->
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                    ),
+                )
+            UsernamePolicy.Violation.TOO_LONG ->
+                return AdminResult.Failure(
+                    AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
+                )
+            null -> Unit
+        }
+
+        collisionCheck
+            .check(tenantId, resolvedUsername, resolvedEmail)
+            ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
 
         val resolvedPasswordHash: String
         val resolvedRequiredActions: Set<RequiredAction>
@@ -80,24 +107,27 @@ class AdminUserService(
             resolvedRequiredActions = emptySet()
         }
 
-        if (userRepository.existsByUsername(tenantId, username)) {
-            return AdminResult.Failure(AdminError.Conflict("Username '$username' is already taken."))
+        if (userRepository.existsByUsername(tenantId, resolvedUsername)) {
+            return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))
         }
-        if (userRepository.existsByEmail(tenantId, email)) {
-            return AdminResult.Failure(AdminError.Conflict("Email '${email.lowercase()}' is already registered."))
+        if (userRepository.existsByEmail(tenantId, resolvedEmail)) {
+            return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
         }
 
         val user =
             userRepository.save(
                 User(
                     tenantId = tenantId,
-                    username = username.trim(),
-                    email = email.trim().lowercase(),
+                    username = resolvedUsername,
+                    email = resolvedEmail,
                     fullName = fullName.trim(),
                     passwordHash = resolvedPasswordHash,
                     emailVerified = !sendInvite,
                     enabled = true,
                     requiredActions = resolvedRequiredActions,
+                    externalId = externalId,
+                    givenName = givenName,
+                    familyName = familyName,
                 ),
             )
 
@@ -113,29 +143,63 @@ class AdminUserService(
                 eventType = AuditEventType.ADMIN_USER_CREATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("username" to username, "invite" to sendInvite.toString()),
+                details = mapOf("username" to resolvedUsername, "invite" to sendInvite.toString()),
             ),
         )
 
-        if (sendInvite && tenant.isSmtpReady) {
-            when (credentialFlowService.initiateInvite(user, tenant, baseUrl)) {
-                is SelfServiceResult.Success ->
-                    auditLog.record(
-                        AuditEvent(
-                            tenantId = tenantId,
-                            userId = user.id,
-                            clientId = null,
-                            eventType = AuditEventType.USER_INVITE_SENT,
-                            ipAddress = null,
-                            userAgent = null,
-                            details = mapOf("username" to username),
-                        ),
-                    )
-                is SelfServiceResult.Failure -> Unit
-            }
+        if (sendInvite && dispatchInvite && tenant.isSmtpReady) {
+            dispatchInviteEmail(user, tenant, baseUrl)
         }
 
         return AdminResult.Success(user)
+    }
+
+    /**
+     * Sends the invite email [createUser] would otherwise send inline, for a user created with
+     * `dispatchInvite = false`. Exists so a caller holding a DB transaction across create — e.g.
+     * SCIM provisioning, which must also roll back an enable/disable failure — can commit first
+     * and only then pay for the SMTP round-trip, instead of holding a pool connection across it.
+     * A no-op (not a failure) when there's no pending invite or SMTP isn't configured, mirroring
+     * [createUser]'s own silent skip in those cases.
+     */
+    fun dispatchPendingInvite(
+        userId: UserId,
+        tenantId: TenantId,
+        baseUrl: String,
+    ): AdminResult<Unit> {
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+        if (RequiredAction.SET_PASSWORD in user.requiredActions && tenant.isSmtpReady) {
+            dispatchInviteEmail(user, tenant, baseUrl)
+        }
+        return AdminResult.Success(Unit)
+    }
+
+    private fun dispatchInviteEmail(
+        user: User,
+        tenant: Tenant,
+        baseUrl: String,
+    ) {
+        when (credentialFlowService.initiateInvite(user, tenant, baseUrl)) {
+            is SelfServiceResult.Success ->
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenant.id,
+                        userId = user.id,
+                        clientId = null,
+                        eventType = AuditEventType.USER_INVITE_SENT,
+                        ipAddress = null,
+                        userAgent = null,
+                        details = mapOf("username" to user.username),
+                    ),
+                )
+            is SelfServiceResult.Failure -> Unit
+        }
     }
 
     fun resendInvite(
@@ -192,6 +256,29 @@ class AdminUserService(
         limit: Int = Int.MAX_VALUE,
         offset: Int = 0,
     ): List<User> = userRepository.findByTenantId(tenantId, search, limit, offset)
+
+    /** Tenant-scoped username lookup — the indexed fast path for SCIM's `userName eq` filter. */
+    fun findByUsername(
+        tenantId: TenantId,
+        username: String,
+    ): User? = userRepository.findByUsername(tenantId, username)
+
+    /**
+     * Case-insensitive tenant-scoped username lookup — the indexed fast path for SCIM's
+     * `userName eq` filter. Storage is always lowercase (see [UsernamePolicy]), but a connector
+     * may resend the mixed-case value it originally submitted (e.g. an Okta/Entra UPN like
+     * `Dave.Smith@corp.com`), and a case-sensitive lookup would tell it that user doesn't exist.
+     */
+    fun findByUsernameIgnoreCase(
+        tenantId: TenantId,
+        username: String,
+    ): User? = userRepository.findByUsernameIgnoreCase(tenantId, username)
+
+    /** Tenant-scoped external-id lookup — the indexed fast path for SCIM's `externalId eq` filter. */
+    fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): User? = userRepository.findByExternalId(tenantId, externalId)
 
     fun countUsers(
         tenantId: TenantId,
@@ -265,6 +352,7 @@ class AdminUserService(
         tenantId: TenantId,
         email: String? = null,
         fullName: String? = null,
+        username: String? = null,
     ): AdminResult<User> {
         val user =
             userRepository.findById(userId, tenantId)
@@ -276,12 +364,20 @@ class AdminUserService(
         if (resolvedEmail.isBlank() || !resolvedEmail.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
-
         if (resolvedEmail != user.email && userRepository.existsByEmail(tenantId, resolvedEmail)) {
             return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
         }
 
-        val updated = userRepository.update(user.copy(email = resolvedEmail, fullName = resolvedFullName))
+        val resolvedUsername =
+            when (val r = resolveUsername(tenantId, userId, user, username, resolvedEmail)) {
+                is AdminResult.Failure -> return r
+                is AdminResult.Success -> r.value
+            }
+
+        val updated =
+            userRepository.update(
+                user.copy(email = resolvedEmail, fullName = resolvedFullName, username = resolvedUsername),
+            )
 
         auditLog.record(
             AuditEvent(
@@ -291,12 +387,152 @@ class AdminUserService(
                 eventType = AuditEventType.ADMIN_USER_UPDATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("username" to user.username),
+                details = usernameChangeAuditDetails(user, resolvedUsername),
             ),
         )
 
         return AdminResult.Success(updated)
     }
+
+    /**
+     * Replaces the full mutable profile in one write. Unlike [updateUser], `email`, `fullName`,
+     * `externalId`, `givenName`, and `familyName` are all authoritative — a null clears the field.
+     * `username` alone keeps [updateUser]'s null-means-unchanged convention, since SCIM never
+     * supplies it (`userName` stays immutable over the SCIM protocol surface — see
+     * ScimDiscoveryRoutes) and only the admin UI's profile form does, alongside the rest of the
+     * profile, so a rename cannot land as two separate writes with two different failure windows.
+     */
+    fun replaceUserProfile(
+        userId: UserId,
+        tenantId: TenantId,
+        email: String,
+        fullName: String,
+        externalId: String?,
+        givenName: String?,
+        familyName: String?,
+        username: String? = null,
+    ): AdminResult<User> {
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+        val resolvedEmail = email.trim().lowercase()
+        if (resolvedEmail.isBlank() || !resolvedEmail.contains('@')) {
+            return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
+        }
+        if (resolvedEmail != user.email && userRepository.existsByEmail(tenantId, resolvedEmail)) {
+            return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
+        }
+
+        val resolvedUsername =
+            when (val r = resolveUsername(tenantId, userId, user, username, resolvedEmail)) {
+                is AdminResult.Failure -> return r
+                is AdminResult.Success -> r.value
+            }
+
+        val updated =
+            userRepository.update(
+                user.copy(
+                    email = resolvedEmail,
+                    fullName = fullName.trim(),
+                    externalId = externalId,
+                    givenName = givenName,
+                    familyName = familyName,
+                    username = resolvedUsername,
+                ),
+            )
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_USER_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = usernameChangeAuditDetails(user, resolvedUsername),
+            ),
+        )
+
+        return AdminResult.Success(updated)
+    }
+
+    /**
+     * Shared by [updateUser] and [replaceUserProfile]: resolves an optional username edit
+     * (null means unchanged), validates format, and rejects a collision with another user's
+     * username or email — the two call sites cannot drift apart on what a rename is allowed to do.
+     *
+     * Format and collision checks on the username itself only run when a rename is actually
+     * requested. Every write path now normalizes and validates (see [UsernamePolicy]), but a
+     * stored username can still predate that guarantee on a database that has not yet run the
+     * V66 normalization migration, so re-validating it on every unrelated field update would make
+     * such a user permanently un-editable until then. The email→username collision direction is
+     * independent of that: it runs whenever the email is actually changing, rename or not — a
+     * user whose stored email happens to equal a different user's username must still be able to
+     * update unrelated fields, but a NEWLY set email is always checked.
+     */
+    private fun resolveUsername(
+        tenantId: TenantId,
+        userId: UserId,
+        user: User,
+        username: String?,
+        resolvedEmail: String,
+    ): AdminResult<String> {
+        val normalized = username?.let { UsernamePolicy.normalize(it) }
+        val renaming = normalized != null && normalized != user.username
+
+        if (!renaming) {
+            if (resolvedEmail != user.email) {
+                collisionCheck
+                    .checkEmailOnly(tenantId, email = resolvedEmail, excludingUserId = userId)
+                    ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+            }
+            return AdminResult.Success(user.username)
+        }
+
+        val resolvedUsername = normalized
+
+        if (resolvedUsername.isBlank()) {
+            return AdminResult.Failure(AdminError.Validation("Username is required."))
+        }
+        when (UsernamePolicy.validate(resolvedUsername)) {
+            UsernamePolicy.Violation.INVALID_FORMAT ->
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                    ),
+                )
+            UsernamePolicy.Violation.TOO_LONG ->
+                return AdminResult.Failure(
+                    AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
+                )
+            null -> Unit
+        }
+        if (userRepository.existsByUsername(tenantId, resolvedUsername)) {
+            return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))
+        }
+
+        collisionCheck
+            .check(tenantId, resolvedUsername, resolvedEmail, excludingUserId = userId)
+            ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+
+        return AdminResult.Success(resolvedUsername)
+    }
+
+    /**
+     * The pre-rename username always identifies which row was touched. When a rename actually
+     * happened, the new value is added alongside it so an investigator can tell a username changed
+     * — and to what — without diffing database snapshots.
+     */
+    private fun usernameChangeAuditDetails(
+        user: User,
+        resolvedUsername: String,
+    ): Map<String, String> =
+        if (resolvedUsername != user.username) {
+            mapOf("username" to user.username, "newUsername" to resolvedUsername)
+        } else {
+            mapOf("username" to user.username)
+        }
 
     fun setUserEnabled(
         userId: UserId,

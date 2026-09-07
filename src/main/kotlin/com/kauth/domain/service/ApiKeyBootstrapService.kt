@@ -16,6 +16,10 @@ import com.kauth.domain.port.TenantRepository
  * Unknown tenant slugs cause a fail-fast result so a typo can't silently
  * leave a partner BFF without its key at startup. Unknown scopes are
  * rejected for the same reason.
+ *
+ * The entry is authoritative for every field it owns, the SCIM dialect included: an entry that
+ * names no dialect re-asserts the `rfc` default, so the environment and the running key cannot
+ * drift apart across a restart.
  */
 class ApiKeyBootstrapService(
     private val apiKeyRepository: ApiKeyRepository,
@@ -27,6 +31,8 @@ class ApiKeyBootstrapService(
         val scopes: List<String>,
         val keyHash: String,
         val keyPrefix: String? = null,
+        /** Optional; null means the RFC pass-through. Validated against the registry before it gets here. */
+        val scimDialect: String? = null,
     )
 
     companion object {
@@ -68,6 +74,7 @@ class ApiKeyBootstrapService(
             }
 
             val resolvedPrefix = (entry.keyPrefix ?: defaultKeyPrefix(entry.tenantSlug)).take(16)
+            val resolvedDialect = entry.scimDialect ?: ApiKey.DEFAULT_SCIM_DIALECT
             val existing = apiKeyRepository.findByTenantAndName(tenant.id, entry.name)
             if (existing == null) {
                 apiKeyRepository.save(
@@ -79,6 +86,7 @@ class ApiKeyBootstrapService(
                         scopes = entry.scopes,
                         enabled = true,
                         bootstrapName = entry.name,
+                        scimDialect = resolvedDialect,
                     ),
                 )
                 outcomes += Outcome(entry.tenantSlug, entry.name, Action.CREATED)
@@ -89,8 +97,9 @@ class ApiKeyBootstrapService(
             val scopesUnchanged = existing.scopes.toSet() == entry.scopes.toSet()
             val brandedAsBootstrap = existing.bootstrapName == entry.name
             val enabled = existing.enabled
+            val dialectUnchanged = existing.scimDialect == resolvedDialect
 
-            if (hashUnchanged && scopesUnchanged && brandedAsBootstrap && enabled) {
+            if (hashUnchanged && scopesUnchanged && brandedAsBootstrap && enabled && dialectUnchanged) {
                 outcomes += Outcome(entry.tenantSlug, entry.name, Action.UNCHANGED)
                 continue
             }
@@ -100,6 +109,7 @@ class ApiKeyBootstrapService(
                 keyHash = entry.keyHash,
                 scopes = entry.scopes,
                 bootstrapName = entry.name,
+                scimDialect = resolvedDialect,
             )
             outcomes += Outcome(entry.tenantSlug, entry.name, Action.UPDATED)
         }
