@@ -4,7 +4,7 @@ val logbackVersion = "1.5.32"
 val flywayVersion = "12.11.0"
 val logstashEncoderVersion = "8.1"
 val lettuceVersion = "6.5.5.RELEASE"
-val testcontainersVersion = "1.21.0"
+val testcontainersVersion = "1.21.4"
 
 plugins {
     kotlin("jvm") version "2.3.20"
