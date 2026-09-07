@@ -12,7 +12,7 @@ data class SocialAccount(
     val id: Int? = null,
     val userId: UserId,
     val tenantId: TenantId,
-    val provider: SocialProvider,
+    val provider: ProviderKey,
     /** The stable unique identifier from the provider (Google sub, GitHub id). */
     val providerUserId: String,
     /** Email from the provider at time of linking — may differ from local user email. */

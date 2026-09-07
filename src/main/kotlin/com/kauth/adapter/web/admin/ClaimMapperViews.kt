@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
 import kotlinx.html.*
@@ -18,7 +19,7 @@ internal fun claimMappersListPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Claim Mappers — ${workspace.displayName}",
+            pageTitle = "Claim Mappers · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -26,7 +27,6 @@ internal fun claimMappersListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "claim-mappers",
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -52,7 +52,7 @@ internal fun claimMappersListPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 if (mappers.isEmpty()) {
@@ -83,11 +83,11 @@ internal fun claimMappersListPageImpl(
                                 mappers.forEach { mapper ->
                                     tr {
                                         td {
-                                            span("data-table__id") { +mapper.attributeKey }
+                                            span("data-table__meta") { +mapper.attributeKey }
                                         }
                                         td { +mapper.claimName }
-                                        td { yesNoBadge(mapper.includeInAccess) }
-                                        td { yesNoBadge(mapper.includeInId) }
+                                        td { includedMark(mapper.includeInAccess) }
+                                        td { includedMark(mapper.includeInId) }
                                         td {
                                             div {
                                                 postButton(
@@ -134,7 +134,6 @@ internal fun claimMapperFormPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "claim-mappers",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(
@@ -165,7 +164,7 @@ internal fun claimMapperFormPageImpl(
                 }
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 form(
@@ -260,13 +259,19 @@ internal fun claimMapperFormPageImpl(
         }
     }
 
-private fun TD.yesNoBadge(value: Boolean) {
+/**
+ * Whether a mapper writes its claim into a given token.
+ *
+ * This was two badges per row, one of them green with a status dot. A boolean is not a state,
+ * and badging both halves of it made every row loud while saying nothing a mark would not.
+ */
+private fun TD.includedMark(value: Boolean) {
     if (value) {
-        span("badge badge--active") {
-            span("badge__dot") {}
-            +"Yes"
-        }
+        span("included-mark") { inlineSvgIcon("check-circle", "Included") }
     } else {
-        span("badge badge--inactive") { +"No" }
+        span("data-table__meta") {
+            attributes["aria-label"] = "Not included"
+            +"\u2014"
+        }
     }
 }

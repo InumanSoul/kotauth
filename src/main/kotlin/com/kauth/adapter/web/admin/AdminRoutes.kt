@@ -41,6 +41,7 @@ import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.request.uri
 import io.ktor.server.response.respond
@@ -70,6 +71,7 @@ fun Route.adminRoutes(
     mfaRepository: MfaRepository? = null,
     portalClientProvisioning: PortalClientProvisioning? = null,
     identityProviderRepository: IdentityProviderRepository? = null,
+    identityProviderService: com.kauth.domain.service.IdentityProviderService? = null,
     apiKeyService: ApiKeyService? = null,
     webhookService: WebhookService? = null,
     encryptionService: EncryptionService,
@@ -95,10 +97,14 @@ fun Route.adminRoutes(
     mfaService: MfaService? = null,
     auditLogPort: AuditLogPort? = null,
     securityMethodsService: com.kauth.domain.service.SecurityMethodsService? = null,
+    identityProviderProbeService: com.kauth.domain.service.IdentityProviderProbeService? = null,
+    socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
 ) {
     AdminView.setShellAppInfo(appInfo)
 
     route("/admin") {
+        if (impersonationService != null) adminImpersonationStopRoute(impersonationService)
+
         // ---------------------------------------------------------------
         // Login — OAuth PKCE flow
         // ---------------------------------------------------------------
@@ -219,7 +225,7 @@ fun Route.adminRoutes(
             }
 
             val redirectUri = "$baseUrl/admin/callback"
-            val ipAddress = call.request.local.remoteAddress
+            val ipAddress = call.request.origin.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
             val tokenResult =
                 oauthService?.exchangeAuthorizationCode(
@@ -446,7 +452,7 @@ fun Route.adminRoutes(
                         roleGroupService.createRole(
                             newTenant.id,
                             "user",
-                            "Standard authenticated user — default role for self-registrations",
+                            "Standard authenticated user. The default role for self-registrations",
                             RoleScope.TENANT,
                             null,
                         )
@@ -492,9 +498,16 @@ fun Route.adminRoutes(
                     val workspace = call.attributes[WorkspaceAttr]
                     val wsPairs = call.attributes[WsPairsAttr]
                     val apps = applicationRepository.findByTenantId(workspace.id)
+                    val providers = identityProviderRepository?.findAllByTenant(workspace.id).orEmpty()
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AdminView.workspaceDetailPage(workspace, wsPairs, apps, session.username),
+                        AdminView.workspaceDetailPage(
+                            workspace,
+                            wsPairs,
+                            apps,
+                            session.username,
+                            identityProviders = providers,
+                        ),
                     )
                 }
 
@@ -504,10 +517,14 @@ fun Route.adminRoutes(
                     adminUserService = adminUserService,
                     userRepository = userRepository,
                     identityProviderRepository = identityProviderRepository,
+                    identityProviderService = identityProviderService,
                     mfaRepository = mfaRepository,
                     translationPort = translationPort,
                     webAuthnCredentialRepository = webAuthnCredentialRepository,
                     securityMethodsService = securityMethodsService,
+                    auditLogRepository = auditLogRepository,
+                    identityProviderProbeService = identityProviderProbeService,
+                    baseUrl = baseUrl,
                 )
 
                 adminApplicationRoutes(
@@ -531,6 +548,7 @@ fun Route.adminRoutes(
                     webAuthnService = webAuthnService,
                     mfaService = mfaService,
                     auditLogPort = auditLogPort,
+                    socialAccountRepository = socialAccountRepository,
                 )
 
                 adminSessionAuditRoutes(

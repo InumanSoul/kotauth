@@ -23,6 +23,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.plugins.PayloadTooLargeException
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -130,7 +131,7 @@ fun Route.adminBackupRoutes(
                         userId = null,
                         clientId = null,
                         eventType = AuditEventType.ADMIN_TENANT_EXPORTED,
-                        ipAddress = call.request.local.remoteAddress,
+                        ipAddress = call.request.origin.remoteAddress,
                         userAgent = call.request.headers["User-Agent"],
                         details =
                             mapOf(
@@ -230,7 +231,7 @@ fun Route.adminBackupRoutes(
                                 userId = null,
                                 clientId = null,
                                 eventType = AuditEventType.ADMIN_TENANT_IMPORTED,
-                                ipAddress = call.request.local.remoteAddress,
+                                ipAddress = call.request.origin.remoteAddress,
                                 userAgent = call.request.headers["User-Agent"],
                                 details =
                                     mapOf(

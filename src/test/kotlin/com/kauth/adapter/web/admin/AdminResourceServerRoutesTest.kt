@@ -134,6 +134,12 @@ class AdminResourceServerRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             credentialFlowService = buildCredentialFlowService(),
+            collisionCheck =
+                com.kauth.domain.service
+                    .IdentifierCollisionCheck(userRepo),
+            usernameGenerator =
+                com.kauth.domain.service
+                    .UsernameGenerator(userRepo),
         )
 
     private fun buildAppMgmtService() =
@@ -177,7 +183,7 @@ class AdminResourceServerRoutesTest {
     }
 
     // =========================================================================
-    // POST /settings/apis — create
+    // POST /apis — create
     // =========================================================================
 
     @Test
@@ -189,7 +195,7 @@ class AdminResourceServerRoutesTest {
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/$tenantSlug/settings/apis",
+                    url = "/admin/workspaces/$tenantSlug/apis",
                     formParameters =
                         Parameters.build {
                             append("identifier", "https://api.example.com")
@@ -211,7 +217,7 @@ class AdminResourceServerRoutesTest {
             login(authed)
 
             authed.submitForm(
-                url = "/admin/workspaces/$tenantSlug/settings/apis",
+                url = "/admin/workspaces/$tenantSlug/apis",
                 formParameters =
                     Parameters.build {
                         append("identifier", "https://api.example.com")
@@ -224,7 +230,7 @@ class AdminResourceServerRoutesTest {
         }
 
     // =========================================================================
-    // POST /settings/apis/{id} — update
+    // POST /apis/{id} — update
     // =========================================================================
 
     @Test
@@ -249,7 +255,7 @@ class AdminResourceServerRoutesTest {
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/$tenantSlug/settings/apis/${existing.id!!.value}",
+                    url = "/admin/workspaces/$tenantSlug/apis/${existing.id!!.value}",
                     formParameters =
                         Parameters.build {
                             append("name", "Example API")
@@ -263,7 +269,7 @@ class AdminResourceServerRoutesTest {
         }
 
     // =========================================================================
-    // GET /settings/apis — list page renders scope badges
+    // GET /apis — list page renders scope badges
     // =========================================================================
 
     @Test
@@ -285,7 +291,7 @@ class AdminResourceServerRoutesTest {
                 ),
             )
 
-            val response = authed.get("/admin/workspaces/$tenantSlug/settings/apis")
+            val response = authed.get("/admin/workspaces/$tenantSlug/apis")
 
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()

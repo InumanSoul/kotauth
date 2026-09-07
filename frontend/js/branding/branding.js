@@ -101,6 +101,35 @@
     }
   };
 
+  /* ── active preset detection ── */
+
+  // Which preset (if any) the saved theme currently matches. Nothing persists the
+  // choice, so it is derived from the colour fields rather than assumed — otherwise
+  // the page claims "Dark" is active however the workspace is actually themed.
+  const markActivePreset = () => {
+    const group = document.querySelector('[data-preset]')?.closest('.preset-group');
+    if (!group) return;
+    const currentValue = (key) => {
+      if (key === 'radius') return document.getElementById('field-radius')?.value;
+      return document.getElementById(`native-${key}`)?.value;
+    };
+    const matches = (preset) =>
+      Object.entries(preset).every(([key, val]) => {
+        const actual = currentValue(key);
+        if (actual == null) return false;
+        return String(actual).toLowerCase() === String(val).toLowerCase();
+      });
+
+    group.querySelectorAll('.preset-btn').forEach((b) => b.classList.remove('preset-btn--active'));
+    for (const [name, preset] of Object.entries(presets)) {
+      if (!matches(preset)) continue;
+      group.querySelector(`[data-preset="${name}"]`)?.classList.add('preset-btn--active');
+      return;
+    }
+  };
+
+  markActivePreset();
+
   /* ── event wiring ── */
 
   // Theme preset buttons: [data-preset]

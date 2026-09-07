@@ -31,7 +31,7 @@ internal fun scimProvisioningPageImpl(
     val createKeyHref = "$apiKeysHref/new?scope=${ApiScope.SCIM}"
 
     adminShell(
-        pageTitle = "${EnglishStrings.SCIM_PAGE_TITLE} — ${workspace.displayName}",
+        pageTitle = "${EnglishStrings.SCIM_PAGE_TITLE} · ${workspace.displayName}",
         activeRail = "directory",
         allWorkspaces = allWorkspaces,
         workspaceName = workspace.displayName,
@@ -39,7 +39,6 @@ internal fun scimProvisioningPageImpl(
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
         activeAppSection = "provisioning",
-        contentClass = "content-outer",
         toastMessage = toastMessage,
     ) {
         div("content-inner") {
@@ -59,14 +58,13 @@ internal fun scimProvisioningPageImpl(
             ovCard {
                 ovSectionLabel(EnglishStrings.SCIM_ENDPOINT_HEADING)
                 ovRowMono(EnglishStrings.SCIM_ENDPOINT_LABEL, endpointUrl, copyable = true)
-                ovRowMuted("", EnglishStrings.SCIM_ENDPOINT_HINT)
+                ovProse(EnglishStrings.SCIM_ENDPOINT_HINT)
             }
 
             // ── Status ───────────────────────────────────────────────
             ovCard {
                 ovSectionLabel(EnglishStrings.SCIM_STATUS_HEADING)
-                ovRowMuted(
-                    "",
+                ovProse(
                     when {
                         scimKeys.isEmpty() -> EnglishStrings.SCIM_STATUS_NO_KEY
                         // The table below lists these keys with a Revoked badge, so "no such key"
@@ -80,10 +78,10 @@ internal fun scimProvisioningPageImpl(
             // ── Token / keys ─────────────────────────────────────────
             ovCard {
                 ovSectionLabel(EnglishStrings.SCIM_TOKEN_HEADING)
-                ovRowMuted("", EnglishStrings.SCIM_TOKEN_HINT)
+                ovProse(EnglishStrings.SCIM_TOKEN_HINT)
                 if (scimKeys.isEmpty()) {
                     emptyState(
-                        iconName = "code",
+                        iconName = "key",
                         title = EnglishStrings.SCIM_KEYS_EMPTY_TITLE,
                         description = EnglishStrings.SCIM_KEYS_EMPTY_BODY,
                         cta = {
@@ -108,26 +106,27 @@ internal fun scimProvisioningPageImpl(
             }
 
             // ── Behaviour ────────────────────────────────────────────
-            ovCard {
-                ovSectionLabel(EnglishStrings.SCIM_BEHAVIOUR_HEADING)
+            details("ov-card disclosure") {
+                summary("ov-card__section-label") { +EnglishStrings.SCIM_BEHAVIOUR_HEADING }
                 notice(
                     title = EnglishStrings.SCIM_DEPROVISION_HEADING,
                     description = EnglishStrings.SCIM_DELETE_DEACTIVATES,
                     modifier = "notice--info",
                     iconName = "info",
                 )
-                ovRowMuted("", EnglishStrings.SCIM_BEHAVIOUR_GROUPS)
-                ovRowMuted("", EnglishStrings.SCIM_DELETE_GROUP_PERMANENT)
+                ovProse(EnglishStrings.SCIM_BEHAVIOUR_GROUPS)
+                ovProse(EnglishStrings.SCIM_DELETE_GROUP_PERMANENT)
             }
 
             // ── Per-provider notes ───────────────────────────────────
-            ovCard {
-                ovSectionLabel(EnglishStrings.SCIM_NOTES_HEADING)
-                ovRowMuted("", EnglishStrings.SCIM_NOTES_INTRO)
-                // Only the first note of each dialect carries the label, so the rows read as one block.
+            details("ov-card disclosure") {
+                summary("ov-card__section-label") { +EnglishStrings.SCIM_NOTES_HEADING }
+                ovProse(EnglishStrings.SCIM_NOTES_INTRO)
+                // Each dialect keeps its own name. Dropping the name from every note but the
+                // first ran the dialects together into one undifferentiated block of text.
                 scimDialects.forEach { dialect ->
                     dialect.setupNotes.forEachIndexed { index, note ->
-                        ovRowMuted(if (index == 0) dialect.label else "", note)
+                        if (index == 0) ovProseTerm(dialect.label, note) else ovProse(note)
                     }
                 }
             }
@@ -139,7 +138,7 @@ private fun DIV.scimKeyTable(
     scimKeys: List<ApiKey>,
     slug: String,
 ) {
-    table("key-table") {
+    table("data-table") {
         thead {
             tr {
                 th { +EnglishStrings.SCIM_KEYS_COL_NAME }
@@ -152,12 +151,12 @@ private fun DIV.scimKeyTable(
             scimKeys.forEach { key ->
                 tr {
                     td {
-                        span("key-table__name") { +key.name }
-                        span("key-table__meta") { +" ${key.keyPrefix}…" }
+                        span("data-table__name") { +key.name }
+                        span("data-table__meta") { +" ${key.keyPrefix}…" }
                     }
                     td { scimDialectCell(key, slug) }
                     td {
-                        span("key-table__meta") {
+                        span("data-table__meta") {
                             +(key.lastUsedAt?.toDisplayString() ?: EnglishStrings.SCIM_KEYS_NEVER_USED)
                         }
                     }
@@ -183,8 +182,8 @@ private fun TD.scimDialectCell(
     slug: String,
 ) {
     if (key.bootstrapName != null) {
-        span("key-table__meta") { +scimDialectFor(key.scimDialect).label }
-        span("key-table__meta key-table__meta--with-icon") {
+        span("data-table__meta") { +scimDialectFor(key.scimDialect).label }
+        span("data-table__meta data-table__meta--with-icon") {
             attributes["aria-label"] = EnglishStrings.SCIM_DIALECT_ENV_MANAGED_HINT
             +" ${EnglishStrings.SCIM_DIALECT_ENV_MANAGED} "
             span("inline-help") {
@@ -246,12 +245,13 @@ internal fun DIV.scimDialectSelector(selectedId: String) {
 /**
  * The badge that marks a record an identity provider owns.
  *
- * Rendered from `externalId` alone, which is all KotAuth stores — no provider name is available,
- * so none is claimed.
+ * No provider name is available for either origin KotAuth records — a SCIM `externalId` or a
+ * brokered first sign-in — so none is claimed. [reason] is the tooltip: the default is SCIM's,
+ * and a brokered account passes its own, because no sync runs over one.
  */
-internal fun FlowContent.idpManagedBadge() {
+internal fun FlowContent.idpManagedBadge(reason: String = EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN) {
     span("badge badge--info") {
-        title = EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN
+        title = reason
         +EnglishStrings.SCIM_IDP_MANAGED_BADGE
     }
 }

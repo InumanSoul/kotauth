@@ -8,11 +8,11 @@ import kotlinx.html.*
 /**
  * Per-workspace export view — `/admin/workspaces/{slug}/settings/backup`.
  *
- * One form, one submit, one downloaded file. Confirmation is the slug-typed-back
- * pattern (HTML5 `pattern` attribute, no JS) so the export button literally cannot
- * fire until the operator has typed the slug exactly. Combined with the password
- * + confirm-password pair this matches the strictest existing destructive flow
- * in the admin without any client-side script.
+ * One form, one submit, one downloaded file. Confirmation is the slug typed back,
+ * enforced in three places: the route rejects a mismatch, `backup-slug-validation.js`
+ * disables the submit button until the value matches, and the HTML5 `pattern`
+ * attribute is the fallback when scripting is off. The route is the authority — the
+ * other two only shorten the round trip.
  */
 internal fun workspaceBackupPageImpl(
     workspace: Tenant,
@@ -23,7 +23,7 @@ internal fun workspaceBackupPageImpl(
     {
         val slug = workspace.slug
         adminShell(
-            pageTitle = "${EnglishStrings.BACKUP_PAGE_TITLE} — ${workspace.displayName}",
+            pageTitle = "${EnglishStrings.BACKUP_PAGE_TITLE} · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -31,7 +31,6 @@ internal fun workspaceBackupPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "backup",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(
@@ -59,16 +58,15 @@ internal fun workspaceBackupPageImpl(
                 }
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
-                div("notice notice--info") {
-                    span("notice__icon") { inlineSvgIcon("info", "info") }
-                    div("notice__body") {
-                        span("notice__title") { +EnglishStrings.BACKUP_SCOPE_NOTICE_TITLE }
-                        span("notice__desc") { +EnglishStrings.BACKUP_SCOPE_NOTICE_BODY }
-                    }
-                }
+                notice(
+                    title = EnglishStrings.BACKUP_SCOPE_NOTICE_TITLE,
+                    description = EnglishStrings.BACKUP_SCOPE_NOTICE_BODY,
+                    modifier = "notice--info",
+                    iconName = "info",
+                )
 
                 form(
                     action = "/admin/workspaces/$slug/settings/backup",
@@ -135,7 +133,7 @@ internal fun workspaceBackupPageImpl(
                             div {
                                 input(type = InputType.text, name = "confirmSlug") {
                                     classes = setOf("edit-row__field", "edit-row__field--mono")
-                                    attributes["pattern"] = java.util.regex.Pattern.quote(slug)
+                                    attributes["pattern"] = escapeForHtmlPattern(slug)
                                     attributes["required"] = "required"
                                     attributes["autocomplete"] = "off"
                                     attributes["data-confirm-slug"] = slug
@@ -175,7 +173,6 @@ internal fun importTenantPageImpl(
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(
@@ -200,21 +197,18 @@ internal fun importTenantPageImpl(
                 }
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
-                div("notice notice--info") {
-                    span("notice__icon") { inlineSvgIcon("info", "info") }
-                    div("notice__body") {
-                        span("notice__title") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_TITLE }
-                        span("notice__desc") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_BODY }
-                        ul {
-                            li { +EnglishStrings.IMPORT_RECOVERY_OAUTH_SECRETS }
-                            li { +EnglishStrings.IMPORT_RECOVERY_SOCIAL_SECRETS }
-                            li { +EnglishStrings.IMPORT_RECOVERY_SMTP_PASSWORD }
-                            li { +EnglishStrings.IMPORT_RECOVERY_MFA_SEEDS }
-                            li { +EnglishStrings.IMPORT_RECOVERY_SESSIONS }
-                        }
+                notice(modifier = "notice--info", iconName = "info") {
+                    span("notice__title") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_TITLE }
+                    span("notice__desc") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_BODY }
+                    ul {
+                        li { +EnglishStrings.IMPORT_RECOVERY_OAUTH_SECRETS }
+                        li { +EnglishStrings.IMPORT_RECOVERY_SOCIAL_SECRETS }
+                        li { +EnglishStrings.IMPORT_RECOVERY_SMTP_PASSWORD }
+                        li { +EnglishStrings.IMPORT_RECOVERY_MFA_SEEDS }
+                        li { +EnglishStrings.IMPORT_RECOVERY_SESSIONS }
                     }
                 }
 

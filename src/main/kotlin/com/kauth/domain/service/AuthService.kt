@@ -30,7 +30,8 @@ import java.time.Instant
  * indistinguishable from a wrong password — no slug enumeration leaks.
  *
  * Flow — login:
- *   slug → Tenant → find User by username in that tenant → verify password → tokens + session
+ *   slug → Tenant → resolve User by the workspace's identifier mode (username, email, or
+ *   either — see UserIdentifierResolver) in that tenant → verify password → tokens + session
  *
  * Flow — register:
  *   slug → Tenant → check policy → validate → hash password → save User
@@ -46,6 +47,8 @@ class AuthService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
+    private val identifierResolver: UserIdentifierResolver,
+    private val collisionCheck: IdentifierCollisionCheck,
 ) {
     // Equalises latency so wrong-password vs. user-not-found / disabled / locked / pending-setup
     // are indistinguishable timing-wise — closes the bcrypt-skipped enumeration vector.
@@ -96,7 +99,28 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
-        val user = userRepository.findByUsername(tenant.id, username)
+        val resolution =
+            identifierResolver.resolve(
+                tenant.id,
+                tenant.securityConfig.loginIdentifierMode,
+                username,
+            )
+        if (resolution is IdentifierResolution.Ambiguous) {
+            runDummyVerify(rawPassword)
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = null,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "ambiguous_identifier"),
+                ),
+            )
+            return AuthResult.Failure(AuthError.InvalidCredentials)
+        }
+        val user = (resolution as? IdentifierResolution.Found)?.user
         if (user == null) {
             runDummyVerify(rawPassword)
             auditLog.record(
@@ -358,6 +382,26 @@ class AuthService(
             return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
         }
 
+        // Normalize FIRST, then validate — "Dave" becomes "dave" and is accepted, while
+        // "john doe" is rejected rather than silently rewritten. This was previously the only
+        // write path with no username format validation at all.
+        val normalizedUsername = UsernamePolicy.normalize(username)
+        val normalizedEmail = email.trim().lowercase()
+
+        when (UsernamePolicy.validate(normalizedUsername)) {
+            UsernamePolicy.Violation.INVALID_FORMAT ->
+                return AuthResult.Failure(
+                    AuthError.ValidationError(
+                        "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                    ),
+                )
+            UsernamePolicy.Violation.TOO_LONG ->
+                return AuthResult.Failure(
+                    AuthError.ValidationError("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
+                )
+            null -> Unit
+        }
+
         // In passwordless mode the password is generated server-side and never used by
         // the user — skip policy/confirmation checks. The User table still requires a
         // hash, so we mint a random unguessable secret to satisfy the schema.
@@ -377,19 +421,26 @@ class AuthService(
                 rawPassword
             }
 
-        if (userRepository.existsByUsername(tenant.id, username)) {
+        if (userRepository.existsByUsername(tenant.id, normalizedUsername)) {
             return AuthResult.Failure(AuthError.UserAlreadyExists)
         }
 
-        if (userRepository.existsByEmail(tenant.id, email)) {
+        if (userRepository.existsByEmail(tenant.id, normalizedEmail)) {
             return AuthResult.Failure(AuthError.EmailAlreadyExists)
         }
+
+        // Same-namespace duplicates are ruled out above; this catches the cross-namespace
+        // pair — this username equal to a DIFFERENT user's email, or vice versa — that the
+        // database's separate unique constraints would otherwise allow through.
+        collisionCheck
+            .check(tenant.id, normalizedUsername, normalizedEmail)
+            ?.let { return AuthResult.Failure(AuthError.ValidationError(it)) }
 
         val newUser =
             User(
                 tenantId = tenant.id,
-                username = username.trim(),
-                email = email.trim().lowercase(),
+                username = normalizedUsername,
+                email = normalizedEmail,
                 fullName = fullName.trim(),
                 passwordHash = passwordHasher.hash(effectivePassword),
             )

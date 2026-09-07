@@ -57,6 +57,12 @@ object ApiScope {
     const val CLAIM_MAPPERS_READ = "claim_mappers:read"
     const val CLAIM_MAPPERS_WRITE = "claim_mappers:write"
 
+    /** List identity provider configurations. The client secret is never returned. */
+    const val IDENTITY_PROVIDERS_READ = "identity_providers:read"
+
+    /** Create, update and delete identity provider configurations. */
+    const val IDENTITY_PROVIDERS_WRITE = "identity_providers:write"
+
     /** Master-tenant only — export a workspace as an encrypted backup. */
     const val TENANTS_EXPORT = "tenants:export"
 
@@ -114,6 +120,8 @@ object ApiScope {
             USER_ATTRIBUTES_WRITE,
             CLAIM_MAPPERS_READ,
             CLAIM_MAPPERS_WRITE,
+            IDENTITY_PROVIDERS_READ,
+            IDENTITY_PROVIDERS_WRITE,
             TENANTS_EXPORT,
             TENANTS_IMPORT,
             AUTH_SEND_OTP,

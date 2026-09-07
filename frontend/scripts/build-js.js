@@ -23,6 +23,7 @@ const bundles = [
       src('shared/password-validation.js'),
       src('shared/backup-slug-validation.js'),
       src('shared/toast.js'),
+      src('admin/callback-template.js'),
       src('admin/settings.js'),
       src('admin/update-check.js'),
     ],

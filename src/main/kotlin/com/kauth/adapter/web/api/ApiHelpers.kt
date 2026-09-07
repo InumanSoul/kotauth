@@ -215,7 +215,7 @@ internal suspend fun ApplicationCall.respondWebAuthnError(error: WebAuthnError):
             respondProblem(
                 HttpStatusCode.Conflict,
                 "Cannot revoke last passkey",
-                "This is the user's last passkey and password login is disabled — enable password login " +
+                "This is the user's last passkey and password login is disabled. Enable password login " +
                     "or add another passkey before revoking this one.",
             )
         WebAuthnError.TenantMismatch ->
@@ -236,7 +236,7 @@ internal suspend fun ApplicationCall.respondWebAuthnError(error: WebAuthnError):
             respondProblem(
                 HttpStatusCode.UnprocessableEntity,
                 "WebAuthn error",
-                "Unexpected WebAuthn error — this endpoint doesn't produce challenge/auth flows.",
+                "Unexpected WebAuthn error. This endpoint doesn't produce challenge/auth flows.",
             )
     }
 
@@ -266,7 +266,8 @@ data class ProblemDetail(
 // -- Request bodies -----------------------------------------------------------
 
 @Serializable data class CreateUserRequest(
-    val username: String,
+    /** Omit or leave blank to have Kotauth generate one from the name and email. */
+    val username: String? = null,
     val email: String,
     val fullName: String,
     val password: String,
@@ -275,6 +276,7 @@ data class ProblemDetail(
 @Serializable data class UpdateUserRequest(
     val email: String? = null,
     val fullName: String? = null,
+    val username: String? = null,
 )
 
 @Serializable data class CreateRoleRequest(
@@ -332,7 +334,8 @@ data class ProblemDetail(
  * Requires SMTP to be configured on the tenant.
  */
 @Serializable data class InviteUserRequest(
-    val username: String,
+    /** Omit or leave blank to have Kotauth generate one from the name and email. */
+    val username: String? = null,
     val email: String,
     val fullName: String,
 )
