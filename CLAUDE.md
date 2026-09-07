@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Kotauth is a self-hosted identity and access management server built with Kotlin/Ktor. It provides multi-tenant authentication, authorization, user management, OAuth2/OIDC, MFA, and an admin UI.
 
-**Stack**: Kotlin 2.3.20 · Ktor 3.5.1 · Exposed 1.3.1 (ORM) · PostgreSQL 15 · JVM 17 (compile target pinned in `build.gradle.kts`) · Gradle 9.4.1 · LightningCSS (build-time only)
+**Stack**: Kotlin · Ktor · Exposed (ORM) · PostgreSQL 15 · JVM 17 (compile target pinned in `build.gradle.kts`) · Gradle · LightningCSS (build-time only)
+
+Library versions are declared at the top of `build.gradle.kts` and pinned in `gradle.lockfile` — read them there rather than from prose, which goes stale within days of a Dependabot merge.
 
 ## Common Commands
 
@@ -33,7 +35,7 @@ Kotauth is a self-hosted identity and access management server built with Kotlin
 src/main/kotlin/com/kauth/
 ├── domain/
 │   ├── model/       # Pure data classes, value objects
-│   ├── port/        # ~27 interface contracts (repository, token, email, etc.)
+│   ├── port/        # 43 interface contracts (repository, token, email, etc.)
 │   └── service/     # Business logic, returns sealed Result types
 ├── adapter/
 │   ├── web/         # Ktor route handlers

@@ -92,7 +92,7 @@ Pre-release tags (e.g. `1.19.0-rc1`) are published but do not move the `latest` 
 
 ## Under the hood
 
-**Stack:** Kotlin 2.3.20, Ktor 3.5.1, Exposed 1.3.1 (ORM), PostgreSQL 15, JVM 17, Gradle 9.4.1. The runtime image is ~410 MB, mostly the JRE base; the JAR runs as an unprivileged user.
+**Stack:** Kotlin on Ktor, Exposed for persistence, PostgreSQL 15, JVM 17, Gradle. Exact library versions live in [`build.gradle.kts`](build.gradle.kts) and are pinned in `gradle.lockfile`. The runtime image is ~410 MB, mostly the JRE base; the JAR runs as an unprivileged user.
 
 **Architecture:** [hexagonal (Ports & Adapters)](https://alistair.cockburn.us/hexagonal-architecture/) — the domain layer (`domain/model`, `domain/port`, `domain/service`) has zero framework dependencies, so business logic is testable in-memory without Docker, a database, or HTTP. Adapters (`adapter/web`, `adapter/persistence`, `adapter/token`, `adapter/email`, `adapter/social`) sit at the edge.
 
