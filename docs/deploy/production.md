@@ -192,6 +192,17 @@ server {
 
 Set `KAUTH_TRUSTED_PROXY=true` so Kotauth honors `X-Forwarded-For`. Never set this without a reverse proxy in front — it lets clients spoof the IPs that gate rate limiting.
 
+#### One trusted hop only
+
+With `KAUTH_TRUSTED_PROXY=true`, Kotauth reads the **last** entry of `X-Forwarded-For` as the client address. That is the address the proxy directly in front of it observed, and a client cannot forge it.
+
+Front-ends differ in how they write the header:
+
+- **Replacing** — the bundled `docker/Caddyfile` (`header_up X-Forwarded-For {remote_host}`) and the nginx example above (`proxy_set_header X-Forwarded-For $remote_addr`) discard whatever the client sent. First and last entry are then the same value.
+- **Appending** — nginx's `$proxy_add_x_forwarded_for`, most cloud load balancers, and Cloudflare keep the client's value and append their own. Only the last entry is trustworthy.
+
+If you run **more than one** proxy in front of Kotauth (for example a CDN in front of a load balancer), the last entry is the *inner* proxy's address rather than the client's, so every rate limit and every audit-log IP collapses onto that one address. There is no setting for that topology yet. Terminate on a single trusted hop, or have the outermost trusted proxy overwrite `X-Forwarded-For` with the client address it observed.
+
 ### Traefik
 
 ```yaml
@@ -227,6 +238,7 @@ For periodic reset (hourly is typical for public demos):
 - [ ] Master workspace admin password rotated after first login
 - [ ] Backups scheduled for the `kotauth_db_data` volume
 - [ ] If using `KAUTH_TRUSTED_PROXY=true`, the proxy in front overwrites client-supplied `X-Forwarded-*` headers
+- [ ] If using `KAUTH_TRUSTED_PROXY=true`, exactly one trusted proxy sits in front (see [One trusted hop only](#one-trusted-hop-only))
 
 ## CLI tools
 

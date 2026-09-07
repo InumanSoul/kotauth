@@ -34,7 +34,9 @@ For configuration knobs — set your own `KAUTH_SECRET_KEY`, point at an externa
 - **Multi-tenancy** — Isolated workspaces, each with its own users, applications, settings, and RS256 signing keys
 - **RBAC** — Roles, groups, composite role inheritance, JWT `realm_access` / `resource_access` claims
 - **MFA** — TOTP (RFC 6238), recovery codes, per-tenant policy (optional / required / required for admins)
+- **Sign-in identifier** — per-workspace choice of username, email, or either; existing workspaces keep username-only until an admin opts in
 - **Social login** — Google and GitHub OAuth2, with automatic account linking
+- **OIDC identity brokering** — sign users in through any OpenID Connect provider, configured per workspace; endpoints read from the issuer's discovery document, with optional per-endpoint pins. Optional just-in-time account creation, off by default and gated on a provider-asserted verified email plus an exact-match allowed-domain list. No identity provider has been verified against a live tenant; the implementation follows the specifications the providers publish
 - **User self-service** — Email verification, password reset, session management, MFA enrollment
 - **Admin console** — Web UI for workspaces, users, applications, audit logs, webhooks, branding
 - **REST API v1** — 30+ endpoints, API key authentication, OpenAPI 3.1 spec with Swagger UI
@@ -90,7 +92,7 @@ Pre-release tags (e.g. `1.19.0-rc1`) are published but do not move the `latest` 
 
 ## Under the hood
 
-**Stack:** Kotlin 2.3.20, Ktor 3.4.2, Exposed 0.61.0 (ORM), PostgreSQL 15, JVM 17, Gradle 8.14. The runtime image is ~120 MB; the JAR runs as an unprivileged user.
+**Stack:** Kotlin 2.3.20, Ktor 3.5.1, Exposed 1.3.1 (ORM), PostgreSQL 15, JVM 17, Gradle 9.4.1. The runtime image is ~120 MB; the JAR runs as an unprivileged user.
 
 **Architecture:** [hexagonal (Ports & Adapters)](https://alistair.cockburn.us/hexagonal-architecture/) — the domain layer (`domain/model`, `domain/port`, `domain/service`) has zero framework dependencies, so business logic is testable in-memory without Docker, a database, or HTTP. Adapters (`adapter/web`, `adapter/persistence`, `adapter/token`, `adapter/email`, `adapter/social`) sit at the edge.
 

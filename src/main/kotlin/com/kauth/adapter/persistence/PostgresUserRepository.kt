@@ -43,6 +43,23 @@ class PostgresUserRepository : UserRepository {
                 .singleOrNull()
         }
 
+    override fun findByUsernameIgnoreCase(
+        tenantId: TenantId,
+        username: String,
+    ): User? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where {
+                    (UsersTable.tenantId eq tenantId.value) and
+                        (UsersTable.username.lowerCase() eq username.trim().lowercase())
+                }.map { it.toUser() }
+                // UNIQUE (tenant_id, username) permits two rows differing only in case, so a
+                // case-differing collision is still one match — singleOrNull() would fail open
+                // here (return null) precisely on the collision this lookup exists to catch.
+                .firstOrNull()
+        }
+
     override fun findByEmail(
         tenantId: TenantId,
         email: String,
@@ -135,6 +152,7 @@ class PostgresUserRepository : UserRepository {
     override fun update(user: User): User =
         transaction {
             UsersTable.update({ UsersTable.id eq user.id!!.value }) {
+                it[username] = user.username
                 it[email] = user.email.lowercase()
                 it[fullName] = user.fullName
                 it[externalId] = user.externalId

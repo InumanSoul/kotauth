@@ -10,6 +10,7 @@ import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
@@ -87,7 +88,7 @@ private suspend fun handleSendOtp(
     val params = call.receiveParameters()
     val email = params["email"]?.trim()?.lowercase().orEmpty()
     val isResend = params["resend"] == "true"
-    val ipAddress = call.request.local.remoteAddress
+    val ipAddress = call.request.origin.remoteAddress
 
     if (email.isBlank() || "@" !in email) {
         return call.respondHtml(
@@ -162,7 +163,7 @@ private suspend fun handleVerifyOtp(
 
     val params = call.receiveParameters()
     val code = params["code"]?.trim().orEmpty()
-    val ipAddress = call.request.local.remoteAddress
+    val ipAddress = call.request.origin.remoteAddress
 
     if (!code.matches(Regex("\\d{6}"))) {
         return call.respondHtml(

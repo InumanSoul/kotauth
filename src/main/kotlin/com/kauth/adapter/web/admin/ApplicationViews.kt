@@ -76,7 +76,7 @@ internal fun applicationDetailPageImpl(
     {
         val appPairs = allApps.map { it.clientId to it.name }
         adminShell(
-            pageTitle = "${application.name} — ${workspace.displayName}",
+            pageTitle = "${application.name} · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -86,8 +86,7 @@ internal fun applicationDetailPageImpl(
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -115,11 +114,7 @@ internal fun applicationDetailPageImpl(
                         }
                         div("page-header__meta") {
                             span("badge badge--id") { +application.clientId }
-                            when (application.accessType) {
-                                AccessType.PUBLIC -> span("badge badge--public") { +"Public" }
-                                AccessType.CONFIDENTIAL -> span("badge badge--confidential") { +"Confidential" }
-                                AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
-                            }
+                            accessTypeLabel(application.accessType)
                         }
                     }
                 }
@@ -137,8 +132,11 @@ internal fun applicationDetailPageImpl(
 
             // ── New secret banner (shown once after regeneration) ────
             if (newSecret != null) {
-                div("notice notice--success") {
-                    p { +"New Client Secret — copy it now. You will not see it again." }
+                notice(modifier = "notice--success", iconName = "check-circle") {
+                    p {
+                        +"New client secret. "
+                        +EnglishStrings.SECRET_SHOWN_ONCE
+                    }
                     div("copy-field") {
                         span("copy-field__value") { +newSecret }
                         button(type = ButtonType.button) {
@@ -162,11 +160,7 @@ internal fun applicationDetailPageImpl(
                     ovRowMuted("Description", application.description)
                 }
                 ovRow("Access Type") {
-                    when (application.accessType) {
-                        AccessType.PUBLIC -> span("badge badge--public") { +"Public" }
-                        AccessType.CONFIDENTIAL -> span("badge badge--confidential") { +"Confidential" }
-                        AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
-                    }
+                    accessTypeLabel(application.accessType)
                 }
                 ovRow(EnglishStrings.GRANT_TYPES_LABEL) {
                     if (application.grantTypes.isEmpty()) {
@@ -305,7 +299,7 @@ internal fun applicationDetailPageImpl(
                 if (defaultRoles.isEmpty()) {
                     p("edit-row__hint") {
                         style = "padding:8px 16px 12px;"
-                        +"No default roles configured — roles added here are granted "
+                        +"No default roles configured. Roles added here are granted "
                         +"automatically to users who self-register through this app."
                     }
                 } else {
@@ -376,11 +370,21 @@ internal fun applicationDetailPageImpl(
 
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
+                div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                 div("danger-zone") {
                     dangerZoneCard(
-                        title = "Disable this application",
-                        description = "All login attempts will be rejected. This can be reversed at any time.",
+                        title =
+                            if (application.enabled) {
+                                "Disable this application"
+                            } else {
+                                "Enable this application"
+                            },
+                        description =
+                            if (application.enabled) {
+                                "All login attempts will be rejected. This can be reversed at any time."
+                            } else {
+                                "Login attempts are being rejected. Enabling accepts them again."
+                            },
                     ) {
                         postButton(
                             action = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/toggle",
@@ -421,7 +425,7 @@ internal fun createApplicationPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "New Application — ${workspace.displayName}",
+            pageTitle = "New Application · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -429,7 +433,6 @@ internal fun createApplicationPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             showSidebar = false,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -460,7 +463,7 @@ internal fun createApplicationPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────
@@ -527,17 +530,17 @@ internal fun createApplicationPageImpl(
                         option {
                             value = "public"
                             selected = (prefill.accessType == "public")
-                            +"Public — browser / SPA / mobile (no secret)"
+                            +"Public (browser, SPA or mobile app, no secret)"
                         }
                         option {
                             value = "confidential"
                             selected = (prefill.accessType == "confidential")
-                            +"Confidential — server-side app with a secret"
+                            +"Confidential (server-side app with a secret)"
                         }
                         option {
                             value = "bearer_only"
                             selected = (prefill.accessType == "bearer_only")
-                            +"Bearer Only — resource server (validates tokens only)"
+                            +"Bearer only (resource server, validates tokens only)"
                         }
                     }
                 }
@@ -608,8 +611,7 @@ internal fun editApplicationPageImpl(
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -640,7 +642,7 @@ internal fun editApplicationPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────
@@ -662,7 +664,7 @@ internal fun editApplicationPageImpl(
                                 value = application.clientId
                             }
                             div("edit-row__hint") {
-                                +"Client ID is immutable — it may appear in issued tokens."
+                                +"Client ID is immutable, because it may appear in issued tokens."
                             }
                         }
                     }
@@ -703,17 +705,17 @@ internal fun editApplicationPageImpl(
                         option {
                             value = "public"
                             selected = (application.accessType == AccessType.PUBLIC)
-                            +"Public — browser / SPA / mobile (no secret)"
+                            +"Public (browser, SPA or mobile app, no secret)"
                         }
                         option {
                             value = "confidential"
                             selected = (application.accessType == AccessType.CONFIDENTIAL)
-                            +"Confidential — server-side app with a secret"
+                            +"Confidential (server-side app with a secret)"
                         }
                         option {
                             value = "bearer_only"
                             selected = (application.accessType == AccessType.BEARER_ONLY)
-                            +"Bearer Only — resource server (validates tokens only)"
+                            +"Bearer only (resource server, validates tokens only)"
                         }
                     }
                 }

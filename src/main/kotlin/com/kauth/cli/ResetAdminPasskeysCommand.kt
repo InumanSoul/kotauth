@@ -2,13 +2,16 @@ package com.kauth.cli
 
 import com.kauth.config.EnvironmentConfig
 import com.kauth.config.ServiceGraph
+import com.kauth.domain.service.UsernamePolicy
 import com.kauth.domain.service.WebAuthnResult
 import com.kauth.infrastructure.DatabaseFactory
 import kotlin.system.exitProcess
 
 object ResetAdminPasskeysCommand {
     fun execute(args: List<String>) {
-        val username = parseUsername(args)
+        // Usernames are always stored normalized (see UsernamePolicy) — this break-glass lookup
+        // must match the same way, or an operator's `USER=Admin` fails after V66 rewrites the row.
+        val username = parseUsername(args)?.let { UsernamePolicy.normalize(it) }
         if (username == null) {
             System.err.println("Usage: cli reset-admin-passkeys --username=<admin-username>")
             exitProcess(1)

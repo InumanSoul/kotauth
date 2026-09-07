@@ -14,7 +14,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
 fun Route.adminResourceServerRoutes(service: ResourceServerService) {
-    get("/settings/apis") {
+    get("/apis") {
         val ctx = call.adminContext()
         val resources = service.list(ctx.workspace.id)
         val toast = call.request.queryParameters["saved"]?.let(::toastFor)
@@ -30,7 +30,7 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         )
     }
 
-    get("/settings/apis/new") {
+    get("/apis/new") {
         val ctx = call.adminContext()
         call.respondHtml(
             HttpStatusCode.OK,
@@ -43,7 +43,7 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         )
     }
 
-    post("/settings/apis") {
+    post("/apis") {
         val ctx = call.adminContext()
         val params = call.receiveParameters()
         val identifier = params["identifier"].orEmpty()
@@ -59,7 +59,7 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
 
         when (val result = service.create(ctx.workspace.id, identifier, name, description, scopes)) {
             is ResourceServerResult.Success ->
-                call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=created")
+                call.respondRedirect("/admin/workspaces/${ctx.slug}/apis?saved=created")
             is ResourceServerResult.Failure -> {
                 val prefill =
                     com.kauth.domain.model.ResourceServer(
@@ -83,12 +83,12 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         }
     }
 
-    get("/settings/apis/{id}/edit") {
+    get("/apis/{id}/edit") {
         val ctx = call.adminContext()
         val id = call.parameters["id"]?.toIntOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
         val rs =
             service.get(ctx.workspace.id, ResourceServerId(id))
-                ?: return@get call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis")
+                ?: return@get call.respondRedirect("/admin/workspaces/${ctx.slug}/apis")
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.resourceServerFormPage(
@@ -100,7 +100,7 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         )
     }
 
-    post("/settings/apis/{id}") {
+    post("/apis/{id}") {
         val ctx = call.adminContext()
         val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
         val params = call.receiveParameters()
@@ -116,7 +116,7 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
 
         when (val result = service.update(ctx.workspace.id, ResourceServerId(id), name, description, scopes)) {
             is ResourceServerResult.Success ->
-                call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=updated")
+                call.respondRedirect("/admin/workspaces/${ctx.slug}/apis?saved=updated")
             is ResourceServerResult.Failure -> {
                 val current = service.get(ctx.workspace.id, ResourceServerId(id))
                 call.respondHtml(
@@ -133,29 +133,29 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         }
     }
 
-    post("/settings/apis/{id}/enable") {
+    post("/apis/{id}/enable") {
         val ctx = call.adminContext()
         val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
         when (service.setEnabled(ctx.workspace.id, ResourceServerId(id), true)) {
             is ResourceServerResult.Success ->
-                call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=enabled")
+                call.respondRedirect("/admin/workspaces/${ctx.slug}/apis?saved=enabled")
             is ResourceServerResult.Failure ->
                 call.respond(HttpStatusCode.NotFound)
         }
     }
 
-    post("/settings/apis/{id}/disable") {
+    post("/apis/{id}/disable") {
         val ctx = call.adminContext()
         val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
         when (service.setEnabled(ctx.workspace.id, ResourceServerId(id), false)) {
             is ResourceServerResult.Success ->
-                call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=disabled")
+                call.respondRedirect("/admin/workspaces/${ctx.slug}/apis?saved=disabled")
             is ResourceServerResult.Failure ->
                 call.respond(HttpStatusCode.NotFound)
         }
     }
 
-    post("/settings/apis/{id}/delete") {
+    post("/apis/{id}/delete") {
         val ctx = call.adminContext()
         val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
         val rsId = ResourceServerId(id)
@@ -163,10 +163,10 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         val params = call.receiveParameters()
         val confirm = params["confirmIdentifier"].orEmpty()
         if (current == null || confirm != current.identifier) {
-            return@post call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis")
+            return@post call.respondRedirect("/admin/workspaces/${ctx.slug}/apis")
         }
         service.delete(ctx.workspace.id, rsId)
-        call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=deleted")
+        call.respondRedirect("/admin/workspaces/${ctx.slug}/apis?saved=deleted")
     }
 }
 

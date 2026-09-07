@@ -31,12 +31,17 @@ import com.kauth.adapter.persistence.PostgresWebhookDeliveryRepository
 import com.kauth.adapter.persistence.PostgresWebhookEndpointRepository
 import com.kauth.adapter.social.GitHubOAuthAdapter
 import com.kauth.adapter.social.GoogleOAuthAdapter
+import com.kauth.adapter.social.HttpJwksAdapter
+import com.kauth.adapter.social.HttpOidcDiscoveryAdapter
+import com.kauth.adapter.social.JdkHttpFormPoster
 import com.kauth.adapter.token.BcryptPasswordHasher
+import com.kauth.adapter.token.JavaJwtVerifierAdapter
 import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.adapter.webauthn.YubicoCredentialRepositoryBridge
 import com.kauth.adapter.webauthn.YubicoRelyingPartyAdapter
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.BrokeredReferenceHasher
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
@@ -70,16 +75,23 @@ import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.IdentifierCollisionCheck
+import com.kauth.domain.service.IdentityProviderProbeService
+import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.ImpersonationService
+import com.kauth.domain.service.JitProvisioningService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.OidcTokenValidator
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SecurityMethodsService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
+import com.kauth.domain.service.UserIdentifierResolver
+import com.kauth.domain.service.UsernameGenerator
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
 import com.kauth.domain.service.WorkspaceSettingsService
@@ -147,6 +159,8 @@ data class ServiceGraph(
     val roleRepository: RoleRepository,
     val groupRepository: GroupRepository,
     val identityProviderRepository: IdentityProviderRepository,
+    val identityProviderService: IdentityProviderService,
+    val identityProviderProbeService: IdentityProviderProbeService,
     val portalConfigRepository: PortalConfigRepository,
     val themeRepository: ThemeRepository,
     val emailBrandingRepository: TenantEmailBrandingRepository,
@@ -181,6 +195,7 @@ data class ServiceGraph(
     val webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository,
     val securityMethodsService: SecurityMethodsService,
     val passkeyRateLimiter: RateLimiterPort,
+    val socialRateLimiter: RateLimiterPort,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
     val transactionRunner: TransactionRunner,
@@ -322,6 +337,8 @@ data class ServiceGraph(
                     passwordPolicy = passwordPolicyAdapter,
                     emailScope = applicationScope,
                 )
+            val identifierResolver = UserIdentifierResolver(userRepository)
+            val identifierCollisionCheck = IdentifierCollisionCheck(userRepository)
             val authService =
                 AuthService(
                     userRepository = userRepository,
@@ -334,6 +351,8 @@ data class ServiceGraph(
                     passwordPolicy = passwordPolicyAdapter,
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
+                    identifierResolver = identifierResolver,
+                    collisionCheck = identifierCollisionCheck,
                 )
             // -- User attributes + claim mapping ------------------------------
             val userAttributeService =
@@ -390,6 +409,7 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     corsPort = corsOriginCache,
                 )
+            val usernameGenerator = UsernameGenerator(userRepository)
             val adminUserService =
                 AdminUserService(
                     tenantRepository = tenantRepository,
@@ -398,6 +418,8 @@ data class ServiceGraph(
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     credentialFlowService = credentialFlowService,
+                    collisionCheck = identifierCollisionCheck,
+                    usernameGenerator = usernameGenerator,
                     passwordPolicy = passwordPolicyAdapter,
                     emailPort = emailAdapter,
                 )
@@ -446,6 +468,31 @@ data class ServiceGraph(
                     apiKeyRepository = apiKeyRepository,
                     tenantRepository = tenantRepository,
                 )
+            // One discovery cache and one JWKS cache for every tenant's OIDC provider; the
+            // adapters the resolver builds per request share them.
+            val jwksPort = HttpJwksAdapter()
+            val oidcDiscoveryPort = HttpOidcDiscoveryAdapter()
+            val oidcTokenValidator =
+                OidcTokenValidator(
+                    jwks = jwksPort,
+                    verifier = JavaJwtVerifierAdapter(),
+                )
+            // The admin probe shares the same two adapters the login flow resolves through, so a
+            // discovery test reports what a sign-in would actually get, not a second opinion.
+            val identityProviderProbeService =
+                IdentityProviderProbeService(
+                    discovery = oidcDiscoveryPort,
+                    jwks = jwksPort,
+                )
+            val jitProvisioningService =
+                JitProvisioningService(
+                    userRepository = userRepository,
+                    socialAccountRepository = socialAccountRepository,
+                    auditLog = auditLogAdapter,
+                    references = BrokeredReferenceHasher(config.secretKey),
+                    applicationRepository = applicationRepository,
+                    roleRepository = roleRepository,
+                )
             val socialLoginService =
                 SocialLoginService(
                     identityProviderRepository = identityProviderRepository,
@@ -456,13 +503,22 @@ data class ServiceGraph(
                     tokenPort = tokenAdapter,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
-                    providerAdapters =
-                        mapOf(
-                            SocialProvider.GOOGLE to GoogleOAuthAdapter(),
-                            SocialProvider.GITHUB to GitHubOAuthAdapter(),
+                    providerResolver =
+                        TenantAwareSocialProviderResolver(
+                            compiledIn =
+                                mapOf(
+                                    ProviderKey.GOOGLE to GoogleOAuthAdapter(),
+                                    ProviderKey.GITHUB to GitHubOAuthAdapter(),
+                                ),
+                            identityProviders = identityProviderRepository,
+                            discovery = oidcDiscoveryPort,
+                            tokenValidator = oidcTokenValidator,
+                            formPoster = JdkHttpFormPoster(),
                         ),
+                    collisionCheck = identifierCollisionCheck,
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
+                    jitProvisioning = jitProvisioningService,
                 )
 
             // -- WebAuthn (passkeys) ------------------------------------------
@@ -545,6 +601,8 @@ data class ServiceGraph(
             val otpEmailLimiter = buildRateLimiter(max = 3, windowSecs = 900, prefix = "otp_email")
             val otpIpLimiter = buildRateLimiter(max = 10, windowSecs = 900, prefix = "otp_ip")
             val passkeyAuthLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "passkey_auth")
+            // Two requests per sign-in attempt, both of which reach an issuer over the network.
+            val socialLoginLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "social_login")
             val apiWriteLimiter = buildRateLimiter(max = 60, windowSecs = 60, prefix = "api_write")
             // Reads are throttled far more generously than writes (300/min vs 60/min) and, unlike
             // every other limiter here, fail OPEN on a Redis outage: a rate limiter guards against
@@ -640,6 +698,8 @@ data class ServiceGraph(
                 roleRepository = roleRepository,
                 groupRepository = groupRepository,
                 identityProviderRepository = identityProviderRepository,
+                identityProviderService = IdentityProviderService(identityProviderRepository),
+                identityProviderProbeService = identityProviderProbeService,
                 portalConfigRepository = portalConfigRepository,
                 themeRepository = themeRepository,
                 emailBrandingRepository = emailBrandingRepository,
@@ -678,6 +738,7 @@ data class ServiceGraph(
                         identityProviderRepository = identityProviderRepository,
                     ),
                 passkeyRateLimiter = passkeyAuthLimiter,
+                socialRateLimiter = socialLoginLimiter,
                 flywaySchemaVersion = flywaySchemaVersion,
                 transactionRunner = backupTransactionRunner,
             )

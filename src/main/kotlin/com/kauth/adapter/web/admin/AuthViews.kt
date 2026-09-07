@@ -33,11 +33,10 @@ internal fun adminErrorPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "Error — KotAuth",
+            pageTitle = "Error · KotAuth",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner content-inner--wide") {
                 pageHeader(
