@@ -143,6 +143,50 @@ class ApiKeyServiceTest {
         assertEquals(expiry, result.value.apiKey.expiresAt)
     }
 
+    @Test
+    fun `create - duplicate name in the same tenant is refused`() {
+        val first =
+            svc.create(
+                tenantId = TenantId(1),
+                name = "Duplicate Key",
+                scopes = listOf(ApiScope.USERS_READ),
+            )
+        assertIs<ApiKeyResult.Success<CreatedApiKey>>(first)
+
+        val second =
+            svc.create(
+                tenantId = TenantId(1),
+                name = "Duplicate Key",
+                scopes = listOf(ApiScope.USERS_READ),
+            )
+        assertIs<ApiKeyResult.Failure>(second)
+        assertIs<ApiKeyError.Validation>(second.error)
+        assertTrue(
+            second.error.message.contains("\"Duplicate Key\"") &&
+                second.error.message.contains("already exists"),
+        )
+        assertEquals(1, apiKeys.all().size, "a refused duplicate must not be persisted")
+    }
+
+    @Test
+    fun `create - the same name is allowed in a different tenant`() {
+        tenants.add(
+            Tenant(
+                id = TenantId(2),
+                slug = "globex",
+                displayName = "Globex",
+                issuerUrl = null,
+            ),
+        )
+
+        assertIs<ApiKeyResult.Success<CreatedApiKey>>(
+            svc.create(TenantId(1), "Shared Name", listOf(ApiScope.USERS_READ)),
+        )
+        assertIs<ApiKeyResult.Success<CreatedApiKey>>(
+            svc.create(TenantId(2), "Shared Name", listOf(ApiScope.USERS_READ)),
+        )
+    }
+
     // =========================================================================
     // validate
     // =========================================================================

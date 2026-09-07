@@ -227,6 +227,34 @@ class AdminApiKeysTest {
         }
 
     @Test
+    fun `POST api-keys with a duplicate name re-renders the form with a validation error`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            apiKeyService.create(TenantId(2), "Cobalto ERP", listOf(ApiScope.USERS_READ))
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys",
+                    formParameters =
+                        Parameters.build {
+                            append("name", "Cobalto ERP")
+                            append("scopes", ApiScope.USERS_READ)
+                        },
+                )
+
+            assertEquals(
+                HttpStatusCode.UnprocessableEntity,
+                response.status,
+                "a duplicate name must be a validation error, not a 500",
+            )
+            val body = response.bodyAsText()
+            assertTrue(body.contains("already exists"), "the form must name the duplicate-name constraint")
+        }
+
+    @Test
     fun `POST api-keys revoke redirects back to list`() =
         testApplication {
             application { installTestApp() }

@@ -158,9 +158,9 @@ class AdminBackupRoutesTest {
         appRepo.add(acmeApp)
         userRepo.add(acmeUser)
 
-        fullScopeKey = createMasterKey(listOf(ApiScope.TENANTS_EXPORT, ApiScope.TENANTS_IMPORT))
-        exportOnlyKey = createMasterKey(listOf(ApiScope.TENANTS_EXPORT))
-        noScopeKey = createMasterKey(listOf(ApiScope.USERS_READ))
+        fullScopeKey = createMasterKey("full-scope", listOf(ApiScope.TENANTS_EXPORT, ApiScope.TENANTS_IMPORT))
+        exportOnlyKey = createMasterKey("export-only", listOf(ApiScope.TENANTS_EXPORT))
+        noScopeKey = createMasterKey("no-scope", listOf(ApiScope.USERS_READ))
         nonMasterKey =
             (
                 apiKeyService.create(
@@ -171,8 +171,11 @@ class AdminBackupRoutesTest {
             ).value.rawKey
     }
 
-    private fun createMasterKey(scopes: List<String>): String =
-        (apiKeyService.create(tenantId = master.id, name = "test", scopes = scopes) as ApiKeyResult.Success)
+    private fun createMasterKey(
+        name: String,
+        scopes: List<String>,
+    ): String =
+        (apiKeyService.create(tenantId = master.id, name = name, scopes = scopes) as ApiKeyResult.Success)
             .value.rawKey
 
     @Test
