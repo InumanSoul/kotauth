@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.25.0] - 2026-09-08
+
+### Security
+
+- **Authorizing a client against an API no longer grants it every scope that API declares.** A
+  client's scopes are now an explicit per-client grant, stored per (client, API) pair and enforced
+  as a three-way intersection at token issuance: what was requested, what the API declares, and
+  what this client was granted. Applies to the authorization-code, refresh-token and
+  client-credentials grants, and to the email-OTP back-channel path.
+
+  Previously, separate client credentials bought independent revocation and a real `sub` in the
+  audit trail — but not least privilege. A client created for one capability could request every
+  scope its API offered. See [ADR-23](docs/adr/ADR-23-per-client-scope-allowlists.md).
+
+  An absent grant means the client may request **nothing** on that API, never everything. On the
+  refresh path a soft-deleted application, which no longer resolves to a client, now yields no
+  scopes rather than falling back to the API's full declared set.
+
+### Added
+
+- **Per-scope checkboxes on the authorized-APIs page.** Each authorized API lists its declared
+  scopes, so which scopes a client holds is visible and editable where the authorization is made.
+- `client_authorized_scopes` is exposed through the resource-server service for the admin API.
+
+### Changed
+
+- **Adding a new scope to an API does not grant it to existing clients.** Deliberate: silent
+  propagation is how the previous behaviour would return. Grant it explicitly per client.
+- A scope that the API does not declare is refused rather than stored, so a client's allowlist
+  cannot drift from the API it constrains.
+
+### Migrations
+
+- `V67__client_authorized_scopes.sql` — creates the table and **backfills every existing
+  authorization with one row per scope its API currently declares**, reproducing today's behaviour
+  exactly. No client gains or loses a scope on upgrade. Narrowing begins only when an operator
+  edits a client's scopes or authorizes a new API. A newly authorized API arrives with all of its
+  scopes checked.
+
+---
+
 ## [1.24.1] - 2026-09-07
 
 ### Fixed

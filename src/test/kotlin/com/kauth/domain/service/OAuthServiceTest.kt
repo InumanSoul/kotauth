@@ -8,6 +8,7 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
+import com.kauth.domain.model.ResourceServerId
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -1562,7 +1563,7 @@ class OAuthServiceTest {
     @Test
     fun `narrowScopes accepts all requested when API declares them`() {
         val api = resourceServerOf(scopes = listOf("read:invoices", "write:invoices"))
-        val result = svc.narrowScopes(listOf("read:invoices"), listOf(api))
+        val result = svc.narrowScopes(listOf("read:invoices"), listOf(api), grantingAll(api))
         assertEquals(
             OAuthService.ScopeNarrowing.Ok(listOf("read:invoices")),
             result,
@@ -1572,7 +1573,7 @@ class OAuthServiceTest {
     @Test
     fun `narrowScopes rejects requested scope not declared by any targeted API (strict mode)`() {
         val api = resourceServerOf(scopes = listOf("read:invoices"))
-        val result = svc.narrowScopes(listOf("read:invoices", "delete:invoices"), listOf(api))
+        val result = svc.narrowScopes(listOf("read:invoices", "delete:invoices"), listOf(api), grantingAll(api))
         assertEquals(
             OAuthService.ScopeNarrowing.InvalidScope(listOf("delete:invoices")),
             result,
@@ -1582,7 +1583,7 @@ class OAuthServiceTest {
     @Test
     fun `narrowScopes treats empty API scopes as no narrowing — returns requested as-is`() {
         val api = resourceServerOf(scopes = emptyList())
-        val result = svc.narrowScopes(listOf("anything:goes"), listOf(api))
+        val result = svc.narrowScopes(listOf("anything:goes"), listOf(api), grantingAll(api))
         assertEquals(
             OAuthService.ScopeNarrowing.Ok(listOf("anything:goes")),
             result,
@@ -1593,10 +1594,73 @@ class OAuthServiceTest {
     fun `narrowScopes unions scopes across multiple targeted APIs`() {
         val a = resourceServerOf(identifier = "https://a", scopes = listOf("read:a"))
         val b = resourceServerOf(identifier = "https://b", scopes = listOf("read:b"))
-        val result = svc.narrowScopes(listOf("read:a", "read:b"), listOf(a, b))
+        val result = svc.narrowScopes(listOf("read:a", "read:b"), listOf(a, b), grantingAll(a, b))
         assertEquals(
             OAuthService.ScopeNarrowing.Ok(listOf("read:a", "read:b")),
             result,
+        )
+    }
+
+    // ---- the client axis: what this client was granted, not merely what the API offers ----
+
+    @Test
+    fun `narrowScopes rejects a scope the API declares but this client was not granted`() {
+        val api = resourceServerOf(scopes = listOf("ingest:write", "keys:read", "handoff:admin"))
+        // Client created for ingest only — the exact shape measured on a live integration.
+        val granted = mapOf(api.id!! to setOf("ingest:write"))
+        assertEquals(
+            OAuthService.ScopeNarrowing.InvalidScope(listOf("keys:read")),
+            svc.narrowScopes(listOf("ingest:write", "keys:read"), listOf(api), granted),
+        )
+    }
+
+    @Test
+    fun `narrowScopes accepts the scopes this client was granted`() {
+        val api = resourceServerOf(scopes = listOf("ingest:write", "keys:read"))
+        assertEquals(
+            OAuthService.ScopeNarrowing.Ok(listOf("ingest:write")),
+            svc.narrowScopes(listOf("ingest:write"), listOf(api), mapOf(api.id!! to setOf("ingest:write"))),
+        )
+    }
+
+    @Test
+    fun `narrowScopes treats an absent client grant as nothing, never as everything`() {
+        val api = resourceServerOf(scopes = listOf("ingest:write"))
+        // No entry at all. Reading this as unrestricted is precisely the pre-v1.25.0 bug.
+        assertEquals(
+            OAuthService.ScopeNarrowing.InvalidScope(listOf("ingest:write")),
+            svc.narrowScopes(listOf("ingest:write"), listOf(api), emptyMap()),
+        )
+    }
+
+    @Test
+    fun `narrowScopes treats an empty client grant as nothing`() {
+        val api = resourceServerOf(scopes = listOf("ingest:write"))
+        assertEquals(
+            OAuthService.ScopeNarrowing.InvalidScope(listOf("ingest:write")),
+            svc.narrowScopes(listOf("ingest:write"), listOf(api), mapOf(api.id!! to emptySet())),
+        )
+    }
+
+    @Test
+    fun `narrowScopes intersects per resource — a grant on one does not leak into another`() {
+        val a = resourceServerOf(identifier = "https://a", scopes = listOf("read:a", "write:a"))
+        val b = resourceServerOf(identifier = "https://b", scopes = listOf("read:b"))
+        val granted = mapOf(a.id!! to setOf("write:a"), b.id!! to setOf("read:b"))
+        assertEquals(
+            OAuthService.ScopeNarrowing.InvalidScope(listOf("read:a")),
+            svc.narrowScopes(listOf("read:a", "read:b"), listOf(a, b), granted),
+        )
+    }
+
+    @Test
+    fun `narrowScopes cannot grant a scope the API stopped declaring`() {
+        // The operator removed keys:read from the API; the client's old grant row survives.
+        val api = resourceServerOf(scopes = listOf("ingest:write"))
+        val granted = mapOf(api.id!! to setOf("ingest:write", "keys:read"))
+        assertEquals(
+            OAuthService.ScopeNarrowing.InvalidScope(listOf("keys:read")),
+            svc.narrowScopes(listOf("keys:read"), listOf(api), granted),
         )
     }
 
@@ -1613,14 +1677,22 @@ class OAuthServiceTest {
     // Resource server fixture builder
     // -------------------------------------------------------------------------
 
+    private var nextResourceServerId = 100
+
+    /** Mirrors the V67 backfill: the client is granted every scope each resource declares. */
+    private fun grantingAll(vararg servers: ResourceServer): Map<ResourceServerId, Set<String>> =
+        servers.associate { it.id!! to it.scopes.toSet() }
+
     private fun resourceServerOf(
         identifier: String = "https://api",
         name: String = "Test API",
         description: String? = null,
         enabled: Boolean = true,
         scopes: List<String> = emptyList(),
+        id: ResourceServerId = ResourceServerId(nextResourceServerId++),
     ): ResourceServer =
         ResourceServer(
+            id = id,
             tenantId = TenantId(1),
             identifier = identifier,
             name = name,

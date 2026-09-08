@@ -84,9 +84,23 @@ class ResourceServerService(
     fun setAuthorized(
         clientPk: ApplicationId,
         resourceServerIds: List<ResourceServerId>,
-    ): ResourceServerResult<Unit> {
-        val error = repo.setAuthorizedResources(clientPk, resourceServerIds)
-        return when (error) {
+    ): ResourceServerResult<Unit> = repo.setAuthorizedResources(clientPk, resourceServerIds).toResult()
+
+    /**
+     * Replaces the scopes a client may request on one resource server it is already authorized for.
+     * See ADR-23 — authorizing a client against an API does not grant every scope that API declares.
+     */
+    fun setAllowedScopes(
+        clientPk: ApplicationId,
+        resourceServerId: ResourceServerId,
+        scopes: Set<String>,
+    ): ResourceServerResult<Unit> = repo.setAllowedScopes(clientPk, resourceServerId, scopes).toResult()
+
+    /** The scopes a client may request, per resource server it is authorized for. */
+    fun allowedScopesFor(clientPk: ApplicationId): Map<ResourceServerId, Set<String>> = repo.findAllowedScopes(clientPk)
+
+    private fun ResourceAuthorizationError?.toResult(): ResourceServerResult<Unit> =
+        when (this) {
             null -> ResourceServerResult.Success(Unit)
             is ResourceAuthorizationError.CrossTenant ->
                 ResourceServerResult.Failure(ResourceServerError.CrossTenant)
@@ -94,8 +108,11 @@ class ResourceServerService(
                 ResourceServerResult.Failure(ResourceServerError.NotFound)
             is ResourceAuthorizationError.UnknownResource ->
                 ResourceServerResult.Failure(ResourceServerError.NotFound)
+            is ResourceAuthorizationError.NotAuthorizedForResource ->
+                ResourceServerResult.Failure(ResourceServerError.NotFound)
+            is ResourceAuthorizationError.UndeclaredScope ->
+                ResourceServerResult.Failure(ResourceServerError.UndeclaredScope(scopes))
         }
-    }
 }
 
 sealed class ResourceServerResult<out T> {
@@ -118,6 +135,11 @@ sealed class ResourceServerError {
     object IdentifierAlreadyExists : ResourceServerError()
 
     object NotFound : ResourceServerError()
+
+    /** Scopes were granted to a client that the resource server does not declare. */
+    data class UndeclaredScope(
+        val scopes: Set<String>,
+    ) : ResourceServerError()
 
     object CrossTenant : ResourceServerError()
 }

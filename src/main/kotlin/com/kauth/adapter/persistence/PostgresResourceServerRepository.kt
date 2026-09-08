@@ -174,6 +174,21 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                 }
             }
 
+            val previousScopes =
+                ClientAuthorizedScopesTable
+                    .selectAll()
+                    .where { ClientAuthorizedScopesTable.clientId eq clientPk.value }
+                    .groupBy { it[ClientAuthorizedScopesTable.resourceServerId] }
+                    .mapValues { (_, rows) -> rows.map { it[ClientAuthorizedScopesTable.scope] } }
+
+            val previouslyAuthorized =
+                ClientAuthorizedResourcesTable
+                    .selectAll()
+                    .where { ClientAuthorizedResourcesTable.clientId eq clientPk.value }
+                    .map { it[ClientAuthorizedResourcesTable.resourceServerId] }
+                    .toSet()
+
+            // Deleting the authorization rows cascades their scope rows away (V67).
             ClientAuthorizedResourcesTable.deleteWhere {
                 ClientAuthorizedResourcesTable.clientId eq clientPk.value
             }
@@ -181,6 +196,34 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                 ClientAuthorizedResourcesTable.batchInsert(resourceServerIds) { rsId ->
                     this[ClientAuthorizedResourcesTable.clientId] = clientPk.value
                     this[ClientAuthorizedResourcesTable.resourceServerId] = rsId.value
+                }
+            }
+
+            // A newly authorized resource starts with every scope it declares — the same default
+            // the V67 backfill applied to existing pairs, and what the admin form shows checked.
+            // An operator narrows from there; we never silently grant less than they last chose,
+            // and re-saving an unchanged authorization must not reset their choices.
+            for (rsId in resourceServerIds) {
+                val declared =
+                    ResourceServersTable
+                        .selectAll()
+                        .where { ResourceServersTable.id eq rsId.value }
+                        .singleOrNull()
+                        ?.let { Json.decodeFromString<List<String>>(it[ResourceServersTable.scopes].ifBlank { "[]" }) }
+                        ?: emptyList()
+                val seed =
+                    if (rsId.value in previouslyAuthorized) {
+                        // Preserve what the operator had chosen before this save.
+                        previousScopes[rsId.value] ?: declared
+                    } else {
+                        declared
+                    }
+                for (sc in seed) {
+                    ClientAuthorizedScopesTable.insert {
+                        it[clientId] = clientPk.value
+                        it[resourceServerId] = rsId.value
+                        it[scope] = sc
+                    }
                 }
             }
             null
@@ -197,4 +240,61 @@ class PostgresResourceServerRepository : ResourceServerRepository {
             scopes = Json.decodeFromString(this[ResourceServersTable.scopes].ifBlank { "[]" }),
             createdAt = this[ResourceServersTable.createdAt].toInstant(),
         )
+
+    override fun findAllowedScopes(clientPk: ApplicationId): Map<ResourceServerId, Set<String>> =
+        transaction {
+            ClientAuthorizedScopesTable
+                .selectAll()
+                .where { ClientAuthorizedScopesTable.clientId eq clientPk.value }
+                .groupBy { ResourceServerId(it[ClientAuthorizedScopesTable.resourceServerId]) }
+                .mapValues { (_, rows) -> rows.map { it[ClientAuthorizedScopesTable.scope] }.toSet() }
+        }
+
+    override fun setAllowedScopes(
+        clientPk: ApplicationId,
+        resourceServerId: ResourceServerId,
+        scopes: Set<String>,
+    ): ResourceAuthorizationError? =
+        transaction {
+            val authorized =
+                ClientAuthorizedResourcesTable
+                    .selectAll()
+                    .where {
+                        (ClientAuthorizedResourcesTable.clientId eq clientPk.value) and
+                            (ClientAuthorizedResourcesTable.resourceServerId eq resourceServerId.value)
+                    }.any()
+            if (!authorized) return@transaction ResourceAuthorizationError.NotAuthorizedForResource(resourceServerId)
+
+            val declared =
+                ResourceServersTable
+                    .selectAll()
+                    .where { ResourceServersTable.id eq resourceServerId.value }
+                    .singleOrNull()
+                    ?.let {
+                        Json.decodeFromString<List<String>>(
+                            it[ResourceServersTable.scopes].ifBlank { "[]" },
+                        )
+                    }?.toSet()
+                    ?: return@transaction ResourceAuthorizationError.UnknownResource(resourceServerId)
+
+            // Refuse rather than silently store a scope the resource server does not offer —
+            // otherwise the allowlist drifts from the API it is meant to constrain.
+            val undeclared = scopes - declared
+            if (undeclared.isNotEmpty()) {
+                return@transaction ResourceAuthorizationError.UndeclaredScope(resourceServerId, undeclared)
+            }
+
+            ClientAuthorizedScopesTable.deleteWhere {
+                (ClientAuthorizedScopesTable.clientId eq clientPk.value) and
+                    (ClientAuthorizedScopesTable.resourceServerId eq resourceServerId.value)
+            }
+            for (sc in scopes) {
+                ClientAuthorizedScopesTable.insert {
+                    it[clientId] = clientPk.value
+                    it[ClientAuthorizedScopesTable.resourceServerId] = resourceServerId.value
+                    it[scope] = sc
+                }
+            }
+            null
+        }
 }

@@ -8,6 +8,7 @@ import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.ClaimTokenType
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
+import com.kauth.domain.model.ResourceServerId
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
@@ -366,8 +367,9 @@ class OAuthService(
             }
 
         val requestedScopes = authCode.scopes.split(" ").filter { it.isNotBlank() }
+        val clientAllowedScopes = resourceServerRepository?.findAllowedScopes(client.id) ?: emptyMap()
         val finalScopes =
-            when (val narrowing = narrowScopes(requestedScopes, resolvedResourceServers)) {
+            when (val narrowing = narrowScopes(requestedScopes, resolvedResourceServers, clientAllowedScopes)) {
                 is ScopeNarrowing.Ok -> narrowing.narrowed
                 is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
                     OAuthError.InvalidScope(narrowing.rejected),
@@ -498,7 +500,14 @@ class OAuthService(
                     } else {
                         emptyList()
                     }
-                when (val narrowing = narrowScopes(requestedScopes, resolvedServers)) {
+                when (
+                    val narrowing =
+                        narrowScopes(
+                            requestedScopes,
+                            resolvedServers,
+                            resourceServerRepository?.findAllowedScopes(client.id) ?: emptyMap(),
+                        )
+                ) {
                     is ScopeNarrowing.Ok -> narrowing.narrowed
                     is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
                         OAuthError.InvalidScope(narrowing.rejected),
@@ -572,16 +581,39 @@ class OAuthService(
         ) : ScopeNarrowing()
     }
 
+    /**
+     * Narrows a scope request to what the token may actually carry.
+     *
+     * Three-way intersection: what was **requested**, what the targeted resource servers
+     * **declare**, and what this **client** was granted on each of them.
+     *
+     * [clientAllowedScopes] is required rather than defaulted on purpose. Before v1.25.0 the
+     * intersection stopped at what the resource server declared, so authorizing a client
+     * against an API granted it every scope that API offered — separate credentials bought
+     * independent revocation and audit attribution, but not least privilege. A default value
+     * here would let a new call site silently reproduce that, so every caller must state what
+     * the client is allowed. An absent entry means "nothing on that resource", never
+     * "everything".
+     */
     fun narrowScopes(
         requested: List<String>,
         resolvedResources: List<ResourceServer>,
+        clientAllowedScopes: Map<ResourceServerId, Set<String>>,
     ): ScopeNarrowing {
         if (requested.isEmpty()) return ScopeNarrowing.Ok(emptyList())
 
+        // A resource server that declares no scopes narrows nothing — pre-existing behaviour
+        // for deployments that predate the scopes column (v1.18.0). Unchanged here.
         val anyDeclares = resolvedResources.any { it.scopes.isNotEmpty() }
         if (!anyDeclares) return ScopeNarrowing.Ok(requested)
 
-        val allowed = resolvedResources.flatMap { it.scopes }.toSet()
+        val allowed =
+            resolvedResources
+                .flatMap { rs ->
+                    val declared = rs.scopes.toSet()
+                    val grantedToClient = rs.id?.let { clientAllowedScopes[it] } ?: emptySet()
+                    declared intersect grantedToClient
+                }.toSet()
         val rejected = requested.filterNot { it in allowed }
         return if (rejected.isEmpty()) {
             ScopeNarrowing.Ok(requested)
@@ -736,7 +768,18 @@ class OAuthService(
             if (resourcesNarrowed) {
                 val anyDeclares = resolvedResourceServers.any { it.scopes.isNotEmpty() }
                 if (anyDeclares) {
-                    val allowed = resolvedResourceServers.flatMap { it.scopes }.toSet()
+                    // Same three-way intersection as narrowScopes: declared ∩ granted-to-client.
+                    // `client` is null when the application was soft-deleted after the token was
+                    // issued. No client identity means no per-client grants to intersect against, so
+                    // narrowing removes every scope — fail closed rather than fall back to the
+                    // resource server's full declared set.
+                    val granted =
+                        client?.let { resourceServerRepository?.findAllowedScopes(it.id) } ?: emptyMap()
+                    val allowed =
+                        resolvedResourceServers
+                            .flatMap { rs ->
+                                rs.scopes.toSet() intersect (rs.id?.let { granted[it] } ?: emptySet())
+                            }.toSet()
                     sessionScopes.filter { it in allowed }
                 } else {
                     sessionScopes
@@ -745,7 +788,14 @@ class OAuthService(
                 sessionScopes
             }
         val finalScopes =
-            when (val narrowing = narrowScopes(effectiveScopes, resolvedResourceServers)) {
+            when (
+                val narrowing =
+                    narrowScopes(
+                        effectiveScopes,
+                        resolvedResourceServers,
+                        client?.let { resourceServerRepository?.findAllowedScopes(it.id) } ?: emptyMap(),
+                    )
+            ) {
                 is ScopeNarrowing.Ok -> narrowing.narrowed
                 is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
                     OAuthError.InvalidScope(narrowing.rejected),

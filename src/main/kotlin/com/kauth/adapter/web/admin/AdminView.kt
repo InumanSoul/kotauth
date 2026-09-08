@@ -584,6 +584,7 @@ object AdminView {
         allApps: List<com.kauth.domain.model.Application>,
         allResources: List<com.kauth.domain.model.ResourceServer>,
         authorizedIds: Set<Int>,
+        allowedScopes: Map<Int, Set<String>> = emptyMap(),
         error: String? = null,
         toastMessage: String? = null,
     ): HTML.() -> Unit =
@@ -595,6 +596,7 @@ object AdminView {
             allApps,
             allResources,
             authorizedIds,
+            allowedScopes,
             error,
             toastMessage,
         )
