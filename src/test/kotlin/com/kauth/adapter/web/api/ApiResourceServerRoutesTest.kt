@@ -39,6 +39,7 @@ import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebAuthnCredentialRepository
 import com.kauth.fakes.FakeWebhookDeliveryRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
+import com.kauth.fakes.FakeWebhookSender
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.client.request.bearerAuth
@@ -199,6 +200,7 @@ class ApiResourceServerRoutesTest {
         WebhookService(
             endpointRepository = webhookEndpointRepo,
             deliveryRepository = webhookDeliveryRepo,
+            sender = FakeWebhookSender(),
             scope = CoroutineScope(Dispatchers.Unconfined),
         )
 

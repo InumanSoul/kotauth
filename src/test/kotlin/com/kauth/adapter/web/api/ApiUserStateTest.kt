@@ -38,6 +38,7 @@ import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebAuthnCredentialRepository
 import com.kauth.fakes.FakeWebhookDeliveryRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
+import com.kauth.fakes.FakeWebhookSender
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.client.request.bearerAuth
@@ -566,7 +567,12 @@ class ApiUserStateTest {
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = AlwaysAllowLimiter(),
                 apiReadRateLimiter = AlwaysAllowLimiter(),
-                webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
+                webhookService =
+                    WebhookService(
+                        FakeWebhookEndpointRepository(),
+                        FakeWebhookDeliveryRepository(),
+                        FakeWebhookSender(),
+                    ),
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =
                     WebAuthnService(

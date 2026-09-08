@@ -29,6 +29,7 @@ import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebhookDeliveryRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
+import com.kauth.fakes.FakeWebhookSender
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import io.ktor.client.plugins.cookies.HttpCookies
@@ -80,6 +81,7 @@ class AdminWebhooksTest {
         WebhookService(
             endpointRepository = webhookEndpointRepo,
             deliveryRepository = webhookDeliveryRepo,
+            sender = FakeWebhookSender(),
         )
 
     private val masterTenant =

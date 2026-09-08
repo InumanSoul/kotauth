@@ -40,6 +40,7 @@ import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.adapter.webauthn.YubicoCredentialRepositoryBridge
 import com.kauth.adapter.webauthn.YubicoRelyingPartyAdapter
+import com.kauth.adapter.webhook.HttpUrlConnectionWebhookSender
 import com.kauth.domain.model.BrokeredReferenceHasher
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.port.ApplicationRepository
@@ -293,6 +294,7 @@ data class ServiceGraph(
                 WebhookService(
                     endpointRepository = webhookEndpointRepository,
                     deliveryRepository = webhookDeliveryRepository,
+                    sender = HttpUrlConnectionWebhookSender(),
                     scope = applicationScope,
                 )
             val auditChainHasher = AuditChainHasher(config.secretKey)
