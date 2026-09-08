@@ -186,6 +186,12 @@ internal suspend fun ApplicationCall.respondResourceServerError(error: ResourceS
             )
         ResourceServerError.NotFound ->
             respondProblem(HttpStatusCode.NotFound, "Not Found", "Resource server not found.")
+        is ResourceServerError.UndeclaredScope ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "Validation Error",
+                "Not declared by this resource server: ${error.scopes.sorted().joinToString(", ")}.",
+            )
         ResourceServerError.CrossTenant ->
             respondProblem(
                 HttpStatusCode.UnprocessableEntity,

@@ -1607,13 +1607,15 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api.example.com",
                     name = "API",
                     scopes = listOf("read:invoices"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
             val oauthSvc = buildOAuthServiceWithResources(rsRepo)
 
@@ -1670,21 +1672,25 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api-a.example.com",
                     name = "A",
                     scopes = listOf("read:a"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api-b.example.com",
                     name = "B",
                     scopes = listOf("read:b"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
             val oauthSvc = buildOAuthServiceWithResources(rsRepo)
 
@@ -1742,13 +1748,15 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api.example.com",
                     name = "API",
                     scopes = listOf("read:invoices"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
             val oauthSvc = buildOAuthServiceWithResources(rsRepo)
 
@@ -1808,13 +1816,15 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api.example.com",
                     name = "API",
                     scopes = listOf("read:invoices"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
             val oauthSvc = buildOAuthServiceWithResources(rsRepo)
 
@@ -1872,13 +1882,15 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api.example.com",
                     name = "API",
                     scopes = listOf("read:invoices"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
             val oauthSvc = buildOAuthServiceWithResources(rsRepo)
 
@@ -1946,13 +1958,15 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api.example.com",
                     name = "API",
                     scopes = listOf("read:invoices"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
             val oauthSvc = buildOAuthServiceWithResources(rsRepo)
 
@@ -2025,21 +2039,25 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api-a.example.com",
                     name = "A",
                     scopes = listOf("read:a"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api-b.example.com",
                     name = "B",
                     scopes = listOf("read:b"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
             val oauthSvc = buildOAuthServiceWithResources(rsRepo)
 
@@ -2115,13 +2133,15 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api-a.example.com",
                     name = "A",
                     scopes = listOf("read:a"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
             val oauthSvc = buildOAuthServiceWithResources(rsRepo)
 
@@ -2492,7 +2512,7 @@ class AuthRoutesTest {
         testApplication {
             resetFixtures()
             val rsRepo = FakeResourceServerRepository()
-            rsRepo.seed(
+            rsRepo.seedAuthorized(
                 ResourceServer(
                     tenantId = TenantId(1),
                     identifier = "https://api.example.com",
@@ -2500,6 +2520,8 @@ class AuthRoutesTest {
                     enabled = true,
                     scopes = listOf("read:invoices", "write:invoices"),
                 ),
+                ApplicationId(1),
+                TenantId(1),
             )
 
             application {

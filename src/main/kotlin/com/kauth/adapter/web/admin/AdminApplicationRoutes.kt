@@ -343,6 +343,10 @@ fun Route.adminApplicationRoutes(
                             allApps = allApps,
                             allResources = all,
                             authorizedIds = authorizedIds,
+                            allowedScopes =
+                                resourceServerService
+                                    .allowedScopesFor(app.id)
+                                    .mapKeys { (k, _) -> k.value },
                             toastMessage = toast,
                         ),
                     )
@@ -370,10 +374,31 @@ fun Route.adminApplicationRoutes(
                                     .ResourceServerId(it)
                             }
                     when (val result = resourceServerService.setAuthorized(app.id, selectedIds)) {
-                        is com.kauth.domain.service.ResourceServerResult.Success ->
-                            call.respondRedirect(
-                                "/admin/workspaces/$slug/applications/$clientId/authorized-apis?saved=ok",
-                            )
+                        is com.kauth.domain.service.ResourceServerResult.Success -> {
+                            // Authorizing an API seeds every scope it declares; the operator's
+                            // per-scope choices are applied on top. Only for APIs that are actually
+                            // authorized — a stale `scope:` field for an unchecked API is ignored
+                            // rather than resurrecting a grant.
+                            var scopeError: String? = null
+                            for (rsId in selectedIds) {
+                                val chosen = params.getAll("scope:${rsId.value}").orEmpty().toSet()
+                                when (val r = resourceServerService.setAllowedScopes(app.id, rsId, chosen)) {
+                                    is com.kauth.domain.service.ResourceServerResult.Success -> Unit
+                                    is com.kauth.domain.service.ResourceServerResult.Failure -> {
+                                        scopeError = r.error.toString()
+                                    }
+                                }
+                            }
+                            if (scopeError != null) {
+                                call.respondRedirect(
+                                    "/admin/workspaces/$slug/applications/$clientId/authorized-apis?saved=err",
+                                )
+                            } else {
+                                call.respondRedirect(
+                                    "/admin/workspaces/$slug/applications/$clientId/authorized-apis?saved=ok",
+                                )
+                            }
+                        }
                         is com.kauth.domain.service.ResourceServerResult.Failure -> {
                             val all = resourceServerService.list(workspace.id)
                             val allApps = applicationRepository.findByTenantId(workspace.id)

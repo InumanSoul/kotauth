@@ -187,4 +187,6 @@ private fun errorMessage(error: ResourceServerError): String =
         ResourceServerError.IdentifierAlreadyExists -> "An API with that audience identifier already exists."
         ResourceServerError.NotFound -> "API not found."
         ResourceServerError.CrossTenant -> "Cross-tenant authorization is not allowed."
+        is ResourceServerError.UndeclaredScope ->
+            "This API does not declare: ${error.scopes.sorted().joinToString(", ")}."
     }

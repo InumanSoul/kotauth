@@ -274,7 +274,8 @@ In protocol terms Kotauth is a compliant OAuth 2.0 / OIDC authorization server w
 
 Recorded here because a roadmap that only lists future features overstates the present.
 
-**Scopes do not isolate clients from one another.** Authorizing a client against an API grants it every scope that API declares. There is no per-client scope allowlist, and `narrowScopes` filters against what the *resource server* declares rather than what the *client* is permitted. Measured on a live integration: a client created for a single ingest scope successfully minted a token carrying two others and read an admin endpoint across tenants. Separate credentials still buy independent revocation and a real `sub` in the audit trail — they do not buy least privilege, which is what the admin console implies they buy. Until the anticipated `allowedScopes` field exists, the only real isolation boundary is one resource server per privilege level. **This is the highest-priority open item.**
+**Scopes now isolate clients from one another** as of v1.25.0 — a client's scopes are an
+explicit per-client grant rather than everything its API declares. See ADR-23.
 
 **Identity provider configuration is partially excluded from backups.** A backup export does not carry most identity-provider configuration, so a restore does not reproduce a workspace's brokered sign-in setup.
 
@@ -402,6 +403,7 @@ Recorded ADRs live in [`docs/adr/`](adr/). This table is generated from those fi
 | [ADR-20](adr/ADR-20-scim-dialects-selected-per-key.md) | A SCIM dialect is selected per API key, never sniffed from the request |
 | [ADR-21](adr/ADR-21-just-in-time-provisioning.md) | Just-in-time provisioning only creates; linking happens before the gate |
 | [ADR-22](adr/ADR-22-rfc8252-loopback-redirect-matching.md) | Loopback redirect URIs match on any port, for public clients only |
+| [ADR-23](adr/ADR-23-per-client-scope-allowlists.md) | A client's scopes are granted per client, not inherited from the API |
 
 ### Decisions without an ADR
 

@@ -126,6 +126,8 @@ internal fun clientAuthorizedApisPageImpl(
     allApps: List<com.kauth.domain.model.Application>,
     allResources: List<ResourceServer>,
     authorizedIds: Set<Int>,
+    /** Per resource-server id, the scopes this client may request. See ADR-23. */
+    allowedScopes: Map<Int, Set<String>> = emptyMap(),
     error: String? = null,
     toastMessage: String? = null,
 ): HTML.() -> Unit =
@@ -237,6 +239,35 @@ internal fun clientAuthorizedApisPageImpl(
                                         span("badge badge--id") { +rs.identifier }
                                         if (!rs.enabled) {
                                             span("badge badge--inactive") { +"Disabled" }
+                                        }
+                                    }
+                                    // Authorizing a client against an API no longer grants every
+                                    // scope that API declares — the operator chooses which. A newly
+                                    // authorized API arrives with all of them checked, matching what
+                                    // this client could already request before the change.
+                                    if (rs.scopes.isNotEmpty()) {
+                                        val granted = allowedScopes[rsId] ?: rs.scopes.toSet()
+                                        div("chip-grid") {
+                                            rs.scopes.sorted().forEach { sc ->
+                                                label(
+                                                    "scope-chip" +
+                                                        if (!rs.enabled) " scope-chip--disabled" else "",
+                                                ) {
+                                                    input(
+                                                        type = InputType.checkBox,
+                                                        name = "scope:$rsId",
+                                                    ) {
+                                                        value = sc
+                                                        if (sc in granted) {
+                                                            attributes["checked"] = "checked"
+                                                        }
+                                                        if (!rs.enabled) {
+                                                            attributes["disabled"] = "disabled"
+                                                        }
+                                                    }
+                                                    span("scope-chip__label") { +sc }
+                                                }
+                                            }
                                         }
                                     }
                                 }
