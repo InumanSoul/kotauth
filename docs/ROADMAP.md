@@ -280,6 +280,12 @@ Recorded here because a roadmap that only lists future features overstates the p
 
 **Cross-namespace collision prevention is a read-before-write.** Two concurrent creates with mirrored identifiers can both pass the check, because no database constraint spans the username and email namespaces. The runtime refusal bounds the consequence to two users seeing a generic failure until an administrator intervenes.
 
+**The runtime image is large.** Roughly 410 MB, of which the great majority is the
+`eclipse-temurin` JRE base. Swagger UI is bundled into the JAR (~1.6 MB of assets served from
+`/static/swagger/`) rather than loaded from a CDN, and the logstash encoder pulls in a Jackson
+runtime that nothing else uses. A slim-image pass — a jlink-derived runtime, unbundled Swagger,
+and a kotlinx.serialization log encoder — is scoped but unscheduled.
+
 **No verification against live identity products is claimed.** SCIM targets RFC 7644/7643 and brokering targets OpenID Connect Core and Discovery. Neither has been certified against, nor verified end-to-end with, any particular vendor.
 
 ---
@@ -416,6 +422,5 @@ These are real, load-bearing choices that shape the codebase but were never writ
 | Social-registered users get an unusable password hash | The account exists; password sign-in stays disabled until the user sets one |
 | API keys hashed with SHA-256, not bcrypt | 256-bit key entropy makes brute force infeasible; avoids bcrypt latency on every API call |
 | API key prefix stored for display | Human-friendly identification without exposing the credential |
-| Swagger UI loaded from a CDN | Saves roughly 7 MB from the fat JAR |
 
 A fifteenth entry — *user lookup by `(tenant_id, username)`, no global username namespace* — was **superseded in v1.24.0**. The workspace-scoped namespace still holds, but lookup is now by the workspace's configured identifier (username, email, or either), and usernames are normalized and uniquely enforced case-insensitively.
