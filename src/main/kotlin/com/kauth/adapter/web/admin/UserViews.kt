@@ -865,7 +865,7 @@ internal fun userListPageImpl(
                                     td {
                                         a(
                                             href = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}",
-                                            classes = "data-table__id",
+                                            classes = "data-table__name",
                                         ) { +user.username }
                                     }
                                     td {
@@ -1364,10 +1364,9 @@ private fun FlowContent.activeImpersonationCard(active: ActiveImpersonation) {
         div("ov-card__section-label") { +EnglishStrings.IMPERSONATION_ACTIVE_HEADING }
         div("ov-card__row") {
             span("ov-card__label") { +EnglishStrings.IMPERSONATION_ACTIVE_USER }
-            span("ov-card__value") {
+            span("ov-card__value ov-card__value--mono") {
                 a(
                     href = "/admin/workspaces/${active.targetWorkspaceSlug}/users/${active.targetUserId}",
-                    classes = "data-table__id",
                 ) { +active.targetUsername }
             }
         }

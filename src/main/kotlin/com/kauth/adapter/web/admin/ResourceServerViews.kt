@@ -69,9 +69,10 @@ internal fun resourceServersListPageImpl(
                                 resources.forEach { rs ->
                                     tr {
                                         td {
-                                            a(href = "/admin/workspaces/$slug/apis/${rs.id!!.value}/edit") {
-                                                +rs.name
-                                            }
+                                            a(
+                                                href = "/admin/workspaces/$slug/apis/${rs.id!!.value}/edit",
+                                                classes = "data-table__name",
+                                            ) { +rs.name }
                                         }
                                         td {
                             span("data-table__meta") { +rs.identifier }

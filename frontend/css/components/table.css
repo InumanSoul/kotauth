@@ -3,10 +3,15 @@
  * Data tables for listing resources (users, apps, sessions, etc.).
  *
  * New BEM block: .data-table (used by new page designs)
- *   .data-table__id      — monospace accent LINK. Only ever on an <a>: it is coloured and
- *                          underlines on hover, so on inert text it promises a click that
- *                          does not exist. A technical value that is not a link is __meta.
- *   .data-table__name    — primary text cell
+ *
+ * ROW IDENTITY RULE: the thing a human uses to tell one row from another leads column one
+ * and carries the row's link, as .data-table__name. Technical identifiers (slug, client_id,
+ * UUID) sit beside it as inert __meta. Tables used to do the reverse — link the client_id
+ * and leave the app name as dead text — which made every row read as a database record
+ * rather than a thing. AdminTableIdentityTest guards this.
+ *
+ *   .data-table__name    — the row's identity. On an <a> in column one it is the row link;
+ *                          elsewhere a primary text cell. Body colour, underline on hover.
  *   .data-table__email   — monospace muted email cell
  *   .data-table__meta    — monospace muted secondary cell (URLs, counts, timestamps)
  *   .data-table__meta--with-icon — meta cell carrying a trailing .inline-help icon
@@ -52,14 +57,6 @@
 .data-table tbody tr:last-child td { border-bottom: none; }
 .data-table tbody tr { transition: background 0.1s; }
 .data-table tbody tr:hover { background: var(--color-row-hover); }
-
-.data-table__id {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--color-accent);
-  text-decoration: none;
-}
-.data-table__id:hover { text-decoration: underline; }
 
 .data-table__name {
   font-size: var(--text-base);

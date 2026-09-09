@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.25.2] - 2026-09-09
 
 ### Fixed
+
+- **Admin tables linked the wrong word.** The workspace list put the link on the slug and left the
+  display name as inert text beside it; the application list linked the `client_id` and left the
+  application's name dead. The word an operator actually recognises was the one they could not
+  click, and every row read as a database record rather than as a thing.
+
+  Eight tables were changed to follow one rule: the row's identity leads column one and carries the
+  link, with the technical identifier beside it as secondary text. Two of them — workspaces and
+  applications — had their first two columns swapped to do it; the rest already led with the right
+  value and only wore the wrong class. Closes #133.
 
 - **Seven create-screens disagreed with themselves.** The breadcrumb said "New Role" while the
   heading said "Create Role" — and the same split existed for applications, groups, users,
@@ -28,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `breadcrumb()` calls each remaining legacy file makes and fails if any file gains one, if the
   allowance lists a file that no longer needs it, or if the allowance drifts above the real count.
   The numbers can only go down.
+- **`.data-table__id` is retired, and a ratchet keeps it retired.** The class rendered a monospace
+  accent link, so reaching for it meant putting the row's link on a technical identifier — the CSS
+  vocabulary made the wrong layout the easy one. It is deleted; `data-table__name` carries the
+  identity link and `data-table__meta` the identifier beside it. `AdminTableIdentityTest` fails if
+  the class reappears in a view or a stylesheet, or if a link is styled as inert `__meta` text.
+
+  It deliberately does not try to enforce column order: that would mean brace-matching the
+  kotlinx.html DSL, and several of these tables are read-only lists with no row link at all, so the
+  check would need exceptions for exactly the rows most likely to be edited. The rule is documented
+  where an author will hit it, at the top of `table.css`.
 - **CI applies every migration to an empty database.** The unit suite runs on in-memory fakes, so
   it never sees a migration at all; nothing in CI applied `V1` through the newest file to a fresh
   database. A broken `V*.sql` therefore passed Flyway's checksum validation, passed the unit tests,

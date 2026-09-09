@@ -71,7 +71,7 @@ internal fun rolesListPageImpl(
                                 td {
                                     a(
                                         href = "/admin/workspaces/$slug/roles/${role.id?.value}",
-                                        classes = "data-table__id",
+                                        classes = "data-table__name",
                                     ) { +role.name }
                                 }
                                 td {
@@ -505,7 +505,7 @@ internal fun groupsListPageImpl(
                                 td {
                                     a(
                                         href = "/admin/workspaces/$slug/groups/${group.id?.value}",
-                                        classes = "data-table__id",
+                                        classes = "data-table__name",
                                     ) { +group.name }
                                 }
                                 td { span("data-table__name") { +(parent?.name ?: "\u2014") } }

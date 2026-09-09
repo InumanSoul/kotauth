@@ -202,11 +202,11 @@ internal fun workspaceDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
+                                th { +EnglishStrings.COL_NAME }
                                 th {
                                     style = "width:210px;"
                                     +"Client ID"
                                 }
-                                th { +EnglishStrings.COL_NAME }
                                 th {
                                     style = "width:110px;"
                                     +"Type"
@@ -221,14 +221,16 @@ internal fun workspaceDetailPageImpl(
                         tbody {
                             apps.forEach { app ->
                                 tr {
+                                    // The application's name is its identity here and carries the
+                                    // link; the client_id is the technical value beside it.
                                     td {
                                         a(
                                             href =
                                                 "/admin/workspaces/${workspace.slug}/applications/${app.clientId}",
-                                            classes = "data-table__id",
-                                        ) { +app.clientId }
+                                            classes = "data-table__name",
+                                        ) { +app.name }
                                     }
-                                    td { span("data-table__name") { +app.name } }
+                                    td { span("data-table__meta") { +app.clientId } }
                                     td { accessTypeLabel(app.accessType) }
                                     td { applicationStatus(app.enabled) }
                                     td {
