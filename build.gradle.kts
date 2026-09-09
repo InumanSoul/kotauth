@@ -3,7 +3,7 @@ val exposedVersion = "1.5.0"
 val logbackVersion = "1.5.32"
 val flywayVersion = "13.5.0"
 val logstashEncoderVersion = "8.1"
-val lettuceVersion = "6.5.5.RELEASE"
+val lettuceVersion = "7.7.0.RELEASE"
 val testcontainersVersion = "1.21.4"
 
 plugins {
