@@ -55,8 +55,8 @@ internal fun workspaceListPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { style = "width:200px;"; +"Slug" }
                                 th { +EnglishStrings.COL_NAME }
+                                th { style = "width:200px;"; +"Slug" }
                                 th { style = "width:130px;"; +"Registration" }
                                 th { style = "width:70px;" }
                             }
@@ -64,13 +64,15 @@ internal fun workspaceListPageImpl(
                         tbody {
                             workspaces.forEach { ws ->
                                 tr {
+                                    // The row's identity leads and carries the link; the slug is
+                                    // the technical value beside it, not the thing you click.
                                     td {
                                         a(
                                             href = "/admin/workspaces/${ws.slug}",
-                                            classes = "data-table__id",
-                                        ) { +ws.slug }
+                                            classes = "data-table__name",
+                                        ) { +ws.displayName }
                                     }
-                                    td { span("data-table__name") { +ws.displayName } }
+                                    td { span("data-table__meta") { +ws.slug } }
                                     // Open registration is the default, so only a closed
                                     // workspace is worth a badge.
                                     td {

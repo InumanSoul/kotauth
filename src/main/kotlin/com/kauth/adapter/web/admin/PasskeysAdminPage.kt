@@ -140,7 +140,7 @@ internal fun HTML.passkeysAdminPage(
                                     td {
                                         a(
                                             "/admin/workspaces/$slug/users/${u.id?.value}",
-                                            classes = "data-table__id",
+                                            classes = "data-table__name",
                                         ) { +u.username }
                                     }
                                     td { span("data-table__name") { +u.fullName } }

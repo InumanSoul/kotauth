@@ -75,7 +75,7 @@ project-root/
 │       │   ├── card.css               ← .card, .card-body, .card-title (legacy)
 │       │   ├── form.css               ← input, select, textarea, label, .field (legacy global)
 │       │   ├── stat-card.css          ← .stat-grid, .stat-card, .stat-label, .stat-value
-│       │   ├── table.css              ← .data-table, .data-table__id/name/actions (BEM)
+│       │   ├── table.css              ← .data-table, .data-table__name/meta/actions (BEM)
 │       │   ├── empty-state.css        ← .empty-state, .empty-state__icon/title/desc/cta (BEM)
 │       │   ├── ov-card.css            ← .ov-card, .ov-card__section-label/row/label/value (BEM)
 │       │   ├── notice.css             ← .notice, .notice--success/error (BEM)
@@ -455,11 +455,16 @@ Used inside ov-cards for settings and edit forms. Grid layout matching ov-card__
 
 ```css
 .data-table              /* full-width bordered table */
-.data-table__id          /* accent link in first column */
-.data-table__name        /* primary text cell */
+.data-table__name        /* the row's identity; on an <a> in column one, the row link */
 .data-table__email       /* secondary text cell */
+.data-table__meta        /* monospace muted technical value (slug, client_id, UUID) */
 .data-table__actions     /* right-aligned action buttons */
 ```
+
+**Row identity rule.** The thing a human uses to tell one row from another leads
+column one and carries the link, as `__name`. Technical identifiers sit beside it
+as inert `__meta`. `AdminTableIdentityTest` guards this; `.data-table__id`, which
+styled the reverse, was retired in v1.25.2.
 
 ### `key-table` — compact sub-table for detail pages
 
