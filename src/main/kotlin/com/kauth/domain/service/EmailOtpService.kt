@@ -292,8 +292,10 @@ class EmailOtpService(
         )
     }
 
-    // Back-channel issuance — PKCE not required (ADR-15). Scopes are fixed for now;
-    // TODO(v1.13): derive from client.allowedScopes once that field exists.
+    // Back-channel issuance — PKCE not required (ADR-15). Scopes are fixed: the challenge has no
+    // scope field to intersect the client's allowlist against, so honouring ADR-23 here needs a
+    // requested-scope parameter first. See #160. Fixed OIDC scopes are strictly narrower than any
+    // allowlist, so this under-grants rather than over-grants.
     private fun issueAuthorizationCodeFor(
         tenant: Tenant,
         userId: UserId,

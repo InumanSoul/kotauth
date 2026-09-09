@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.25.3] - 2026-09-09
+
+### Fixed
+
+- **A `POST` under a workspace could return 500 instead of redirecting to the login page.** Ktor's
+  `onCall` hooks do not short-circuit: when the admin session guard answered an unauthenticated or
+  stale-session request with a redirect, the workspace resolver installed after it still ran, and
+  its last act was appending the `kotauth_last_ws` cookie. Appending a header to an
+  already-committed response throws under Netty, so the caller got a 500 with no way to tell what
+  had happened. The resolver now returns immediately when the response is already committed.
+
+  Invisible in normal console use — a person always loads the workspace page before submitting a
+  form there — and it only surfaced when something drove the console programmatically, which is
+  what integrators do while some of these operations still have no API. Closes #124.
+
+  The codebase already knew about this hazard on the API side: `ScimScopePlugin` carries a comment
+  explaining that sibling hooks in the same phase all run regardless and must not clobber an
+  earlier response. The admin tree simply never got the same treatment.
+
+- **Malformed backup request bodies no longer discard the parse error.** Both handlers caught the
+  exception and returned a generic 400 without recording anything, so a rejected body could not be
+  explained after the fact. The cause is now logged at debug; the client still gets the generic 400,
+  because a parse error must not describe the parser.
+
+### Changed
+
+- **CI runs `detekt`.** It has been a ratchet since v1.15.0, but no CI job invoked it, so 79 new
+  violations accumulated past the baseline between June and September — visible only to whoever ran
+  `make build`, which had been failing for that reason. `make lint` now runs `ktlintCheck detekt`,
+  matching the CI Lint job rather than a subset of it.
+
+  Twelve of the accumulated violations were fixed outright: three over-complex conditions replaced
+  with named predicates, two swallowed exceptions now logged, and seven SCIM enum entries suppressed
+  properly — they are lower camel case because RFC 7644 §3.12 defines the wire values that way, and
+  renaming them would mean a mapping table that exists only to satisfy a naming rule.
+
+  A further thirteen were never meant to be analysed at all: `detekt.yml` excluded `**/*View.kt`
+  while `.editorconfig` disables ktlint for both `*View.kt` and `*Views.kt`, so the plural DSL files
+  were held to rules the comment above them said they were exempt from. The globs now match.
+
+  The remaining 79 are frozen in the baseline, which moves 148 → 151 entries — 76 resolved, 79
+  added. They are route-registration functions that wire an entire subsystem inline, the largest
+  being `oauthProtocolRoutes` at 730 lines and complexity 125. Tracked in #161.
+
+---
+
 ## [1.25.2] - 2026-09-09
 
 ### Fixed

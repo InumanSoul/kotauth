@@ -470,6 +470,11 @@ fun Route.adminRoutes(
                 val workspaceResolverPlugin =
                     createRouteScopedPlugin("WorkspaceResolverPlugin") {
                         onCall { call ->
+                            // `onCall` hooks do not short-circuit. When the session guard above
+                            // responds with a redirect to the login page, this still runs — and
+                            // appending a cookie to an already-committed response throws under
+                            // Netty, so the caller gets a 500 instead of the redirect (#124).
+                            if (call.response.isCommitted) return@onCall
                             val slug =
                                 call.parameters["slug"]
                                     ?: return@onCall call.respond(HttpStatusCode.BadRequest)

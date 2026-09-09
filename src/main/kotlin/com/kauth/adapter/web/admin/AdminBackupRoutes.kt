@@ -20,6 +20,7 @@ import com.kauth.domain.service.BackupResult
 import com.kauth.domain.service.ExportOptions
 import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.log
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.plugins.PayloadTooLargeException
@@ -83,6 +84,9 @@ fun Route.adminBackupRoutes(
                     } catch (e: PayloadTooLargeException) {
                         throw e
                     } catch (e: Exception) {
+                        // The client gets a generic 400 — a parse error must not describe the
+                        // parser. Debug keeps the cause for whoever has to explain the rejection.
+                        call.application.log.debug("Backup export body rejected", e)
                         return@post call.respondProblem(
                             HttpStatusCode.BadRequest,
                             "Invalid request body",
@@ -191,6 +195,7 @@ fun Route.adminBackupRoutes(
                     } catch (e: PayloadTooLargeException) {
                         throw e
                     } catch (e: Exception) {
+                        call.application.log.debug("Backup import body rejected", e)
                         return@post call.respondProblem(
                             HttpStatusCode.BadRequest,
                             "Invalid request body",

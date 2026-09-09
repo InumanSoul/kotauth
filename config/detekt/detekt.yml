@@ -1,6 +1,7 @@
 # Detekt configuration — complexity and code-smell analysis only.
 # Formatting is owned by ktlint (make lint); style rules that overlap are disabled.
-# *View.kt files (kotlinx.html DSL) are excluded, mirroring the ktlint exemption.
+# *View.kt and *Views.kt files (kotlinx.html DSL) are excluded, mirroring the ktlint
+# exemption in .editorconfig, which disables ktlint for both patterns.
 
 build:
   maxIssues: 0
@@ -13,11 +14,11 @@ complexity:
   LargeClass:
     active: true
     threshold: 400
-    excludes: ['**/*View.kt']
+    excludes: ['**/*View.kt', '**/*Views.kt']
   LongMethod:
     active: true
     threshold: 80
-    excludes: ['**/*View.kt']
+    excludes: ['**/*View.kt', '**/*Views.kt']
   LongParameterList:
     active: true
     functionThreshold: 8
@@ -31,7 +32,7 @@ complexity:
     thresholdInClasses: 20
     thresholdInFiles: 25
     ignorePrivate: true
-    excludes: ['**/*View.kt']
+    excludes: ['**/*View.kt', '**/*Views.kt']
   NestedBlockDepth:
     active: true
     threshold: 5

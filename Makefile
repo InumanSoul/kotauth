@@ -31,8 +31,8 @@ css-portal: ## Compile the portal CSS bundles (sidenav + tabnav)
 version: ## Generate version.properties resource (required before running from IDE)
 	./gradlew generateVersionProperties
 
-lint: ## Run ktlint check (all .kt except *View.kt)
-	./gradlew ktlintCheck
+lint: ## Run ktlint + detekt, matching the CI Lint job
+	./gradlew ktlintCheck detekt
 
 lint-fix: ## Auto-fix lint issues with ktlintFormat
 	./gradlew ktlintFormat
