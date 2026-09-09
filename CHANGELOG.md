@@ -40,6 +40,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   signature. Previously the transport was inside `WebhookService` and only delivery rows were
   observable.
 
+### Chore
+
+- Dependency bumps: Flyway 13.5.0, HikariCP 7.1.0, Lettuce 7.7.0, java-jwt 4.6.0,
+  webauthn-server-core 2.9.0.
+
+  Three of these — Flyway, HikariCP and Lettuce — are majors that CI cannot verify: the unit suite
+  runs on fakes and never opens a database or a Redis connection, and CI runs neither
+  `postgresTest` nor `redisTest`. They were checked by running those suites directly, and by
+  reading the class-file version of each published jar to confirm none raises the JDK floor above
+  17.
+
+  Flyway 13 drops the second Jackson generation the build was carrying: Flyway 12 pulled Jackson 3
+  (`tools.jackson.*`) alongside the Jackson 2 already present. It also adds
+  `flyway-database-cockroachdb`, which is dead weight for a Postgres-only product and could be
+  excluded. Lettuce 7 adds Netty's DNS resolver modules.
+
 ---
 
 ## [1.25.0] - 2026-09-08
