@@ -438,7 +438,7 @@ internal fun createApplicationPageImpl(
             breadcrumb(
                 "Workspaces" to "/admin",
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
-                "New Application" to null,
+                "Create Application" to null,
             )
 
             // ── Page header with external submit ───────────────────

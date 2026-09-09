@@ -30,14 +30,10 @@ internal fun HTML.passkeysAdminPage(
         loggedInAs = loggedInAs,
     ) {
         div("content-inner") {
-            breadcrumb(
+            adminPage(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
                 "Security" to "/admin/workspaces/$slug/settings/security",
-                EnglishStrings.ADMIN_PASSKEYS_PAGE_TITLE to null,
-            )
-
-            pageHeader(
                 title = EnglishStrings.ADMIN_PASSKEYS_PAGE_TITLE,
                 subtitleContent = {
                     +"Passkey enrollment status for ${workspace.displayName}. Configuration: "

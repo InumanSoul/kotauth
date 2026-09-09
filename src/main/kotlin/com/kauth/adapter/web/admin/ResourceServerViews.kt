@@ -27,13 +27,10 @@ internal fun resourceServersListPageImpl(
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
-                breadcrumb(
+                adminPage(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
-                    EnglishStrings.API_NAV_LABEL to null,
-                )
-
-                pageHeader(
+                    crumb = EnglishStrings.API_NAV_LABEL,
                     title = EnglishStrings.API_PAGE_TITLE,
                     subtitle = EnglishStrings.API_PAGE_SUBTITLE,
                     actions = {

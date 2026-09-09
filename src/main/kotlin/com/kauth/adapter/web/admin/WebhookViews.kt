@@ -262,14 +262,14 @@ internal fun createWebhookPageImpl(
                 slug to "/admin/workspaces/$slug",
                 "Settings" to "/admin/workspaces/$slug/settings",
                 "Webhooks" to "/admin/workspaces/$slug/settings/webhooks",
-                "New Endpoint" to null,
+                "Create Webhook Endpoint" to null,
             )
 
             // ── Page header ──────────────────────────────────────────
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
-                        h1("page-header__title") { +"Add Webhook Endpoint" }
+                        h1("page-header__title") { +"Create Webhook Endpoint" }
                         p("page-header__sub") {
                             +"KotAuth will POST signed JSON payloads to your endpoint."
                         }

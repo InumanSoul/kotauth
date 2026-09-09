@@ -37,20 +37,18 @@ internal fun activeSessionsPageImpl(
             },
         ) {
             div("content-inner") {
-                breadcrumb(
-                    "Workspaces" to "/admin",
-                    workspace.slug to "/admin/workspaces/${workspace.slug}",
-                    "Security" to "/admin/workspaces/${workspace.slug}/settings/security",
-                    "Sessions" to null,
-                )
-
                 val sessionSubtitle =
                     if (totalCount > sessions.size) {
                         "Showing the ${sessions.size} most recent of $totalCount active sessions"
                     } else {
                         "$totalCount active session${if (totalCount != 1) "s" else ""} in this workspace"
                     }
-                pageHeader(
+                adminPage(
+                    "Workspaces" to "/admin",
+                    workspace.slug to "/admin/workspaces/${workspace.slug}",
+                    "Security" to "/admin/workspaces/${workspace.slug}/settings/security",
+                    // Terse on purpose: the trail reads better than "Active Sessions".
+                    crumb = "Sessions",
                     title = "Active Sessions",
                     subtitle = sessionSubtitle,
                     actions = if (sessions.isNotEmpty()) {
@@ -156,14 +154,10 @@ internal fun auditLogPageImpl(
             showSidebar = false,
         ) {
             div("content-inner content-inner--wide") {
-                breadcrumb(
+                adminPage(
                     "Workspaces" to "/admin",
                     workspace.slug to "/admin/workspaces/${workspace.slug}",
                     "Logs" to "/admin/workspaces/${workspace.slug}/logs",
-                    "Audit Log" to null,
-                )
-
-                pageHeader(
                     title = "Audit Log",
                     subtitle = "Security-relevant events for the ${workspace.displayName} workspace.",
                 )
