@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.25.1] - 2026-09-08
+
+### Changed
+
+- **Webhook delivery moved behind a port.** `WebhookService` opened its own HTTP connections from
+  the domain layer, importing `java.net.HttpURLConnection` — a violation of
+  [ADR-01](docs/adr/ADR-01-hexagonal-architecture.md), which requires `domain/` to depend on no
+  framework or I/O. The transport now sits behind `WebhookSenderPort`, implemented by
+  `HttpUrlConnectionWebhookSender`.
+
+  The move is deliberately behaviour-preserving: same timeouts, same 2xx-is-success rule, same
+  swallow-and-retry on failure. Migrating to a non-blocking client and adding SSRF defence on
+  operator-supplied URLs are separate pieces of work — doing either here would have hidden a
+  behaviour change inside a refactor.
+
+### Added
+
+- **A repository contract test run against both the fake and a real Postgres.** In v1.24.0,
+  `PostgresUserRepository.update` never wrote the `username` column, so admin username renames
+  silently did nothing in production while every test passed — `FakeUserRepository` stores the
+  whole object, and nothing compared the two implementations.
+
+  `UserRepositoryContract` now runs the same assertions against both, in the shape that catches
+  this class of bug: mutate a field, re-read through the repository, and assert on what came back
+  rather than on whatever `update()` returned. Verified by reintroducing the original bug — three
+  contract tests fail against Postgres while the fake stays green.
+
+  The Postgres side is tagged `postgres` and runs under `make test-postgres`, alongside the
+  existing integration tests.
+- `FakeWebhookSender` records outbound webhooks, so a test can assert on a request's headers and
+  signature. Previously the transport was inside `WebhookService` and only delivery rows were
+  observable.
+
+### Chore
+
+- Dependency bumps: Flyway 13.5.0, HikariCP 7.1.0, Lettuce 7.7.0, java-jwt 4.6.0,
+  webauthn-server-core 2.9.0.
+
+  Three of these — Flyway, HikariCP and Lettuce — are majors that CI cannot verify: the unit suite
+  runs on fakes and never opens a database or a Redis connection, and CI runs neither
+  `postgresTest` nor `redisTest`. They were checked by running those suites directly, and by
+  reading the class-file version of each published jar to confirm none raises the JDK floor above
+  17.
+
+  Flyway 13 drops the second Jackson generation the build was carrying: Flyway 12 pulled Jackson 3
+  (`tools.jackson.*`) alongside the Jackson 2 already present. It also adds
+  `flyway-database-cockroachdb`, which is dead weight for a Postgres-only product and could be
+  excluded. Lettuce 7 adds Netty's DNS resolver modules.
+
+---
+
 ## [1.25.0] - 2026-09-08
 
 ### Security

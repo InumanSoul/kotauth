@@ -4,6 +4,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookEventType
 import com.kauth.fakes.FakeWebhookDeliveryRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
+import com.kauth.fakes.FakeWebhookSender
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,6 +30,7 @@ class WebhookServiceTest {
         WebhookService(
             endpointRepository = endpoints,
             deliveryRepository = deliveries,
+            sender = FakeWebhookSender(),
         )
 
     @BeforeTest

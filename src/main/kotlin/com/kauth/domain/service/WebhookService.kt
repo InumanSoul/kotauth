@@ -7,6 +7,8 @@ import com.kauth.domain.model.WebhookEndpoint
 import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.WebhookDeliveryRepository
 import com.kauth.domain.port.WebhookEndpointRepository
+import com.kauth.domain.port.WebhookRequest
+import com.kauth.domain.port.WebhookSenderPort
 import com.kauth.domain.util.SecureTokens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,9 +16,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URI
 import java.time.Instant
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -40,6 +39,7 @@ import javax.crypto.spec.SecretKeySpec
 class WebhookService(
     private val endpointRepository: WebhookEndpointRepository,
     private val deliveryRepository: WebhookDeliveryRepository,
+    private val sender: WebhookSenderPort,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -49,8 +49,6 @@ class WebhookService(
     private val maxAttempts = retryDelaysMs.size
 
     // HTTP timeout for each delivery attempt
-    private val connectTimeoutMs = 5_000
-    private val readTimeoutMs = 10_000
 
     // ==========================================================================
     // Public API
@@ -242,36 +240,33 @@ class WebhookService(
     }
 
     /**
-     * Performs one HTTP POST. Returns (httpStatus, isSuccess).
-     * A 2xx response code is considered success; anything else (including exceptions)
-     * is a failure that triggers a retry.
+     * Sends one request through [WebhookSenderPort]. Returns (httpStatus, isSuccess); a 2xx is
+     * success, anything else — including a transport failure — schedules a retry.
+     *
+     * The signature and event headers are computed here because they are domain concerns; the
+     * port only carries them.
      */
     private fun sendRequest(
         endpoint: WebhookEndpoint,
         payload: String,
         eventType: String,
-    ): Pair<Int?, Boolean> =
-        try {
-            val url = URI(endpoint.url).toURL()
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.doOutput = true
-            conn.connectTimeout = connectTimeoutMs
-            conn.readTimeout = readTimeoutMs
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            conn.setRequestProperty("User-Agent", "KotAuth-Webhook/1.0")
-            conn.setRequestProperty("X-KotAuth-Event", eventType)
-            conn.setRequestProperty("X-KotAuth-Signature", computeSignature(endpoint.secret, payload))
-
-            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload) }
-
-            val status = conn.responseCode
-            val success = status in 200..299
-            Pair(status, success)
-        } catch (e: Exception) {
-            log.warn("Webhook HTTP error: endpoint=${endpoint.id} url=${endpoint.url}: ${e.message}")
-            Pair(null, false)
-        }
+    ): Pair<Int?, Boolean> {
+        val result =
+            sender.post(
+                WebhookRequest(
+                    url = endpoint.url,
+                    payload = payload,
+                    headers =
+                        mapOf(
+                            "Content-Type" to "application/json; charset=utf-8",
+                            "User-Agent" to "KotAuth-Webhook/1.0",
+                            "X-KotAuth-Event" to eventType,
+                            "X-KotAuth-Signature" to computeSignature(endpoint.secret, payload),
+                        ),
+                ),
+            )
+        return Pair(result.httpStatus, result.success)
+    }
 
     // ==========================================================================
     // Helpers
