@@ -50,14 +50,11 @@ internal fun mfaSettingsPageImpl(
         ) {
             div("content-inner") {
                 // Breadcrumb
-                breadcrumb(
+                adminPage(
                     "Workspaces" to "/admin",
                     workspace.slug to "/admin/workspaces/${workspace.slug}",
                     "Security" to "/admin/workspaces/${workspace.slug}/settings/security",
-                    "MFA" to null,
-                )
-
-                pageHeader(
+                    crumb = "MFA",
                     title = "Multi-Factor Authentication",
                     subtitleContent = {
                         +"TOTP-based MFA enrollment status for ${workspace.displayName}. Policy: "
@@ -1102,7 +1099,7 @@ internal fun createApiKeyPageImpl(
             slug to "/admin/workspaces/$slug",
             "Settings" to "/admin/workspaces/$slug/settings",
             "API Keys" to "/admin/workspaces/$slug/settings/api-keys",
-            "New API Key" to null,
+            "Create API Key" to null,
         )
 
         // ── Page header ──────────────────────────────────────────

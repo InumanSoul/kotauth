@@ -42,13 +42,9 @@ internal fun scimProvisioningPageImpl(
         toastMessage = toastMessage,
     ) {
         div("content-inner") {
-            breadcrumb(
+            adminPage(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
-                EnglishStrings.SCIM_PAGE_TITLE to null,
-            )
-
-            pageHeader(
                 title = EnglishStrings.SCIM_PAGE_TITLE,
                 subtitle = EnglishStrings.SCIM_PAGE_SUBTITLE,
                 actions = { primaryLink(createKeyHref, EnglishStrings.SCIM_TOKEN_CREATE_CTA, "plus") },

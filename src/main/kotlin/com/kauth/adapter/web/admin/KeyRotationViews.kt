@@ -28,14 +28,10 @@ internal fun keyManagementPageImpl(
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
-                breadcrumb(
+                adminPage(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
                     "Settings" to "/admin/workspaces/$slug/settings",
-                    "Signing Keys" to null,
-                )
-
-                pageHeader(
                     title = "Signing Keys",
                     subtitle = "RS256 key pairs used to sign JWTs for this workspace.",
                     actions = {

@@ -9,8 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Seven create-screens disagreed with themselves.** The breadcrumb said "New Role" while the
+  heading said "Create Role" — and the same split existed for applications, groups, users,
+  workspaces, API keys and webhook endpoints. All now read **Create X** in both places, matching
+  the primary button already on those screens. Closes part of #134.
+
 ### Added
 
+- **`adminPage()` renders a page's breadcrumb and heading from one title**, so the trailing crumb
+  cannot silently diverge from the `h1`. Sixteen of thirty-seven admin pages had drifted.
+
+  Where a shorter crumb is genuinely wanted — "MFA" reads better in a trail than "Multi-Factor
+  Authentication" — it is now passed explicitly as `crumb =`, which makes it a decision visible in
+  review rather than an accident indistinguishable from one. Three pages do this.
+- **A ratchet keeps it from coming back.** `AdminPageIdentityTest` records how many direct
+  `breadcrumb()` calls each remaining legacy file makes and fails if any file gains one, if the
+  allowance lists a file that no longer needs it, or if the allowance drifts above the real count.
+  The numbers can only go down.
 - **CI applies every migration to an empty database.** The unit suite runs on in-memory fakes, so
   it never sees a migration at all; nothing in CI applied `V1` through the newest file to a fresh
   database. A broken `V*.sql` therefore passed Flyway's checksum validation, passed the unit tests,

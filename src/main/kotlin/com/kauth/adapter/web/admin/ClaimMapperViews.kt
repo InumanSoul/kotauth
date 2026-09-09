@@ -30,14 +30,10 @@ internal fun claimMappersListPageImpl(
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
-                breadcrumb(
+                adminPage(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
                     "Settings" to "/admin/workspaces/$slug/settings",
-                    "Claim Mappers" to null,
-                )
-
-                pageHeader(
                     title = "Claim Mappers",
                     subtitle =
                         "Control which user attributes appear as claims in access and ID tokens. " +

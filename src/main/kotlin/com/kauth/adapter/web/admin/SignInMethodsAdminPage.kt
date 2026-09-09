@@ -27,13 +27,9 @@ internal fun HTML.signInMethodsAdminPage(
         toastMessage = toastMessage,
     ) {
         div("content-inner") {
-            breadcrumb(
+            adminPage(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
-                EnglishStrings.ADMIN_NAV_SIGN_IN_METHODS to null,
-            )
-
-            pageHeader(
                 title = EnglishStrings.ADMIN_NAV_SIGN_IN_METHODS,
                 subtitle = EnglishStrings.SIGN_IN_METHODS_PAGE_SUB,
                 actions = {

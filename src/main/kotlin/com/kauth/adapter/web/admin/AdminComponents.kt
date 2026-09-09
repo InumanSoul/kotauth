@@ -51,6 +51,42 @@ fun DIV.breadcrumb(vararg crumbs: Pair<String, String?>) {
 }
 
 /**
+ * Renders a page's breadcrumb and header together, from one source of truth.
+ *
+ * The trailing crumb defaults to [title], so the two cannot silently disagree. Before this
+ * existed, `breadcrumb()` and `pageHeader()` were independent calls with independently typed
+ * strings, and sixteen of thirty-seven pages had drifted — the console said "New Role" in the
+ * crumb and "Create Role" in the heading.
+ *
+ * Pass [crumb] only where a shorter trailing crumb is deliberate: "MFA" in the trail reads better
+ * than "Multi-Factor Authentication", and a resource's identifier is often the right crumb for a
+ * page titled with its display name. Being explicit makes that a decision a reviewer can see,
+ * rather than an accident that looks identical to one.
+ *
+ * [ancestors] are the crumbs before this page, each a label and its href.
+ */
+fun DIV.adminPage(
+    vararg ancestors: Pair<String, String>,
+    title: String,
+    crumb: String = title,
+    subtitle: String? = null,
+    subtitleContent: (P.() -> Unit)? = null,
+    left: (DIV.() -> Unit)? = null,
+    meta: (DIV.() -> Unit)? = null,
+    actions: (DIV.() -> Unit)? = null,
+) {
+    breadcrumb(*ancestors.map { it.first to it.second as String? }.toTypedArray(), crumb to null)
+    pageHeader(
+        title = title,
+        subtitle = subtitle,
+        subtitleContent = subtitleContent,
+        left = left,
+        meta = meta,
+        actions = actions,
+    )
+}
+
+/**
  * Renders the standard page header with title, optional meta row, and actions.
  *
  * subtitleContent takes precedence over subtitle when both are provided.

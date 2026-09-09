@@ -294,7 +294,7 @@ internal fun createWorkspacePageImpl(
             div("content-inner content-inner--wide") {
             breadcrumb(
                 "Workspaces" to "/admin",
-                "New Workspace" to null,
+                "Create Workspace" to null,
             )
 
             // ── Page header with external submit ───────────────────

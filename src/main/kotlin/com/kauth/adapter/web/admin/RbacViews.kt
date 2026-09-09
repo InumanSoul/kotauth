@@ -128,7 +128,7 @@ internal fun createRolePageImpl(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
                 "Roles" to "/admin/workspaces/$slug/roles",
-                "New Role" to null,
+                "Create Role" to null,
             )
 
             div("page-header") {
@@ -557,7 +557,7 @@ internal fun createGroupPageImpl(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
                 "Groups" to "/admin/workspaces/$slug/groups",
-                "New Group" to null,
+                "Create Group" to null,
             )
 
             div("page-header") {

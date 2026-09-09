@@ -944,7 +944,7 @@ internal fun createUserPageImpl(
                 "Workspaces" to "/admin",
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
                 "Users" to "/admin/workspaces/${workspace.slug}/users",
-                "New User" to null,
+                "Create User" to null,
             )
 
             // ── Page header (narrow form variant) ────────────────────
