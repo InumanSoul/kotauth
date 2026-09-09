@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **CI applies every migration to an empty database.** The unit suite runs on in-memory fakes, so
+  it never sees a migration at all; nothing in CI applied `V1` through the newest file to a fresh
+  database. A broken `V*.sql` therefore passed Flyway's checksum validation, passed the unit tests,
+  and failed only when someone provisioned a new deployment — which has happened here before.
+
+  `MigrationChainTest` starts an empty Postgres, migrates, and asserts the run reached the newest
+  version on disk with every migration applied and none left failed. It then migrates again and
+  asserts the second run is a no-op, which is what an operator's restart does on every deploy.
+- **CI runs the Docker-backed suites.** `postgresTest` and `redisTest` now run on every push and
+  pull request. Both suites and their Testcontainers wiring already existed but were invoked only
+  by hand, so anything reached solely through a database or a Redis connection was unverified —
+  including the Flyway, HikariCP and Lettuce major upgrades in 1.25.1, whose green checks
+  confirmed compilation and nothing more.
+- **Migration filenames are checked without a database**, so a mistake fails in `make test` rather
+  than after a container has booted: no two migrations may claim the same version, every name must
+  match `V<number>__<lower_snake_case>.sql`, and versions must be contiguous from 1. The duplicate
+  check catches two branches independently adding the same number, which Flyway only refuses once
+  someone applies it — by which point the second file is already merged.
+
+---
+
 ## [1.25.1] - 2026-09-08
 
 ### Changed
