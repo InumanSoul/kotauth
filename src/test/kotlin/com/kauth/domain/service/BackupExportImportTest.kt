@@ -89,6 +89,8 @@ class BackupExportImportTest {
     private val destEmailBranding = FakeTenantEmailBrandingRepository()
     private val destAuditPort = FakeAuditLogPort()
     private val txRunner = FakeTransactionRunner()
+    private val sourceResourceServers = com.kauth.fakes.FakeResourceServerRepository()
+    private val destResourceServers = com.kauth.fakes.FakeResourceServerRepository()
 
     private fun exporter() =
         BackupExporterService(
@@ -102,6 +104,7 @@ class BackupExportImportTest {
             tenantKeyRepository = sourceKeys,
             userAttributeRepository = sourceAttrs,
             auditLogRepository = sourceAudit,
+            resourceServerRepository = sourceResourceServers,
         )
 
     private fun importer() =
@@ -120,6 +123,7 @@ class BackupExportImportTest {
             emailBrandingRepository = destEmailBranding,
             auditLogPort = destAuditPort,
             transactionRunner = txRunner,
+            resourceServerRepository = destResourceServers,
         )
 
     @BeforeTest

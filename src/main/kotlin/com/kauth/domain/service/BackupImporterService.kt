@@ -1,10 +1,13 @@
 package com.kauth.domain.service
 
 import com.kauth.domain.model.AccessType
+import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationBackup
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.BackupExportV1
+import com.kauth.domain.model.DEFAULT_OIDC_SCOPES
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.GroupBackup
@@ -12,7 +15,9 @@ import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.ProviderKey
+import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.ResourceServerId
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
@@ -28,6 +33,7 @@ import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.PortalConfigRepository
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantClaimMapperRepository
 import com.kauth.domain.port.TenantEmailBrandingRepository
@@ -85,6 +91,8 @@ class BackupImporterService(
     private val userAttributeRepository: UserAttributeRepository,
     private val emailBrandingRepository: TenantEmailBrandingRepository,
     private val auditLogPort: AuditLogPort?,
+    // Optional, mirroring the exporter: a deployment can run without resource servers wired.
+    private val resourceServerRepository: ResourceServerRepository? = null,
     private val transactionRunner: TransactionRunner,
 ) {
     /**
@@ -239,6 +247,26 @@ class BackupImporterService(
             )
         }
 
+        // Created before applications: an authorization is a link from a client to a resource
+        // server, so the resource server has to have a primary key before the client can name it.
+        val resourceServerPkByIdentifier: MutableMap<String, ResourceServerId> = mutableMapOf()
+        if (resourceServerRepository != null) {
+            export.resourceServers.forEach { rsb ->
+                val created =
+                    resourceServerRepository.create(
+                        tenantId = createdTenant.id,
+                        identifier = rsb.identifier,
+                        name = rsb.name,
+                        description = rsb.description,
+                        scopes = rsb.scopes,
+                    )
+                if (!rsb.enabled) {
+                    created.id?.let { resourceServerRepository.setEnabled(createdTenant.id, it, false) }
+                }
+                created.id?.let { resourceServerPkByIdentifier[rsb.identifier] = it }
+            }
+        }
+
         val appPkByClientId: MutableMap<String, ApplicationId> = mutableMapOf()
         export.applications.forEach { ab ->
             val accessType = AccessType.fromValue(ab.accessType)
@@ -269,7 +297,7 @@ class BackupImporterService(
                     redirectUris = ab.redirectUris,
                     grantTypes = grants,
                     clientSecretHash = null,
-                    audience = null,
+                    audience = ab.audience,
                 )
             val finalApp =
                 if (!ab.enabled) {
@@ -279,6 +307,8 @@ class BackupImporterService(
                     saved
                 }
             appPkByClientId[finalApp.clientId] = finalApp.id
+            restoreLauncherFields(finalApp, ab)
+            restoreAuthorizedResources(finalApp.id, ab, resourceServerPkByIdentifier)
         }
 
         val rolePkByName: MutableMap<RoleScopedKey, RoleId> = mutableMapOf()
@@ -350,34 +380,64 @@ class BackupImporterService(
             }
         }
 
-        // Normalize, then reject rather than rewrite: a restore that silently alters an
-        // identifier can break an integrator's stored references to it. Validated as one pass
-        // over every record before any of them is saved, and reported together, so an operator
-        // restoring hundreds of users sees the full list of offenders in one failure instead of
-        // discovering them one retry at a time.
-        val invalidUserRecords =
+        // Backups predating v1.24.0 carry usernames the format rule now forbids ("John Doe").
+        // Migration V66 rewrites exactly those rows in place on the upgrade path; this applies
+        // the same rewrite on the restore path, so a supported import is not a dead end. Every
+        // change is reported in the ImportSummary — the objection to rewriting identifiers is
+        // that it happens silently, and this does not.
+        //
+        // Two cases V66 aborts on abort here too, because neither is a cosmetic difference:
+        // a username that collapses to nothing leaves a user who can never sign in by username,
+        // and two that collapse together would merge or drop an identity row.
+        val usernameRewrites =
             export.users.mapNotNull { ub ->
-                val normalized = UsernamePolicy.normalize(ub.username)
-                if (UsernamePolicy.isValid(normalized)) {
-                    null
-                } else {
-                    "user record for email '${ub.email}' has username '${ub.username}' which does not " +
-                        "normalize to a valid username (got '$normalized')"
+                val rewritten = UsernamePolicy.rewriteLegacy(ub.username)
+                if (rewritten == ub.username) null else UsernameRewrite(ub.username, rewritten, ub.email)
+            }
+
+        val unrewritable =
+            export.users.mapNotNull { ub ->
+                val rewritten = UsernamePolicy.rewriteLegacy(ub.username)
+                when (UsernamePolicy.validate(rewritten)) {
+                    null -> null
+                    UsernamePolicy.Violation.TOO_LONG ->
+                        "user record for email '${ub.email}' has a username of " +
+                            "${rewritten.length} characters, over the ${UsernamePolicy.MAX_LENGTH} limit"
+                    UsernamePolicy.Violation.INVALID_FORMAT ->
+                        "user record for email '${ub.email}' has username '${ub.username}', which " +
+                            "rewrites to '$rewritten' — usually a username made entirely of " +
+                            "characters outside ${UsernamePolicy.USERNAME_PATTERN.pattern}, such " +
+                            "as a non-Latin script"
                 }
             }
-        if (invalidUserRecords.isNotEmpty()) {
+        if (unrewritable.isNotEmpty()) {
             error(
-                "Backup import rejected: ${invalidUserRecords.size} user record(s) have usernames " +
-                    "that do not normalize to a valid username. Usernames must match " +
-                    "${UsernamePolicy.USERNAME_PATTERN.pattern} and be at most " +
-                    "${UsernamePolicy.MAX_LENGTH} characters after trimming and lowercasing. " +
-                    "Offending records: ${invalidUserRecords.joinToString("; ")}.",
+                "Backup import rejected: ${unrewritable.size} user record(s) have usernames that " +
+                    "cannot be rewritten into a valid one. Rename these users on the source " +
+                    "deployment and export again. Offending records: ${unrewritable.joinToString("; ")}.",
+            )
+        }
+
+        val collisions =
+            export.users
+                .groupBy { UsernamePolicy.rewriteLegacy(it.username) }
+                .filterValues { it.size > 1 }
+                .map { (rewritten, records) ->
+                    "'$rewritten' would be produced by ${records.size} records: " +
+                        records.joinToString(", ") { "'${it.username}' (${it.email})" }
+                }
+        if (collisions.isNotEmpty()) {
+            error(
+                "Backup import rejected: ${collisions.size} username(s) would collide after " +
+                    "rewriting. Merging or dropping identity rows is not an acceptable restore " +
+                    "outcome, so these must be de-duplicated on the source deployment and " +
+                    "exported again. Collisions: ${collisions.joinToString("; ")}.",
             )
         }
 
         val userPkByUsername: MutableMap<String, UserId> = mutableMapOf()
         export.users.forEach { ub ->
-            val normalizedUsername = UsernamePolicy.normalize(ub.username)
+            val normalizedUsername = UsernamePolicy.rewriteLegacy(ub.username)
             val saved =
                 userRepository.save(
                     User(
@@ -454,7 +514,22 @@ class BackupImporterService(
                     provider = provider,
                     clientId = sp.clientId,
                     clientSecret = "",
+                    // Stays disabled regardless of what the backup recorded: the secret is never
+                    // exported, and an enabled provider with no secret fails at the first login
+                    // rather than at configuration time. The operator re-enables it after
+                    // supplying the secret, which is also when the rest of this becomes live.
                     enabled = false,
+                    kind =
+                        sp.kind?.let { k -> ProviderKind.entries.firstOrNull { it.name == k } } ?: ProviderKind.OAUTH2,
+                    displayName = sp.displayName,
+                    issuer = sp.issuer,
+                    authorizationEndpoint = sp.authorizationEndpoint,
+                    tokenEndpoint = sp.tokenEndpoint,
+                    jwksUri = sp.jwksUri,
+                    scopes = sp.scopes ?: DEFAULT_OIDC_SCOPES,
+                    jitEnabled = sp.jitEnabled,
+                    jitAllowedDomains = sp.jitAllowedDomains,
+                    trustEmailClaim = sp.trustEmailClaim,
                 ),
             )
         }
@@ -485,8 +560,10 @@ class BackupImporterService(
             groups = export.groups.size,
             claimMappers = export.claimMappers.size,
             socialProviders = export.socialProviders.size,
+            resourceServers = if (resourceServerRepository != null) export.resourceServers.size else 0,
             signingKeys = export.signingKeys?.size ?: 0,
             auditEvents = export.auditLog?.size ?: 0,
+            usernameRewrites = usernameRewrites,
         )
     }
 
@@ -545,6 +622,69 @@ class BackupImporterService(
         val scope: RoleScope,
         val clientId: String?,
     )
+
+    /**
+     * `create` cannot set the launcher fields, so anything non-default needs a follow-up `update`.
+     * Skipped entirely when the backup carries only defaults, which keeps pre-1.26 restores to the
+     * same single insert they always did.
+     */
+    private fun restoreLauncherFields(
+        app: Application,
+        ab: ApplicationBackup,
+    ) {
+        val hasLauncherConfig =
+            ab.launcherUrl != null || ab.iconUrl != null || !ab.launcherVisible || ab.launcherDisplayOrder != 0
+        if (!hasLauncherConfig) return
+        applicationRepository.update(
+            appId = app.id,
+            name = app.name,
+            description = app.description,
+            accessType = app.accessType.value,
+            redirectUris = app.redirectUris,
+            grantTypes = app.grantTypes,
+            launcherUrl = ab.launcherUrl,
+            iconUrl = ab.iconUrl,
+            launcherVisible = ab.launcherVisible,
+            launcherDisplayOrder = ab.launcherDisplayOrder,
+            audience = ab.audience,
+        )
+    }
+
+    /**
+     * Rebuilds which APIs a client may request tokens for and which scopes it holds on each.
+     *
+     * An identifier the backup names but this export never carried is skipped rather than
+     * failing the restore: the resource server list is new in 1.26, so a client authorization
+     * can legitimately outlive the API it points at in a hand-assembled or partial payload.
+     */
+    private fun restoreAuthorizedResources(
+        appPk: ApplicationId,
+        ab: ApplicationBackup,
+        resourceServerPkByIdentifier: Map<String, ResourceServerId>,
+    ) {
+        val repo = resourceServerRepository ?: return
+        if (ab.authorizedResources.isEmpty()) return
+        val resolved =
+            ab.authorizedResources.mapNotNull { ar ->
+                resourceServerPkByIdentifier[ar.resourceIdentifier]?.let { ar to it }
+            }
+        if (resolved.isEmpty()) return
+
+        repo.setAuthorizedResources(appPk, resolved.map { it.second })?.let {
+            error("Application '${ab.clientId}' could not be authorized against its APIs: $it")
+        }
+        // Authorizing grants every scope the resource server declares, so this narrowing is not
+        // optional: swallowing a failure here would restore the client with MORE scopes than the
+        // backup recorded, which is precisely the over-granting ADR-23 exists to prevent.
+        resolved.forEach { (ar, rsPk) ->
+            repo.setAllowedScopes(appPk, rsPk, ar.scopes.toSet())?.let {
+                error(
+                    "Application '${ab.clientId}' could not be restricted to its recorded scopes " +
+                        "on API '${ar.resourceIdentifier}': $it",
+                )
+            }
+        }
+    }
 }
 
 /**
@@ -560,6 +700,21 @@ data class ImportSummary(
     val groups: Int,
     val claimMappers: Int,
     val socialProviders: Int,
+    /** Zero when no resource-server repository is wired, whatever the backup carried. */
+    val resourceServers: Int = 0,
     val signingKeys: Int,
     val auditEvents: Int,
+    /**
+     * Usernames the restore had to rewrite to satisfy the format rule, one entry per changed
+     * record. Empty for any backup taken from v1.24.0 onward. An operator reads this to find
+     * out which stored references on their side now point at a username that no longer exists.
+     */
+    val usernameRewrites: List<UsernameRewrite> = emptyList(),
+)
+
+/** One username the importer rewrote, with the email that identifies whose record it was. */
+data class UsernameRewrite(
+    val from: String,
+    val to: String,
+    val email: String,
 )

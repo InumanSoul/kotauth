@@ -24,11 +24,18 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * Part D of the login-identifier hardening wave: a restored backup must never silently rewrite an
- * invalid username (that could break an integrator's stored references to it), and must never
- * insert one that violates [UsernamePolicy] either — it must reject the whole import and name the
- * offending record. Separate from [BackupExportImportTest] (which this wave does not touch) since
- * it exercises a failure path that test's fixtures don't cover.
+ * What a restore does with a username the format rule now forbids.
+ *
+ * Originally this rejected every such record. That made a path the compatibility matrix declares
+ * supported into a dead end: migration V66 rewrites exactly these values in place on the upgrade
+ * path, but exports are passphrase-encrypted with no decrypt-and-edit route, so an operator
+ * holding a pre-1.24 backup had nothing to fix and no way to fix it (#141).
+ *
+ * The rule now is: rewrite what V66 would rewrite, report every change in the summary, and keep
+ * rejecting only the two cases V66 itself aborts on — a username that collapses to nothing, and
+ * two that collapse together. Those destroy identity rather than reshape an identifier.
+ *
+ * Separate from [BackupExportImportTest] since it exercises paths that test's fixtures don't cover.
  */
 class BackupImporterUsernameValidationTest {
     private val sourceTenants = FakeTenantRepository()
@@ -151,18 +158,49 @@ class BackupImporterUsernameValidationTest {
     }
 
     @Test
-    fun `import rejects a record whose username is invalid after normalization`() {
+    fun `import rewrites a legacy username the way V66 would, and says so`() {
         val export = exportAcme()
-        val badExport = export.copy(users = listOf(export.users.single().copy(username = "john doe")))
+        val legacy = export.copy(users = listOf(export.users.single().copy(username = "John Doe")))
+
+        val result = importer().import(legacy, newSlug = "acme-restored", currentSchemaVersion = 1)
+
+        val summary = assertIs<BackupResult.Success<ImportSummary>>(result).value
+        val restoredTenant = destTenants.findBySlug("acme-restored")!!
+        val restoredUser = destUsers.findByTenantId(restoredTenant.id, null, 100, 0).single()
+        assertEquals("john.doe", restoredUser.username, "must match V66's rewrite of the same value")
+
+        val rewrite = summary.usernameRewrites.single()
+        assertEquals("John Doe", rewrite.from)
+        assertEquals("john.doe", rewrite.to)
+        assertEquals("alice@acme.example.com", rewrite.email)
+    }
+
+    @Test
+    fun `a username that rewrites cleanly is not reported as a rewrite`() {
+        val export = exportAcme()
+
+        val result = importer().import(export, newSlug = "acme-restored", currentSchemaVersion = 1)
+
+        val summary = assertIs<BackupResult.Success<ImportSummary>>(result).value
+        assertTrue(
+            summary.usernameRewrites.isEmpty(),
+            "an already-valid username is unchanged, so nothing should be reported: " +
+                "${summary.usernameRewrites}",
+        )
+    }
+
+    @Test
+    fun `import rejects a username that rewrites to nothing`() {
+        val export = exportAcme()
+        // Entirely outside [a-z0-9._@+-] — collapses to "", exactly the case V66 aborts on.
+        val badExport = export.copy(users = listOf(export.users.single().copy(username = "用户")))
 
         val result = importer().import(badExport, newSlug = "acme-restored", currentSchemaVersion = 1)
 
         assertIs<BackupResult.Failure>(result)
         val error = result.error
         assertIs<BackupError.InvalidPayload>(error)
-        assertContains(error.message, "john doe")
         assertContains(error.message, "alice@acme.example.com")
-        // No user was persisted on the destination — validation runs before the save.
         val createdTenant = destTenants.findBySlug("acme-restored")
         if (createdTenant != null) {
             assertTrue(destUsers.findByTenantId(createdTenant.id, null, 100, 0).isEmpty())
@@ -170,14 +208,45 @@ class BackupImporterUsernameValidationTest {
     }
 
     @Test
-    fun `import reports every offending record in one failure, not just the first`() {
+    fun `import rejects two usernames that would collide after rewriting`() {
         val export = exportAcmeWithTwoUsers()
         val badExport =
             export.copy(
                 users =
                     export.users.map {
                         when (it.username) {
-                            "alice" -> it.copy(username = "john doe")
+                            "alice" -> it.copy(username = "John Doe")
+                            "bob" -> it.copy(username = "john/doe")
+                            else -> it
+                        }
+                    },
+            )
+
+        val result = importer().import(badExport, newSlug = "acme-restored", currentSchemaVersion = 1)
+
+        assertIs<BackupResult.Failure>(result)
+        val error = result.error
+        assertIs<BackupError.InvalidPayload>(error)
+        // Merging or dropping an identity row is never an acceptable restore outcome, so this
+        // stays a refusal even though both values rewrite to something valid on their own.
+        assertContains(error.message, "john.doe")
+        assertContains(error.message, "alice@acme.example.com")
+        assertContains(error.message, "bob@acme.example.com")
+        val createdTenant = destTenants.findBySlug("acme-restored")
+        if (createdTenant != null) {
+            assertTrue(destUsers.findByTenantId(createdTenant.id, null, 100, 0).isEmpty())
+        }
+    }
+
+    @Test
+    fun `import reports every unrewritable record in one failure, not just the first`() {
+        val export = exportAcmeWithTwoUsers()
+        val badExport =
+            export.copy(
+                users =
+                    export.users.map {
+                        when (it.username) {
+                            "alice" -> it.copy(username = "用户")
                             "bob" -> it.copy(username = "a".repeat(UsernamePolicy.MAX_LENGTH + 1))
                             else -> it
                         }
@@ -189,12 +258,10 @@ class BackupImporterUsernameValidationTest {
         assertIs<BackupResult.Failure>(result)
         val error = result.error
         assertIs<BackupError.InvalidPayload>(error)
-        // Both offenders are named in the SAME failure — an operator restoring many users must
-        // see the full list at once, not discover them one aborted retry at a time.
-        assertContains(error.message, "john doe")
+        // Both offenders in the SAME failure — an operator restoring many users must see the
+        // full list at once, not discover them one aborted retry at a time.
         assertContains(error.message, "alice@acme.example.com")
         assertContains(error.message, "bob@acme.example.com")
-        // No user was persisted on the destination — validation runs before any save.
         val createdTenant = destTenants.findBySlug("acme-restored")
         if (createdTenant != null) {
             assertTrue(destUsers.findByTenantId(createdTenant.id, null, 100, 0).isEmpty())

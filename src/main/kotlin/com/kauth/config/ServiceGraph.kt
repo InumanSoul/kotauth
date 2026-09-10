@@ -650,6 +650,7 @@ data class ServiceGraph(
                     tenantKeyRepository = tenantKeyRepository,
                     userAttributeRepository = userAttributeRepository,
                     auditLogRepository = auditLogRepository,
+                    resourceServerRepository = resourceServerRepository,
                 )
             val backupImporterService =
                 BackupImporterService(
@@ -667,6 +668,7 @@ data class ServiceGraph(
                     emailBrandingRepository = emailBrandingRepository,
                     auditLogPort = auditLogAdapter,
                     transactionRunner = backupTransactionRunner,
+                    resourceServerRepository = resourceServerRepository,
                 )
 
             return ServiceGraph(

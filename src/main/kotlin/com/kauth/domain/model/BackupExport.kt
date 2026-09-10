@@ -34,6 +34,8 @@ data class BackupExportV1(
     val applications: List<ApplicationBackup>,
     val claimMappers: List<ClaimMapperBackup>,
     val socialProviders: List<SocialProviderBackup>,
+    /** Empty in backups taken before resource servers were exported (pre-1.26). */
+    val resourceServers: List<ResourceServerBackup> = emptyList(),
     val users: List<UserBackup>,
     val roles: List<RoleBackup>,
     val groups: List<GroupBackup>,
@@ -159,6 +161,42 @@ data class ApplicationBackup(
     val tokenExpiryOverride: Int?,
     /** Null in backups written before grant types existed; the importer derives them from accessType. */
     val grantTypes: List<String>? = null,
+    // All defaulted: backups taken before 1.26 carry none of these, and their defaults are the
+    // same values the model itself defaults to, so an older export restores exactly as it did.
+    val audience: String? = null,
+    val launcherUrl: String? = null,
+    val iconUrl: String? = null,
+    val launcherVisible: Boolean = true,
+    val launcherDisplayOrder: Int = 0,
+    /** Which APIs this client may request tokens for, and which of their scopes it may ask for. */
+    val authorizedResources: List<AuthorizedResourceBackup> = emptyList(),
+)
+
+/**
+ * One client's grant against one resource server, keyed by the resource server's natural
+ * identifier rather than its database id — the same linking rule the rest of the format uses.
+ *
+ * [scopes] is the per-client allowlist introduced in v1.25.0 (ADR-23), not the resource server's
+ * full offering. An empty list means the client may request nothing on that resource, which is
+ * what the model means by absence; it never means "everything".
+ */
+@Serializable
+data class AuthorizedResourceBackup(
+    val resourceIdentifier: String,
+    val scopes: List<String> = emptyList(),
+)
+
+/**
+ * A resource server (an "API" in the console). Exported by identifier so a restore can rebuild
+ * both the API itself and every client authorization pointing at it.
+ */
+@Serializable
+data class ResourceServerBackup(
+    val identifier: String,
+    val name: String,
+    val description: String? = null,
+    val enabled: Boolean = true,
+    val scopes: List<String> = emptyList(),
 )
 
 @Serializable
@@ -169,12 +207,30 @@ data class ClaimMapperBackup(
     val includeInId: Boolean,
 )
 
-/** Provider name + clientId only. Secrets are never exported. */
+/**
+ * An identity provider's non-secret configuration. `clientSecret` is deliberately excluded and
+ * the manifest says so; everything else a provider carries is here.
+ *
+ * Before 1.26 this held only provider, clientId and enabled, so a restored OIDC provider came
+ * back as `oauth2` with no issuer and just-in-time provisioning silently switched off — looking
+ * configured while behaving differently. The fields below are all defaulted to the model's own
+ * defaults, which is exactly the shape an older backup used to restore into.
+ */
 @Serializable
 data class SocialProviderBackup(
     val provider: String,
     val clientId: String,
     val enabled: Boolean,
+    val kind: String? = null,
+    val displayName: String? = null,
+    val issuer: String? = null,
+    val authorizationEndpoint: String? = null,
+    val tokenEndpoint: String? = null,
+    val jwksUri: String? = null,
+    val scopes: String? = null,
+    val jitEnabled: Boolean = false,
+    val jitAllowedDomains: List<String> = emptyList(),
+    val trustEmailClaim: Boolean = false,
 )
 
 /**

@@ -393,6 +393,7 @@ fun Route.adminRoutes(
                     backupEncryptionPort = backupEncryptionPort,
                     currentSchemaVersion = flywaySchemaVersion,
                     maxImportBodyBytes = maxImportBodyBytes,
+                    auditLogPort = auditLogPort,
                 )
             }
 

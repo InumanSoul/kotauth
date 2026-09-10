@@ -3,6 +3,7 @@ package com.kauth.domain.service
 import com.kauth.domain.model.ApplicationBackup
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventBackup
+import com.kauth.domain.model.AuthorizedResourceBackup
 import com.kauth.domain.model.BackupExportV1
 import com.kauth.domain.model.ClaimMapperBackup
 import com.kauth.domain.model.EmailBrandingBackup
@@ -10,6 +11,8 @@ import com.kauth.domain.model.ExportManifest
 import com.kauth.domain.model.GroupBackup
 import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.PortalConfigBackup
+import com.kauth.domain.model.ResourceServerBackup
+import com.kauth.domain.model.ResourceServerId
 import com.kauth.domain.model.RoleBackup
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.SecurityConfigBackup
@@ -23,6 +26,7 @@ import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.IdentityProviderRepository
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantClaimMapperRepository
 import com.kauth.domain.port.TenantKeyRepository
@@ -52,6 +56,9 @@ class BackupExporterService(
     private val tenantKeyRepository: TenantKeyRepository,
     private val userAttributeRepository: UserAttributeRepository,
     private val auditLogRepository: AuditLogRepository?,
+    // Optional for the same reason the console's APIs section is: a deployment can run without
+    // resource servers wired. Null means this export carries none, not that none existed.
+    private val resourceServerRepository: ResourceServerRepository? = null,
 ) {
     /**
      * @param slug source tenant slug
@@ -165,6 +172,19 @@ class BackupExporterService(
                     },
             )
 
+        val resourceServers = resourceServerRepository?.findByTenantId(tenant.id).orEmpty()
+        val resourceServerBackups =
+            resourceServers.map { rs ->
+                ResourceServerBackup(
+                    identifier = rs.identifier,
+                    name = rs.name,
+                    description = rs.description,
+                    enabled = rs.enabled,
+                    scopes = rs.scopes,
+                )
+            }
+        val resourceIdentifiersByPk = resourceServers.mapNotNull { rs -> rs.id?.let { it to rs.identifier } }.toMap()
+
         val applicationBackups =
             applications.map { app ->
                 ApplicationBackup(
@@ -176,6 +196,12 @@ class BackupExporterService(
                     redirectUris = app.redirectUris,
                     tokenExpiryOverride = app.tokenExpiryOverride,
                     grantTypes = app.grantTypes.map { it.value },
+                    audience = app.audience,
+                    launcherUrl = app.launcherUrl,
+                    iconUrl = app.iconUrl,
+                    launcherVisible = app.launcherVisible,
+                    launcherDisplayOrder = app.launcherDisplayOrder,
+                    authorizedResources = authorizedResourcesFor(app.id, resourceIdentifiersByPk),
                 )
             }
 
@@ -195,6 +221,16 @@ class BackupExporterService(
                     provider = idp.provider.value,
                     clientId = idp.clientId,
                     enabled = idp.enabled,
+                    kind = idp.kind.name,
+                    displayName = idp.displayName,
+                    issuer = idp.issuer,
+                    authorizationEndpoint = idp.authorizationEndpoint,
+                    tokenEndpoint = idp.tokenEndpoint,
+                    jwksUri = idp.jwksUri,
+                    scopes = idp.scopes,
+                    jitEnabled = idp.jitEnabled,
+                    jitAllowedDomains = idp.jitAllowedDomains,
+                    trustEmailClaim = idp.trustEmailClaim,
                 )
             }
 
@@ -337,6 +373,7 @@ class BackupExporterService(
                 applications = applicationBackups,
                 claimMappers = claimMapperBackups,
                 socialProviders = socialProviderBackups,
+                resourceServers = resourceServerBackups,
                 users = userBackups,
                 roles = roleBackups,
                 groups = groupBackups,
@@ -360,6 +397,28 @@ class BackupExporterService(
             cursor = group.parentGroupId
         }
         return segments.asReversed().joinToString("/")
+    }
+
+    /**
+     * The APIs this client may request tokens for, with the scopes it was granted on each.
+     *
+     * A resource server the client is authorized for but holds no scopes on is still exported —
+     * the authorization itself is state worth restoring, and an empty scope list restores as the
+     * same "may request nothing here" the source had.
+     */
+    private fun authorizedResourcesFor(
+        clientPk: ApplicationId,
+        identifiersByPk: Map<ResourceServerId, String>,
+    ): List<AuthorizedResourceBackup> {
+        val repo = resourceServerRepository ?: return emptyList()
+        val allowed = repo.findAllowedScopes(clientPk)
+        return repo.listAuthorizedFor(clientPk).mapNotNull { rs ->
+            val pk = rs.id ?: return@mapNotNull null
+            AuthorizedResourceBackup(
+                resourceIdentifier = identifiersByPk[pk] ?: rs.identifier,
+                scopes = allowed[pk].orEmpty().sorted(),
+            )
+        }
     }
 }
 
