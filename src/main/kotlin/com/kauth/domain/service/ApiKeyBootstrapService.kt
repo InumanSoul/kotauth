@@ -99,7 +99,9 @@ class ApiKeyBootstrapService(
             val enabled = existing.enabled
             val dialectUnchanged = existing.scimDialect == resolvedDialect
 
-            if (hashUnchanged && scopesUnchanged && brandedAsBootstrap && enabled && dialectUnchanged) {
+            val entryIsUnchanged =
+                hashUnchanged && scopesUnchanged && brandedAsBootstrap && enabled && dialectUnchanged
+            if (entryIsUnchanged) {
                 outcomes += Outcome(entry.tenantSlug, entry.name, Action.UNCHANGED)
                 continue
             }

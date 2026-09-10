@@ -37,6 +37,12 @@ jobs:
       - name: ktlint check
         run: ./gradlew ktlintCheck --no-daemon
 
+      # detekt has been a ratchet since v1.15.0, but nothing in CI ran it, so 92 new
+      # violations accumulated past the baseline between June and September unnoticed.
+      # Running it here is what makes the baseline mean anything.
+      - name: detekt check
+        run: ./gradlew detekt --no-daemon
+
   test:
     name: Test (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest

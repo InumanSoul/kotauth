@@ -303,6 +303,78 @@ class AdminApiKeysTest {
         }
 
     // =========================================================================
+    // Session guard must stop the pipeline (#124)
+    // =========================================================================
+
+    /**
+     * `onCall` hooks do not short-circuit. When the session guard responds with a redirect to
+     * the login page, every later route-scoped plugin still runs — including the workspace
+     * resolver, whose last act is to append the `kotauth_last_ws` cookie. Appending a header to
+     * an already-committed response throws `UnsupportedOperationException` under Netty, so the
+     * caller sees a 500 instead of the redirect.
+     *
+     * The test engine is more permissive than Netty and lets the append succeed, which is why
+     * 2,500 passing tests never caught this. So these assert the property that actually matters
+     * and is observable in both engines: once the guard has responded, the resolver does not
+     * touch the response. No `kotauth_last_ws` cookie can appear on a login redirect.
+     */
+    @Test
+    fun `unauthenticated POST under a workspace redirects to login without running the resolver`() =
+        testApplication {
+            application { installTestApp() }
+            val noFollow = createClient { followRedirects = false }
+
+            val response =
+                noFollow.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys",
+                    formParameters =
+                        Parameters.build {
+                            append("name", "Test Key")
+                            append("scopes", ApiScope.USERS_READ)
+                        },
+                )
+
+            assertEquals(
+                HttpStatusCode.Found,
+                response.status,
+                "an unauthenticated POST must redirect to login, not fail",
+            )
+            assertTrue(
+                response.headers["Location"]?.contains("/admin/login") == true,
+                "expected a redirect to the login page, got: ${response.headers["Location"]}",
+            )
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("kotauth_last_ws") },
+                "the workspace resolver ran after the guard had already responded — under Netty " +
+                    "this append throws and the caller gets a 500 (#124). Set-Cookie was: " +
+                    "${response.headers.getAll("Set-Cookie")}",
+            )
+        }
+
+    @Test
+    fun `unauthenticated GET under a workspace redirects to login without running the resolver`() =
+        testApplication {
+            application { installTestApp() }
+            val noFollow = createClient { followRedirects = false }
+
+            val response = noFollow.get("/admin/workspaces/acme")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("/admin/login") == true)
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("kotauth_last_ws") },
+                "the workspace resolver ran after the guard had already responded (#124). " +
+                    "Set-Cookie was: ${response.headers.getAll("Set-Cookie")}",
+            )
+        }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 

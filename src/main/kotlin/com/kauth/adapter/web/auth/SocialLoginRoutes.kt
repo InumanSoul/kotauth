@@ -512,12 +512,12 @@ internal fun Route.socialLoginRoutes(
 
         val socialState = SocialState.parse(verifiedPayload)
         val stateAgeMs = socialState?.let { System.currentTimeMillis() - it.timestampMillis }
-        if (socialState == null ||
-            socialState.provider != provider.value ||
-            socialState.slug != slug ||
-            stateAgeMs == null ||
-            stateAgeMs > SOCIAL_STATE_MAX_AGE_MS
-        ) {
+        val stateMatchesRequest =
+            socialState != null &&
+                socialState.provider == provider.value &&
+                socialState.slug == slug
+        val stateIsFresh = stateAgeMs != null && stateAgeMs <= SOCIAL_STATE_MAX_AGE_MS
+        if (!stateMatchesRequest || !stateIsFresh) {
             call.respondHtml(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
@@ -617,7 +617,8 @@ internal fun Route.socialLoginRoutes(
                 // offering a sign-up form to someone just told they are refused is incoherent.
                 // The refusal is recorded by the gate either way, below this decision.
                 val refusalReference = pending.jitReference
-                if (refusal != null && refusalReference != null && tenant != null && !tenant.registrationEnabled) {
+                val signUpIsClosed = tenant != null && !tenant.registrationEnabled
+                if (refusal != null && refusalReference != null && signUpIsClosed) {
                     call.respondHtml(
                         HttpStatusCode.Forbidden,
                         AuthView.jitRefusedPage(
