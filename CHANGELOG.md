@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.26.0] - 2026-09-10
+
+### Fixed
+
+- **A restored workspace silently lost most of its configuration.** Three separate gaps, all with
+  the same shape — the value was dropped on the way out or on the way back, and nothing told the
+  operator:
+
+  - **Identity providers** carried only provider, client id and enabled. Everything else was
+    dropped, so a restored OIDC provider came back as `oauth2` with no issuer and just-in-time
+    provisioning switched off — configured-looking and behaving differently. `kind`, display name,
+    issuer, all three endpoints, `jwksUri`, scopes, JIT settings and `trustEmailClaim` now survive.
+    Closes #130.
+  - **Resource servers were never exported at all.** The exporter did not read them, so a restore
+    lost every API a workspace declared, every client authorization against one, and every
+    per-client scope grant — the whole machine-to-machine configuration built across v1.22 to
+    v1.25.
+  - **Applications** lost their token `audience` and their entire launcher configuration.
+
+  Client secrets, provider secrets, the SMTP password and MFA seeds are still excluded by design,
+  and the export manifest still says so. A restored provider also stays disabled: with no secret,
+  an enabled provider fails at the first login instead of at configuration time.
+
+- **A restored client no longer regains scopes it did not have.** Authorizing a client against an
+  API grants it every scope that API declares, so the restore has to narrow it back to what the
+  backup recorded. A failure in that step is now fatal to the import rather than ignored —
+  swallowing it would restore the client with more access than it was exported with, which is
+  precisely the over-granting [ADR-23](docs/adr/ADR-23-per-client-scope-allowlists.md) exists to
+  prevent.
+
+- **Restoring a pre-1.24 backup is no longer a dead end.** Migration V66 rewrites legacy usernames
+  in place on the upgrade path, but import rejected the identical values and aborted — and since
+  exports are passphrase-encrypted with no decrypt-and-edit route, the operator had nothing to fix
+  and no way to fix it. Import now applies the same rewrite V66 applies, and reports every change.
+
+  The two cases V66 itself aborts on still abort: a username that collapses to nothing leaves a
+  user who can never sign in, and two that collapse together would merge or drop an identity row.
+  Neither is a cosmetic difference to an identifier. Closes #141.
+
+- **Importing a workspace through the console left no audit trail.** The JSON API recorded
+  `ADMIN_TENANT_IMPORTED`; the console path recorded nothing. It now records the same event, with
+  the before-and-after username rewrites in the details — the only durable record a restore leaves.
+
+### Changed
+
+- **The import summary reports what it changed.** `ImportSummary` gains a resource-server count and
+  the list of username rewrites; the REST response carries both, and the console toast names the
+  rewrite count and points at the audit log for the full list.
+
+- **`FakeResourceServerRepository` resolves a client's tenant the way production does**, by reading
+  it back from the application repository instead of requiring a manual `registerClient` call. A
+  client created during the run under test — a restore, say — was invisible to it, so every
+  authorization against that client failed as `UnknownClient` where production would have accepted
+  it. This is the same fake-versus-production divergence class as the v1.24.0 username bug.
+
+---
+
 ## [1.25.3] - 2026-09-09
 
 ### Fixed

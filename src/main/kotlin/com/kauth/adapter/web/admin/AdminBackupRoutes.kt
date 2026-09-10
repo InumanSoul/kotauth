@@ -245,6 +245,8 @@ fun Route.adminBackupRoutes(
                                         "currentSchemaVersion" to currentSchemaVersion.toString(),
                                         "users" to s.users.toString(),
                                         "applications" to s.applications.toString(),
+                                        "resourceServers" to s.resourceServers.toString(),
+                                        "usernameRewrites" to s.usernameRewrites.size.toString(),
                                     ),
                             ),
                         )
@@ -262,6 +264,7 @@ fun Route.adminBackupRoutes(
                                         groups = s.groups,
                                         claimMappers = s.claimMappers,
                                         socialProviders = s.socialProviders,
+                                        resourceServers = s.resourceServers,
                                         signingKeys = s.signingKeys,
                                         auditEvents = s.auditEvents,
                                     ),
@@ -271,6 +274,10 @@ fun Route.adminBackupRoutes(
                                         includedExtras = export.manifest.includedExtras,
                                         notes = export.manifest.notes,
                                     ),
+                                usernameRewrites =
+                                    s.usernameRewrites.map {
+                                        UsernameRewriteDto(from = it.from, to = it.to, email = it.email)
+                                    },
                             ),
                         )
                     }
@@ -390,6 +397,13 @@ data class ExportResponse(
 )
 
 @Serializable
+data class UsernameRewriteDto(
+    val from: String,
+    val to: String,
+    val email: String,
+)
+
+@Serializable
 data class ImportRequest(
     val envelope: String,
     val passphrase: String,
@@ -403,6 +417,12 @@ data class ImportResponse(
     val exportSchemaVersion: Int,
     val summary: BackupCounts,
     val manifest: BackupManifestDto,
+    /**
+     * Usernames the restore rewrote to satisfy the format rule, empty for any backup taken from
+     * v1.24.0 onward. A caller with stored references to a username needs this to know which of
+     * them no longer resolve.
+     */
+    val usernameRewrites: List<UsernameRewriteDto> = emptyList(),
 )
 
 @Serializable
@@ -413,6 +433,7 @@ data class BackupCounts(
     val groups: Int,
     val claimMappers: Int,
     val socialProviders: Int,
+    val resourceServers: Int = 0,
     val signingKeys: Int,
     val auditEvents: Int,
 )

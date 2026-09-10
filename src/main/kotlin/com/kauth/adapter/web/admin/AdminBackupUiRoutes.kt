@@ -2,7 +2,10 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.plugin.MaxRequestBodyBytesAttr
+import com.kauth.domain.model.AuditEvent
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.BackupExportV1
+import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.BackupDecryptResult
 import com.kauth.domain.port.BackupDecryptionError
 import com.kauth.domain.port.BackupEncryptionPort
@@ -12,14 +15,17 @@ import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.BackupResult
 import com.kauth.domain.service.ExportOptions
+import com.kauth.domain.service.ImportSummary
 import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.PayloadTooLargeException
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
@@ -142,6 +148,10 @@ fun Route.adminBackupImportRoutes(
     // Same reasoning as the JSON API import endpoint (AdminBackupRoutes.kt): an uploaded backup
     // file is an entire tenant export, far larger than any other multipart upload this UI takes.
     maxImportBodyBytes: Long,
+    // The JSON API records ADMIN_TENANT_IMPORTED; the console path recorded nothing, so importing
+    // a workspace through the UI left no trace at all. Nullable to match how every other optional
+    // port reaches these routes.
+    auditLogPort: AuditLogPort? = null,
 ) {
     get("/import") {
         val session = call.sessions.get<AdminSession>()!!
@@ -268,12 +278,20 @@ fun Route.adminBackupImportRoutes(
 
         when (val result = backupImporterService.import(export, capturedSlug!!, currentSchemaVersion)) {
             is BackupResult.Success -> {
+                val summary = result.value
+                auditLogPort?.recordConsoleImport(call, summary, export.schemaVersion, currentSchemaVersion)
                 val flashToken =
                     com.kauth.adapter.web.admin.FlashStore.put(
-                        com.kauth.adapter.web.EnglishStrings.TOAST_BACKUP_IMPORTED,
+                        if (summary.usernameRewrites.isEmpty()) {
+                            com.kauth.adapter.web.EnglishStrings.TOAST_BACKUP_IMPORTED
+                        } else {
+                            com.kauth.adapter.web.EnglishStrings.toastBackupImportedWithRewrites(
+                                summary.usernameRewrites.size,
+                            )
+                        },
                     )
                 call.respondRedirect(
-                    "/admin/workspaces/${result.value.newTenantSlug}?flash=$flashToken",
+                    "/admin/workspaces/${summary.newTenantSlug}?flash=$flashToken",
                 )
             }
             is BackupResult.Failure ->
@@ -320,3 +338,40 @@ private val backupJson =
     }
 
 private val SLUG_REGEX = Regex("^[a-z0-9][a-z0-9-]{1,49}$")
+
+/**
+ * The console's counterpart to the audit event the JSON import endpoint records.
+ *
+ * `usernameRewriteDetail` carries the before-and-after pairs rather than just a count: an operator
+ * whose stored references broke needs to know which usernames changed, and the audit log is the
+ * only durable record a restore leaves behind.
+ */
+private fun AuditLogPort.recordConsoleImport(
+    call: ApplicationCall,
+    summary: ImportSummary,
+    exportSchemaVersion: Int,
+    currentSchemaVersion: Int,
+) {
+    record(
+        AuditEvent(
+            tenantId = null,
+            userId = null,
+            clientId = null,
+            eventType = AuditEventType.ADMIN_TENANT_IMPORTED,
+            ipAddress = call.request.origin.remoteAddress,
+            userAgent = call.request.headers["User-Agent"],
+            details =
+                mapOf(
+                    "newSlug" to summary.newTenantSlug,
+                    "exportSchemaVersion" to exportSchemaVersion.toString(),
+                    "currentSchemaVersion" to currentSchemaVersion.toString(),
+                    "users" to summary.users.toString(),
+                    "applications" to summary.applications.toString(),
+                    "resourceServers" to summary.resourceServers.toString(),
+                    "usernameRewrites" to summary.usernameRewrites.size.toString(),
+                    "usernameRewriteDetail" to
+                        summary.usernameRewrites.joinToString("; ") { "${it.from} -> ${it.to}" },
+                ),
+        ),
+    )
+}

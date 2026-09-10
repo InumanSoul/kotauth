@@ -8,7 +8,16 @@ import com.kauth.domain.port.ResourceAuthorizationError
 import com.kauth.domain.port.ResourceServerRepository
 import java.time.Instant
 
-class FakeResourceServerRepository : ResourceServerRepository {
+/**
+ * [applications] lets this fake resolve a client's tenant the way production does — by reading it
+ * back from the clients table — instead of relying on [registerClient]. Without it, a client
+ * created during the run under test (a backup restore, say) is invisible here and every
+ * authorization against it fails as `UnknownClient`, which production would have accepted.
+ * Optional so the 40-odd existing call sites that seed clients by hand keep working unchanged.
+ */
+class FakeResourceServerRepository(
+    private val applications: FakeApplicationRepository? = null,
+) : ResourceServerRepository {
     private val byId = mutableMapOf<Int, ResourceServer>()
     private val authorizations = mutableMapOf<Int, MutableSet<Int>>()
     private val clientTenants = mutableMapOf<Int, TenantId>()
@@ -140,7 +149,10 @@ class FakeResourceServerRepository : ResourceServerRepository {
         clientPk: ApplicationId,
         resourceServerIds: List<ResourceServerId>,
     ): ResourceAuthorizationError? {
-        val clientTenantId = clientTenants[clientPk.value] ?: return ResourceAuthorizationError.UnknownClient
+        val clientTenantId =
+            clientTenants[clientPk.value]
+                ?: applications?.findById(clientPk)?.tenantId
+                ?: return ResourceAuthorizationError.UnknownClient
 
         for (rsId in resourceServerIds) {
             val rs = byId[rsId.value] ?: return ResourceAuthorizationError.UnknownResource(rsId)

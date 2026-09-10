@@ -546,6 +546,15 @@ object EnglishStrings {
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
 
+    /**
+     * Restores of pre-1.24 backups rewrite usernames that the format rule now forbids. The
+     * operator has to be told it happened; the full before-and-after list is in the audit log,
+     * which is the only durable record a restore leaves.
+     */
+    fun toastBackupImportedWithRewrites(count: Int): String =
+        "Workspace imported. $count username${if (count == 1) " was" else "s were"} rewritten to " +
+            "meet the username format rule — see the audit log for the full list."
+
     // -------------------------------------------------------------------------
     // Auth pages — shared chrome (page titles use {0} = workspace name)
     // -------------------------------------------------------------------------
