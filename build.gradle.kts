@@ -1,6 +1,6 @@
 val ktorVersion = "3.5.2"
 val exposedVersion = "1.5.0"
-val logbackVersion = "1.5.32"
+val logbackVersion = "1.6.3"
 val flywayVersion = "13.5.0"
 val logstashEncoderVersion = "8.1"
 val lettuceVersion = "7.7.0.RELEASE"
