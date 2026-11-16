@@ -260,6 +260,26 @@ class PortalRoutesTest {
         }
 
     @Test
+    fun `GET master login sends the person to the console login instead of a portal flow`() =
+        testApplication {
+            tenantRepo.add(
+                Tenant(
+                    id = TenantId(99),
+                    slug = "master",
+                    displayName = "Master",
+                    issuerUrl = null,
+                ),
+            )
+            application { installTestAppWithOAuth() }
+
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/master/account/login")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/admin/login", response.headers["Location"])
+        }
+
+    @Test
     fun `GET login with prompt_failed=true OMITS prompt=none to break the loop`() =
         testApplication {
             application { installTestAppWithOAuth() }

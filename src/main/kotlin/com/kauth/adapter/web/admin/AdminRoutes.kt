@@ -312,7 +312,8 @@ fun Route.adminRoutes(
                 )
             }
             call.sessions.clear<AdminSession>()
-            val postLogoutUri = java.net.URLEncoder.encode("$baseUrl/admin/login", "UTF-8")
+            // Relative, so the end-session endpoint's same-origin check passes whatever the proxy chain.
+            val postLogoutUri = java.net.URLEncoder.encode("/admin/login", "UTF-8")
             val idTokenHint =
                 if (session?.idToken?.isNotBlank() == true) {
                     "&id_token_hint=${java.net.URLEncoder.encode(session.idToken, "UTF-8")}"

@@ -26,8 +26,10 @@ import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.EnglishOnlyTranslation
 import com.kauth.infrastructure.InMemoryRateLimiter
+import com.kauth.installTrustedProxyHeaders
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
@@ -133,8 +135,12 @@ class SsoLogoutTest {
             auditLog = auditLog,
         )
 
-    private fun appBlock(): io.ktor.server.application.Application.() -> Unit =
+    private fun appBlock(
+        baseUrl: String = "",
+        trustedProxy: Boolean = false,
+    ): io.ktor.server.application.Application.() -> Unit =
         {
+            if (trustedProxy) installTrustedProxyHeaders()
             install(ContentNegotiation) { json() }
             routing {
                 authRoutes(
@@ -148,6 +154,7 @@ class SsoLogoutTest {
                     mfaService = mfaService,
                     encryptionService = encryptionService,
                     translationPort = EnglishOnlyTranslation(),
+                    baseUrl = baseUrl,
                 )
             }
         }
@@ -292,4 +299,70 @@ class SsoLogoutTest {
             assertEquals(HttpStatusCode.Found, response.status)
             assertEquals("/dashboard", response.headers["Location"])
         }
+
+    // =========================================================================
+    // Behind a proxy, and the master workspace
+    // =========================================================================
+
+    @Test
+    fun `an absolute post-logout URI on KAUTH_BASE_URL is followed when the proxy hands over another scheme`() =
+        testApplication {
+            application(appBlock(baseUrl = "https://auth.example", trustedProxy = true))
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/master/protocol/openid-connect/logout" +
+                        "?post_logout_redirect_uri=https%3A%2F%2Fauth.example%2Fadmin%2Flogin",
+                ) {
+                    header("X-Forwarded-Proto", "http")
+                    header("X-Forwarded-Host", "auth.example")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("https://auth.example/admin/login", response.headers["Location"])
+        }
+
+    @Test
+    fun `a foreign post-logout URI is still refused when KAUTH_BASE_URL is set`() =
+        testApplication {
+            application(appBlock(baseUrl = "https://auth.example"))
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get("/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=https://evil.example/")
+
+            assertEquals("/t/acme/authorize", response.headers["Location"])
+        }
+
+    @Test
+    fun `master end_session without a post-logout URI lands on the console login`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/master/protocol/openid-connect/logout")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/admin/login", response.headers["Location"])
+        }
+
+    @Test
+    fun `master end_session with a refused post-logout URI lands on the console login`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get("/t/master/protocol/openid-connect/logout?post_logout_redirect_uri=//evil.example/x")
+
+            assertEquals("/admin/login", response.headers["Location"])
+        }
+
+    @Test
+    fun `isSafePostLogoutRedirect matches any trusted origin exactly`() {
+        val origins = listOf("http://auth.example", "https://auth.example")
+        assertTrue(isSafePostLogoutRedirect("https://auth.example/admin/login", origins))
+        assertTrue(isSafePostLogoutRedirect("http://auth.example:80/x", origins))
+        assertFalse(isSafePostLogoutRedirect("https://auth.example:8443/x", origins))
+        assertFalse(isSafePostLogoutRedirect("https://auth.example.evil.com/x", origins))
+        assertFalse(isSafePostLogoutRedirect("https://user@auth.example/x", origins))
+        assertFalse(isSafePostLogoutRedirect("https://auth.example/x", emptyList()))
+    }
 }
