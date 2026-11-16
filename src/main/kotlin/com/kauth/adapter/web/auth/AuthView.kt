@@ -1134,6 +1134,26 @@ object AuthView {
      * Shown when a magic-link consumption fails — expired, used, revoked, or
      * the user has a pending `CHANGE_PASSWORD` required action.
      */
+    /** GET /authorize refusal. Deliberately links nowhere: the only place to send the person is untrusted. */
+    fun authorizeErrorPage(
+        ctx: ViewContext,
+        messageKey: String,
+        developerDetail: String,
+    ): HTML.() -> Unit =
+        {
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_AUTHORIZE_ERROR", ctx.workspaceName), ctx.theme) }
+            body {
+                demoBanner()
+                authShell(ctx.workspaceName, ctx.theme) {
+                    div("card") {
+                        h1("card-title") { +ctx.t("AUTHORIZE_ERROR_TITLE") }
+                        div("alert alert-error") { +ctx.t(messageKey, ctx.workspaceName) }
+                        p("card-subtitle") { +ctx.t("AUTHORIZE_ERROR_DETAIL", developerDetail) }
+                    }
+                }
+            }
+        }
+
     fun magicLinkErrorPage(
         tenantSlug: String,
         ctx: ViewContext,

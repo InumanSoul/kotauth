@@ -104,15 +104,31 @@ class OAuthService(
         tenantSlug: String,
         clientId: String,
         redirectUri: String,
-    ): Boolean {
-        val tenant = tenantRepository.findBySlug(tenantSlug) ?: return false
-        val client = applicationRepository.findByClientId(tenant.id, clientId) ?: return false
-        if (!client.enabled) return false
-        return RedirectUriMatcher.matches(
-            client.redirectUris,
-            redirectUri,
-            allowAnyLoopbackPort = client.accessType == AccessType.PUBLIC,
-        )
+    ): Boolean = checkAuthorizeTarget(tenantSlug, clientId, redirectUri) == AuthorizeTarget.TRUSTED
+
+    /** Why a (clientId, redirectUri) pair is or is not safe to continue an authorization request with. */
+    enum class AuthorizeTarget { TRUSTED, UNKNOWN_CLIENT, DISABLED_CLIENT, UNREGISTERED_REDIRECT_URI }
+
+    /**
+     * [validateRedirectUri] with the reason, so GET /authorize can tell the user which part of the
+     * link is wrong. An unknown tenant counts as an unknown client.
+     */
+    fun checkAuthorizeTarget(
+        tenantSlug: String,
+        clientId: String,
+        redirectUri: String,
+    ): AuthorizeTarget {
+        val tenant = tenantRepository.findBySlug(tenantSlug) ?: return AuthorizeTarget.UNKNOWN_CLIENT
+        val client =
+            applicationRepository.findByClientId(tenant.id, clientId) ?: return AuthorizeTarget.UNKNOWN_CLIENT
+        if (!client.enabled) return AuthorizeTarget.DISABLED_CLIENT
+        val registered =
+            RedirectUriMatcher.matches(
+                client.redirectUris,
+                redirectUri,
+                allowAnyLoopbackPort = client.accessType == AccessType.PUBLIC,
+            )
+        return if (registered) AuthorizeTarget.TRUSTED else AuthorizeTarget.UNREGISTERED_REDIRECT_URI
     }
 
     /**

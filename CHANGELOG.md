@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`GET /authorize` rendered the real sign-in page for a request it could only refuse.** An
+  unregistered `redirect_uri`, an unknown `client_id` or a disabled client was only refused when
+  the form was submitted, so no code leaked. But a user could still type a password into a flow
+  that was going to fail, and a phishing link showed the genuine sign-in page. The request is now
+  refused up front, as RFC 6749 §3.1.2.4 and §4.1.2.1 require: a 400 page that tells the user
+  sign-in was stopped and why, with no redirect and no auth-context cookie. The page also shows the
+  OAuth error for the application's developer. `prompt=none` keeps its JSON 400, and the loopback
+  rule for public clients (ADR-22) is unchanged. `OAuthService.checkAuthorizeTarget` says which of
+  the three cases applies.
+
 ### Fixed
 
 - **An imported workspace could not issue tokens until the server restarted.** A backup exported
@@ -55,6 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The export summary reported `resourceServers: 0`.** The bundle carried them and import restored
   them; only the count in the export response was missing. `BackupCounts` no longer defaults any
   count, so a missing one fails to compile. Closes #175.
+
+- **Repointing the admin console client reset its audience and launcher tile.** When
+  `KAUTH_BASE_URL` changed, startup corrected the `kotauth-admin` redirect URI through a
+  full-replace update that passed only the grants through, so a configured audience, launcher URL,
+  icon, visibility and order fell back to their defaults. Every field but the redirect URI is now
+  carried over.
 
 ---
 

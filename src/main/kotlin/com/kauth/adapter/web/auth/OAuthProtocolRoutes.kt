@@ -297,26 +297,13 @@ internal fun Route.oauthProtocolRoutes(
         val isSilentOnly = "none" in promptValues
         val forceReauth = promptValues.any { it == "login" || it == "consent" || it == "select_account" }
 
-        // Open-redirect guard for any flow that may issue a redirect-uri-based response
-        // (silent auth success, prompt=none failure). The validation must happen before
-        // we ever build a redirect string from `redirectUri` query data.
-        val redirectUriTrusted = oauthService.validateRedirectUri(slug, clientId, redirectUri)
-        if (isSilentOnly && !redirectUriTrusted) {
-            call.respond(
-                HttpStatusCode.BadRequest,
-                mapOf(
-                    "error" to "invalid_request",
-                    "error_description" to "Invalid redirect_uri for client",
-                ),
-            )
-            return@get
-        }
-
-        // RFC 6749 §4.1.2.1: refuse a client that isn't registered for authorization_code
-        // before the login page is ever rendered, instead of collecting the user's password
-        // and MFA only to fail at code issuance.
-        if (!oauthService.clientHasGrant(slug, clientId, GrantType.AUTHORIZATION_CODE)) {
-            if (!redirectUriTrusted) {
+        // RFC 6749 §3.1.2.4 / §4.1.2.1: an unknown or disabled client, or a redirect_uri the client
+        // never registered, is reported to the user and never redirected to. Refusing here, before
+        // any redirect is built and before the login page or its auth-context cookie, also keeps a
+        // phishing link from showing the real sign-in page for a flow that can only fail.
+        val target = oauthService.checkAuthorizeTarget(slug, clientId, redirectUri)
+        if (target != OAuthService.AuthorizeTarget.TRUSTED) {
+            if (isSilentOnly) {
                 call.respond(
                     HttpStatusCode.BadRequest,
                     mapOf(
@@ -326,6 +313,12 @@ internal fun Route.oauthProtocolRoutes(
                 )
                 return@get
             }
+            return@get call.respondAuthorizeRefusal(target, ctx)
+        }
+
+        // Refuse a client that isn't registered for authorization_code before the login page is
+        // ever rendered, instead of collecting the user's password and MFA only to fail at code issuance.
+        if (!oauthService.clientHasGrant(slug, clientId, GrantType.AUTHORIZATION_CODE)) {
             call.respondRedirect(
                 buildString {
                     append(redirectUri)
@@ -351,16 +344,6 @@ internal fun Route.oauthProtocolRoutes(
                 OAuthService.AudienceResolution.Ok(emptyList())
             }
         if (audienceResolution is OAuthService.AudienceResolution.Failed) {
-            if (!redirectUriTrusted) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf(
-                        "error" to "invalid_request",
-                        "error_description" to "Invalid redirect_uri for client",
-                    ),
-                )
-                return@get
-            }
             call.respondRedirect(
                 buildString {
                     append(redirectUri)
@@ -391,7 +374,7 @@ internal fun Route.oauthProtocolRoutes(
         // the SSO witness cookie and, if it still matches all the RP's hints
         // (max_age, id_token_hint, current MFA policy), issue an authorization
         // code and bounce back to the redirect_uri without showing UI.
-        if (!forceReauth && redirectUriTrusted) {
+        if (!forceReauth) {
             val sso = call.getSsoCookie(encryptionService)
             if (sso != null && sso.tenantId == tenant.id.value) {
                 val maxAge = q["max_age"]?.toLongOrNull()
@@ -944,3 +927,21 @@ private fun effectivePort(u: java.net.URI): Int =
     } else {
         80
     }
+
+private suspend fun io.ktor.server.application.ApplicationCall.respondAuthorizeRefusal(
+    target: OAuthService.AuthorizeTarget,
+    ctx: AuthTenantContext,
+) {
+    val (messageKey, detail) =
+        when (target) {
+            OAuthService.AuthorizeTarget.UNKNOWN_CLIENT ->
+                "AUTHORIZE_ERROR_UNKNOWN_CLIENT" to "invalid_client (unknown client_id)"
+            OAuthService.AuthorizeTarget.DISABLED_CLIENT ->
+                "AUTHORIZE_ERROR_DISABLED_CLIENT" to "invalid_client (client is disabled)"
+            OAuthService.AuthorizeTarget.UNREGISTERED_REDIRECT_URI ->
+                "AUTHORIZE_ERROR_UNREGISTERED_REDIRECT_URI" to
+                    "invalid_request (redirect_uri is not registered for this client)"
+            OAuthService.AuthorizeTarget.TRUSTED -> error("a trusted target is not refused")
+        }
+    respondHtml(HttpStatusCode.BadRequest, AuthView.authorizeErrorPage(ctx.viewContext, messageKey, detail))
+}

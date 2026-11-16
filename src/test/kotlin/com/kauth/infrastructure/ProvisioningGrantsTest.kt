@@ -48,6 +48,36 @@ class ProvisioningGrantsTest {
     }
 
     @Test
+    fun `correcting redirect URI drift keeps the admin client's audience and launcher settings`() {
+        provisioning(baseUrl = "https://old.example.com").provision()
+        val master = tenantRepo.findBySlug(Tenant.MASTER_SLUG)!!
+        val before = applicationRepo.findByClientId(master.id, AdminClientProvisioning.ADMIN_CLIENT_ID)!!
+        applicationRepo.update(
+            appId = before.id,
+            name = before.name,
+            description = before.description,
+            accessType = before.accessType.value,
+            redirectUris = before.redirectUris,
+            grantTypes = before.grantTypes,
+            launcherUrl = "https://old.example.com/admin",
+            iconUrl = "https://old.example.com/icon.png",
+            launcherVisible = false,
+            launcherDisplayOrder = 3,
+            audience = "https://api.example.com",
+        )
+
+        provisioning(baseUrl = "https://new.example.com").provision()
+
+        val after = applicationRepo.findByClientId(master.id, AdminClientProvisioning.ADMIN_CLIENT_ID)!!
+        assertEquals(listOf("https://new.example.com/admin/callback"), after.redirectUris)
+        assertEquals("https://api.example.com", after.audience)
+        assertEquals("https://old.example.com/admin", after.launcherUrl)
+        assertEquals("https://old.example.com/icon.png", after.iconUrl)
+        assertEquals(false, after.launcherVisible)
+        assertEquals(3, after.launcherDisplayOrder)
+    }
+
+    @Test
     fun `correcting redirect URI drift preserves the existing grants`() {
         provisioning(baseUrl = "https://old.example.com").provision()
 

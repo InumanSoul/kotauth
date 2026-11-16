@@ -54,8 +54,8 @@ class AdminClientProvisioning(
                 audience = null,
             )
         } else if (adminClient.redirectUris != listOf(callbackUri)) {
-            // Preserve the client's existing grants — an operator may have deliberately
-            // narrowed them, and recomputing from access type would silently widen them back.
+            // update() is a full replace, so everything but the URI is passed through: an operator
+            // may have narrowed the grants or set an audience or launcher tile.
             applicationRepository.update(
                 appId = adminClient.id,
                 name = adminClient.name,
@@ -63,6 +63,11 @@ class AdminClientProvisioning(
                 accessType = adminClient.accessType.value,
                 redirectUris = listOf(callbackUri),
                 grantTypes = adminClient.grantTypes,
+                launcherUrl = adminClient.launcherUrl,
+                iconUrl = adminClient.iconUrl,
+                launcherVisible = adminClient.launcherVisible,
+                launcherDisplayOrder = adminClient.launcherDisplayOrder,
+                audience = adminClient.audience,
             )
         }
     }
