@@ -50,13 +50,7 @@ object ImportTenantCommand {
         val envelope = Files.readString(envelopePath)
 
         val config = EnvironmentConfig.load()
-        DatabaseFactory.init(
-            url = config.dbUrl,
-            user = config.dbUser,
-            password = config.dbPassword,
-            poolMaxSize = 2,
-            poolMinIdle = 1,
-        )
+        DatabaseFactory.init(config, poolMaxSize = 2, poolMinIdle = 1)
         val schemaHead = FlywaySchemaHead.read(toDbConfig(config))
         val services = ServiceGraph.create(config)
 
@@ -91,16 +85,14 @@ object ImportTenantCommand {
                 println(
                     "  users=${s.users} apps=${s.applications} roles=${s.roles} groups=${s.groups} " +
                         "claimMappers=${s.claimMappers} socialProviders=${s.socialProviders} " +
-                        "signingKeys=${s.signingKeys} auditEvents=${s.auditEvents}",
+                        "resourceServers=${s.resourceServers} signingKeys=${s.signingKeys} " +
+                        "auditEvents=${s.auditEvents}",
                 )
                 println()
                 println("Re-enrollment notes:")
                 export.manifest.notes.forEach { println("  - $it") }
                 if (export.signingKeys == null) {
-                    println(
-                        "  - No signing keys were exported. The next server start will provision a fresh RSA " +
-                            "key pair for this tenant via KeyProvisioningService.",
-                    )
+                    println("  - No signing keys were exported. A fresh RSA key pair was provisioned for this tenant.")
                 }
                 exitProcess(0)
             }

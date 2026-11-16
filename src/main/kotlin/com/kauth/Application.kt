@@ -79,15 +79,7 @@ fun main(args: Array<String> = emptyArray()) {
     val appInfo = loadAppInfo()
     val config = EnvironmentConfig.load()
 
-    DatabaseFactory.init(
-        url = config.dbUrl,
-        user = config.dbUser,
-        password = config.dbPassword,
-        poolMaxSize = config.dbPoolMaxSize,
-        poolMinIdle = config.dbPoolMinIdle,
-        bootstrapAdminPassword = config.bootstrapAdminPassword,
-        isDemoMode = config.isDemoMode,
-    )
+    DatabaseFactory.init(config)
 
     val services = ServiceGraph.create(config)
 

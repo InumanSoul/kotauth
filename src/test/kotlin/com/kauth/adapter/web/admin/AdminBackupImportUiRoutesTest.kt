@@ -1,10 +1,14 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.plugin.requestBodySizeLimitPlugin
+import com.kauth.domain.model.BackupExportV1
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
+import com.kauth.domain.service.BackupResult
+import com.kauth.domain.service.ExportOptions
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeGroupRepository
 import com.kauth.fakes.FakeIdentityProviderRepository
@@ -18,7 +22,10 @@ import com.kauth.fakes.FakeThemeRepository
 import com.kauth.fakes.FakeTransactionRunner
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.Pbkdf2AesGcmBackupEncryption
+import com.kauth.infrastructure.PortalClientProvisioning
+import com.kauth.infrastructure.TenantProvisioner
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
@@ -43,10 +50,12 @@ import io.ktor.server.sessions.cookie
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.json.Json
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 
 /**
  * Regression coverage for the defect where an oversized multipart upload on the browser-based
@@ -68,6 +77,7 @@ class AdminBackupImportUiRoutesTest {
     private val attrs = FakeUserAttributeRepository()
     private val auditPort = FakeAuditLogPort()
     private val txRunner = FakeTransactionRunner()
+    private val appRepo = com.kauth.fakes.FakeApplicationRepository()
     private val crypto = Pbkdf2AesGcmBackupEncryption()
 
     private val acme =
@@ -147,6 +157,61 @@ class AdminBackupImportUiRoutesTest {
             assertFalse(response.status == HttpStatusCode.PayloadTooLarge)
         }
 
+    @Test
+    fun `a console import of a backup without signing keys leaves the tenant able to sign tokens`() =
+        testApplication {
+            application { installTestApp(maxImportBodyBytes = TEST_IMPORT_MAX_BYTES) }
+            val client =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(client)
+
+            val response =
+                client.post("/admin/workspaces/import") {
+                    setBody(
+                        MultiPartFormDataContent(
+                            formData {
+                                append(
+                                    "envelope",
+                                    acmeEnvelopeWithoutKeys().toByteArray(),
+                                    Headers.build {
+                                        append(HttpHeaders.ContentDisposition, "filename=\"backup.enc\"")
+                                    },
+                                )
+                                append("passphrase", PASSPHRASE)
+                                append("newSlug", "acme-staging")
+                            },
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val imported = assertNotNull(tenantRepo.findBySlug("acme-staging"))
+            assertEquals(1, tenantKeys.findAllKeys(imported.id).size)
+            assertNotNull(tenantKeys.findActiveKey(imported.id))
+        }
+
+    private fun acmeEnvelopeWithoutKeys(): String {
+        val export =
+            BackupExporterService(
+                tenantRepository = tenantRepo,
+                userRepository = userRepo,
+                applicationRepository = appRepo,
+                roleRepository = roleRepo,
+                groupRepository = groupRepo,
+                claimMapperRepository = claimMappers,
+                identityProviderRepository = idps,
+                tenantKeyRepository = tenantKeys,
+                userAttributeRepository = attrs,
+                auditLogRepository = null,
+            ).export("acme", ExportOptions(), kotauthVersion = "test", currentSchemaVersion = 38)
+        val plaintext =
+            Json.encodeToString(BackupExportV1.serializer(), (export as BackupResult.Success).value)
+        return crypto.encrypt(plaintext, PASSPHRASE.toCharArray())
+    }
+
     private suspend fun login(client: io.ktor.client.HttpClient) {
         client.submitForm(url = "/test-admin-login", formParameters = Parameters.build { })
     }
@@ -178,7 +243,7 @@ class AdminBackupImportUiRoutesTest {
                         BackupImporterService(
                             tenantRepository = tenantRepo,
                             userRepository = userRepo,
-                            applicationRepository = com.kauth.fakes.FakeApplicationRepository(),
+                            applicationRepository = appRepo,
                             roleRepository = roleRepo,
                             groupRepository = groupRepo,
                             claimMapperRepository = claimMappers,
@@ -190,6 +255,11 @@ class AdminBackupImportUiRoutesTest {
                             emailBrandingRepository = FakeTenantEmailBrandingRepository(),
                             auditLogPort = auditPort,
                             transactionRunner = txRunner,
+                            tenantProvisioning =
+                                TenantProvisioner(
+                                    KeyProvisioningService(tenantRepo, tenantKeys),
+                                    PortalClientProvisioning(tenantRepo, appRepo, baseUrl = "https://auth.example"),
+                                ),
                         ),
                     backupEncryptionPort = crypto,
                     currentSchemaVersion = 38,
@@ -202,3 +272,4 @@ class AdminBackupImportUiRoutesTest {
 
 private const val TEST_GLOBAL_MAX_BYTES = 4_096L
 private const val TEST_IMPORT_MAX_BYTES = 50_000L
+private const val PASSPHRASE = "this-is-a-strong-passphrase"

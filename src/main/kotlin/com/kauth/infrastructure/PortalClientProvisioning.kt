@@ -1,6 +1,7 @@
 package com.kauth.infrastructure
 
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.TenantRepository
 
@@ -26,48 +27,52 @@ class PortalClientProvisioning(
     }
 
     /**
-     * For each non-master tenant, find the portal client and ensure its
-     * redirect URI is set to "{baseUrl}/t/{slug}/account/callback".
-     *
-     * Skips tenants whose portal client row is missing (should not happen
-     * after V15 runs, but we guard defensively).
+     * For each non-master tenant, ensure the portal client exists and its
+     * redirect URI is "{baseUrl}/t/{slug}/account/callback".
      */
     fun provisionRedirectUris() {
-        val tenants = tenantRepository.findAll()
-        for (tenant in tenants) {
-            if (tenant.isMaster) continue
+        tenantRepository.findAll().forEach(::provisionForTenant)
+    }
 
-            val callbackUri = "$baseUrl/t/${tenant.slug}/account/callback"
-            val portalClient = applicationRepository.findByClientId(tenant.id, PORTAL_CLIENT_ID)
+    /** Single-tenant variant of [provisionRedirectUris]; master has no portal client. */
+    fun provisionForTenant(tenant: Tenant) {
+        if (tenant.isMaster) return
 
-            if (portalClient == null) {
-                // Workspace was created after V15 ran — the migration only seeds existing
-                // tenants, so new tenants have no portal client row yet. Create it now
-                // with the correct redirect URI already set.
-                applicationRepository.create(
-                    tenantId = tenant.id,
-                    clientId = PORTAL_CLIENT_ID,
-                    name = "KotAuth Self-Service Portal",
-                    description = "Built-in client for the tenant self-service portal (profile, password, MFA)",
-                    accessType = "public",
-                    redirectUris = listOf(callbackUri),
-                    grantTypes = setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN),
-                    clientSecretHash = null,
-                    audience = null,
-                )
-            } else if (portalClient.redirectUris != listOf(callbackUri)) {
-                // Only update when the URI has actually changed to avoid unnecessary writes.
-                // Grants are passed through unchanged — an operator may have deliberately
-                // narrowed them, and recomputing from access type would silently widen them back.
-                applicationRepository.update(
-                    appId = portalClient.id,
-                    name = portalClient.name,
-                    description = portalClient.description,
-                    accessType = portalClient.accessType.value,
-                    redirectUris = listOf(callbackUri),
-                    grantTypes = portalClient.grantTypes,
-                )
-            }
+        val callbackUri = "$baseUrl/t/${tenant.slug}/account/callback"
+        val portalClient = applicationRepository.findByClientId(tenant.id, PORTAL_CLIENT_ID)
+
+        if (portalClient == null) {
+            // Workspace was created after V15 ran — the migration only seeds existing
+            // tenants, so new tenants have no portal client row yet. Create it now
+            // with the correct redirect URI already set.
+            applicationRepository.create(
+                tenantId = tenant.id,
+                clientId = PORTAL_CLIENT_ID,
+                name = "KotAuth Self-Service Portal",
+                description = "Built-in client for the tenant self-service portal (profile, password, MFA)",
+                accessType = "public",
+                redirectUris = listOf(callbackUri),
+                grantTypes = setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN),
+                clientSecretHash = null,
+                audience = null,
+            )
+        } else if (portalClient.redirectUris != listOf(callbackUri)) {
+            // Only update when the URI has actually changed to avoid unnecessary writes. update() is a
+            // full replace, so everything but the URI is passed through: an operator may have narrowed
+            // the grants or set an audience or launcher tile, and a backup restores them.
+            applicationRepository.update(
+                appId = portalClient.id,
+                name = portalClient.name,
+                description = portalClient.description,
+                accessType = portalClient.accessType.value,
+                redirectUris = listOf(callbackUri),
+                grantTypes = portalClient.grantTypes,
+                launcherUrl = portalClient.launcherUrl,
+                iconUrl = portalClient.iconUrl,
+                launcherVisible = portalClient.launcherVisible,
+                launcherDisplayOrder = portalClient.launcherDisplayOrder,
+                audience = portalClient.audience,
+            )
         }
     }
 }
