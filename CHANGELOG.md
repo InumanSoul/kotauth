@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cli import-tenant`), because the step lives in the importer rather than in each caller. A backup
   that carries its own active key keeps exactly that key. Closes #174.
 
+- **Repointing the portal client reset its audience and launcher tile.** The redirect-URI correction
+  (at startup, and now after every import) rewrote the client through a full-replace update that
+  passed only the grants through, so a restored audience, launcher URL, icon, visibility and order
+  fell back to their defaults. Every field but the redirect URI is now carried over.
+
 - **`cli import-tenant` and `cli export-tenant` ignored `KAUTH_BOOTSTRAP_ADMIN_PASSWORD`.** On an
   empty database the first command to run applies the migrations and seeds the master `admin`. The
   CLI did that with a generated password, so a deployment that imports before the server's first

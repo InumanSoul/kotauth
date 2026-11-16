@@ -1,5 +1,6 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantKey
 import com.kauth.fakes.FakeApplicationRepository
@@ -71,6 +72,47 @@ class TenantProvisionerTest {
         val portalClients =
             apps.findByTenantId(tenant.id).filter { it.clientId == PortalClientProvisioning.PORTAL_CLIENT_ID }
         assertEquals(1, portalClients.size)
+    }
+
+    @Test
+    fun `repointing an imported portal client keeps its audience and launcher settings`() {
+        val tenant = tenants.create(slug = "acme", displayName = "Acme", issuerUrl = null)
+        val imported =
+            apps.create(
+                tenantId = tenant.id,
+                clientId = PortalClientProvisioning.PORTAL_CLIENT_ID,
+                name = "Portal",
+                description = null,
+                accessType = "public",
+                redirectUris = listOf("https://old-host.example/t/source/account/callback"),
+                grantTypes = setOf(GrantType.AUTHORIZATION_CODE),
+                clientSecretHash = null,
+                audience = "https://api.acme.example",
+            )
+        apps.update(
+            appId = imported.id,
+            name = imported.name,
+            description = imported.description,
+            accessType = imported.accessType.value,
+            redirectUris = imported.redirectUris,
+            grantTypes = imported.grantTypes,
+            launcherUrl = "https://acme.example/account",
+            iconUrl = "https://acme.example/icon.png",
+            launcherVisible = false,
+            launcherDisplayOrder = 7,
+            audience = "https://api.acme.example",
+        )
+
+        provisioner.provision(tenant)
+
+        val portal = assertNotNull(apps.findByClientId(tenant.id, PortalClientProvisioning.PORTAL_CLIENT_ID))
+        assertEquals(listOf("https://auth.example/t/acme/account/callback"), portal.redirectUris)
+        assertEquals("https://api.acme.example", portal.audience)
+        assertEquals("https://acme.example/account", portal.launcherUrl)
+        assertEquals("https://acme.example/icon.png", portal.iconUrl)
+        assertEquals(false, portal.launcherVisible)
+        assertEquals(7, portal.launcherDisplayOrder)
+        assertEquals(setOf(GrantType.AUTHORIZATION_CODE), portal.grantTypes)
     }
 
     @Test

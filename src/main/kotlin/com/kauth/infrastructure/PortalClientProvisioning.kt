@@ -57,9 +57,9 @@ class PortalClientProvisioning(
                 audience = null,
             )
         } else if (portalClient.redirectUris != listOf(callbackUri)) {
-            // Only update when the URI has actually changed to avoid unnecessary writes.
-            // Grants are passed through unchanged — an operator may have deliberately
-            // narrowed them, and recomputing from access type would silently widen them back.
+            // Only update when the URI has actually changed to avoid unnecessary writes. update() is a
+            // full replace, so everything but the URI is passed through: an operator may have narrowed
+            // the grants or set an audience or launcher tile, and a backup restores them.
             applicationRepository.update(
                 appId = portalClient.id,
                 name = portalClient.name,
@@ -67,6 +67,11 @@ class PortalClientProvisioning(
                 accessType = portalClient.accessType.value,
                 redirectUris = listOf(callbackUri),
                 grantTypes = portalClient.grantTypes,
+                launcherUrl = portalClient.launcherUrl,
+                iconUrl = portalClient.iconUrl,
+                launcherVisible = portalClient.launcherVisible,
+                launcherDisplayOrder = portalClient.launcherDisplayOrder,
+                audience = portalClient.audience,
             )
         }
     }
