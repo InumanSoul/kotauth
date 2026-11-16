@@ -665,6 +665,21 @@ object EnglishStrings {
 
     // Magic-link error page
     const val MAGIC_LINK_ERROR_TITLE = "Sign-in link unavailable"
+
+    // GET /authorize refused before the login page: the link that started sign-in is not trustworthy
+    const val AUTH_PAGE_TITLE_AUTHORIZE_ERROR = "{0} | Sign-in stopped"
+    const val AUTHORIZE_ERROR_TITLE = "Sign-in stopped"
+    const val AUTHORIZE_ERROR_UNKNOWN_CLIENT =
+        "The application that sent you here is not registered with {0}. Do not enter your password. " +
+            "Go back to the application and try again, or contact its support."
+    const val AUTHORIZE_ERROR_DISABLED_CLIENT =
+        "The application that sent you here has been disabled in {0}, so you cannot sign in to it " +
+            "right now. Contact its support."
+    const val AUTHORIZE_ERROR_UNREGISTERED_REDIRECT_URI =
+        "The application that sent you here asked to return you to an address it has not registered " +
+            "with {0}. Sign-in has been stopped so your account is not handed to an unknown site. " +
+            "Do not enter your password."
+    const val AUTHORIZE_ERROR_DETAIL = "Error for the application developer: {0}"
     const val MAGIC_LINK_REQUEST_NEW = "Request a new link"
 
     // Email-OTP login pages (v1.13.0 — hosted browser flow)

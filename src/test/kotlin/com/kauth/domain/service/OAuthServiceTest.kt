@@ -30,6 +30,7 @@ import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -159,6 +160,36 @@ class OAuthServiceTest {
             )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.TenantNotFound>(result.error)
+    }
+
+    @Test
+    fun `checkAuthorizeTarget names why a client and redirect_uri pair is not trusted`() {
+        assertEquals(
+            OAuthService.AuthorizeTarget.TRUSTED,
+            svc.checkAuthorizeTarget("acme", "spa-app", "https://app.example.com/callback"),
+        )
+        assertEquals(
+            OAuthService.AuthorizeTarget.UNREGISTERED_REDIRECT_URI,
+            svc.checkAuthorizeTarget("acme", "spa-app", "https://evil.example/cb"),
+        )
+        assertEquals(
+            OAuthService.AuthorizeTarget.UNKNOWN_CLIENT,
+            svc.checkAuthorizeTarget("acme", "ghost-app", "https://app.example.com/callback"),
+        )
+        assertEquals(
+            OAuthService.AuthorizeTarget.UNKNOWN_CLIENT,
+            svc.checkAuthorizeTarget("no-such-tenant", "spa-app", "https://app.example.com/callback"),
+        )
+    }
+
+    @Test
+    fun `checkAuthorizeTarget reports a disabled client as disabled, even with a registered redirect_uri`() {
+        apps.add(publicClient.copy(id = ApplicationId(99), clientId = "retired-app", enabled = false))
+        assertEquals(
+            OAuthService.AuthorizeTarget.DISABLED_CLIENT,
+            svc.checkAuthorizeTarget("acme", "retired-app", "https://app.example.com/callback"),
+        )
+        assertFalse(svc.validateRedirectUri("acme", "retired-app", "https://app.example.com/callback"))
     }
 
     @Test
