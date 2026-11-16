@@ -114,12 +114,12 @@ Use this to connect to an external or managed database, or when you need to appe
 DB_URL=jdbc:postgresql://your-host:5432/kotauth_db?sslmode=require
 ```
 
-When `DB_URL` is not set, the compose stack constructs the URL automatically from `DB_HOST`, `DB_PORT`, and `DB_NAME` (see below). Kotauth runs Flyway migrations on startup — the schema is created automatically.
+When `DB_URL` is not set (or is blank), Kotauth builds `jdbc:postgresql://DB_HOST:DB_PORT/DB_NAME` from the parts below, each falling back to its own default. A `DB_PORT` that is not a number between 1 and 65535 stops startup. Kotauth runs Flyway migrations on startup — the schema is created automatically.
 
 ---
 
 ### `DB_HOST`
-**Optional.** Default (in Docker Compose): `db`
+**Optional.** Default: `localhost` (`db` in the bundled compose files)
 
 Hostname of the PostgreSQL server. Used to construct `DB_URL` when `DB_URL` is not explicitly set.
 
@@ -147,7 +147,7 @@ Common non-default ports: `6432` (PgBouncer), `5433` (non-standard local instanc
 ---
 
 ### `DB_NAME`
-**Optional.** Default (in Docker Compose): `kotauth_db`
+**Optional.** Default: `kauth_db` (`kotauth_db` in the bundled compose files)
 
 Database name. Used to construct `DB_URL` when `DB_URL` is not explicitly set, and to initialize the bundled `db` service.
 

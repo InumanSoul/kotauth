@@ -423,7 +423,15 @@ fun Route.adminRoutes(
                         registrationEnabled = params["registrationEnabled"] == "true",
                         emailVerificationRequired = params["emailVerificationRequired"] == "true",
                     )
-                when (val result = workspaceSettingsService.createWorkspace(slug, displayName, issuerUrl)) {
+                val created =
+                    workspaceSettingsService.createWorkspace(
+                        slug = slug,
+                        displayName = displayName,
+                        issuerUrl = issuerUrl,
+                        registrationEnabled = prefill.registrationEnabled,
+                        emailVerificationRequired = prefill.emailVerificationRequired,
+                    )
+                when (val result = created) {
                     is AdminResult.Failure -> {
                         val wsPairs =
                             tenantRepository.findAll().map {

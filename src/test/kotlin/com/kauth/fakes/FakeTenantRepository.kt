@@ -38,8 +38,18 @@ class FakeTenantRepository : TenantRepository {
         slug: String,
         displayName: String,
         issuerUrl: String?,
+        registrationEnabled: Boolean,
+        emailVerificationRequired: Boolean,
     ): Tenant {
-        val t = Tenant(id = TenantId(nextId++), slug = slug, displayName = displayName, issuerUrl = issuerUrl)
+        val t =
+            Tenant(
+                id = TenantId(nextId++),
+                slug = slug,
+                displayName = displayName,
+                issuerUrl = issuerUrl,
+                registrationEnabled = registrationEnabled,
+                emailVerificationRequired = emailVerificationRequired,
+            )
         store[t.id.value] = t
         return t
     }

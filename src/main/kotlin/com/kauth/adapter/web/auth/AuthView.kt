@@ -353,6 +353,26 @@ object AuthView {
     // Registration page
     // -------------------------------------------------------------------------
 
+    fun registrationClosedPage(
+        tenantSlug: String,
+        ctx: ViewContext,
+    ): HTML.() -> Unit =
+        {
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_REGISTER", ctx.workspaceName), ctx.theme) }
+            body {
+                demoBanner()
+                authShell(ctx.workspaceName, ctx.theme) {
+                    div("card") {
+                        h1("card-title") { +ctx.t("REGISTER_CLOSED_TITLE") }
+                        p("card-subtitle") { +ctx.t("REGISTER_CLOSED_BODY", ctx.workspaceName) }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
+                        }
+                    }
+                }
+            }
+        }
+
     fun registerPage(
         tenantSlug: String,
         ctx: ViewContext,

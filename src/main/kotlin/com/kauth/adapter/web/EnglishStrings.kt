@@ -619,6 +619,8 @@ object EnglishStrings {
 
     // Registration page
     const val REGISTER_TITLE = "Create account"
+    const val REGISTER_CLOSED_TITLE = "Registration is closed"
+    const val REGISTER_CLOSED_BODY = "{0} does not accept new sign-ups. If you already have an account, sign in."
     const val REGISTER_SUBTITLE = "Fill in your details to get started"
     const val REGISTER_PASSWORDLESS_SUBTITLE = "Fill in your details and we'll email you a sign-in link to finish."
     const val REGISTER_FULL_NAME = "Full Name"

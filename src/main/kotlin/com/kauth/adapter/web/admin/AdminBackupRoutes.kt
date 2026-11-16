@@ -162,6 +162,7 @@ fun Route.adminBackupRoutes(
                                 groups = export.groups.size,
                                 claimMappers = export.claimMappers.size,
                                 socialProviders = export.socialProviders.size,
+                                resourceServers = export.resourceServers.size,
                                 signingKeys = export.signingKeys?.size ?: 0,
                                 auditEvents = export.auditLog?.size ?: 0,
                             ),
@@ -433,7 +434,7 @@ data class BackupCounts(
     val groups: Int,
     val claimMappers: Int,
     val socialProviders: Int,
-    val resourceServers: Int = 0,
+    val resourceServers: Int,
     val signingKeys: Int,
     val auditEvents: Int,
 )
