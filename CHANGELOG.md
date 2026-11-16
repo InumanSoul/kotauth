@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Create a workspace over the API: `POST /admin/api/v1/tenants`.** It needs a master API key
+  with the new `tenants:write` scope, which a `KAUTH_BOOTSTRAP_API_KEYS` entry on `master` can
+  hold. A deployment can now be provisioned from configuration alone, with no console session and
+  no committed backup. The workspace is created through the same `WorkspaceCreationService` as the
+  console, in one transaction, and comes back with an active signing key, the portal client and the
+  `admin` and `user` roles, so discovery, JWKS and tokens work without a restart. An existing slug
+  answers `409`, so a provisioning script can repeat the call safely. See
+  [Provisioning workspaces without the console](docs/operations/provisioning.md). Closes #172 and
+  #126.
+
+### Changed
+
+- **Console create-workspace runs inside one transaction.** It used to create the workspace, then
+  provision its key and portal client, then create the `admin` and `user` roles, as separate
+  writes, and it ignored a failure to create a role. A failure in any step now rolls the whole
+  creation back instead of leaving a workspace half set up. Creating a slug that exists is reported
+  as a conflict rather than a validation error.
+
 ### Security
 
 - **`GET /authorize` rendered the real sign-in page for a request it could only refuse.** An

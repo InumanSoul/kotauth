@@ -46,7 +46,7 @@ class WorkspaceSettingsService(
             return AdminResult.Failure(AdminError.Validation("Display name is required."))
         }
         if (tenantRepository.existsBySlug(slug)) {
-            return AdminResult.Failure(AdminError.Validation("A workspace with slug '$slug' already exists."))
+            return AdminResult.Failure(AdminError.Conflict("A workspace with slug '$slug' already exists."))
         }
         val tenant =
             tenantRepository.create(slug, displayName, issuerUrl, registrationEnabled, emailVerificationRequired)

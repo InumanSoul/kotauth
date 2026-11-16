@@ -18,6 +18,8 @@ class FakeTenantRepository : TenantRepository {
         val nextIdValue = if (tenant.id.value == 0) nextId++ else tenant.id.value
         val t = if (tenant.id.value == 0) tenant.copy(id = TenantId(nextIdValue)) else tenant
         store[t.id.value] = t
+        // Like a database sequence, never hand out an id a seeded row already holds.
+        nextId = maxOf(nextId, t.id.value + 1)
         return t
     }
 

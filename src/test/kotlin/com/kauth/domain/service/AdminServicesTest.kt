@@ -1429,11 +1429,11 @@ class AdminServicesTest {
     }
 
     @Test
-    fun `createWorkspace - returns Validation failure when slug already exists`() {
+    fun `createWorkspace - returns Conflict when slug already exists`() {
         // "acme" was seeded in @BeforeTest
         val result = wsSvc.createWorkspace(slug = "acme", displayName = "Acme Duplicate", issuerUrl = null)
         assertIs<AdminResult.Failure>(result)
-        assertIs<AdminError.Validation>(result.error)
+        assertIs<AdminError.Conflict>(result.error)
     }
 
     @Test

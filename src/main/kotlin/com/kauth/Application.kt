@@ -7,6 +7,7 @@ import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.WorkspaceStub
 import com.kauth.adapter.web.admin.adminBackupRoutes
 import com.kauth.adapter.web.admin.adminRoutes
+import com.kauth.adapter.web.admin.adminTenantRoutes
 import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.api.respondProblem
 import com.kauth.adapter.web.auth.authRoutes
@@ -528,6 +529,12 @@ fun Application.module(
             maxImportBodyBytes = config.maxBackupImportBodyBytes,
         )
 
+        adminTenantRoutes(
+            apiKeyService = s.apiKeyService,
+            tenantRepository = s.tenantRepository,
+            workspaceCreationService = s.workspaceCreationService,
+        )
+
         adminRoutes(
             accountService = s.accountService,
             workspaceSettingsService = s.workspaceSettingsService,
@@ -542,6 +549,7 @@ fun Application.module(
             auditLogRepository = s.auditLogRepository,
             keyProvisioningService = s.keyProvisioningService,
             mfaRepository = s.mfaRepository,
+            workspaceCreationService = s.workspaceCreationService,
             portalClientProvisioning = s.portalClientProvisioning,
             identityProviderRepository = s.identityProviderRepository,
             identityProviderService = s.identityProviderService,
