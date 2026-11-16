@@ -6,6 +6,7 @@ import com.kauth.adapter.persistence.UserRolesTable
 import com.kauth.adapter.persistence.UsersTable
 import com.kauth.adapter.token.BcryptPasswordHasher
 import com.kauth.config.DbConfig
+import com.kauth.config.EnvironmentConfig
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
@@ -19,6 +20,24 @@ object DatabaseFactory {
         val dataSource = createDataSource(config.dbUrl, config.dbUser, config.dbPassword, 2, 1)
         Database.connect(dataSource)
     }
+
+    /**
+     * Migrates and connects from the full config, so every entry point (server and CLI)
+     * seeds the master admin from the same `KAUTH_BOOTSTRAP_ADMIN_PASSWORD` / demo settings.
+     */
+    fun init(
+        config: EnvironmentConfig,
+        poolMaxSize: Int = config.dbPoolMaxSize,
+        poolMinIdle: Int = config.dbPoolMinIdle,
+    ) = init(
+        url = config.dbUrl,
+        user = config.dbUser,
+        password = config.dbPassword,
+        poolMaxSize = poolMaxSize,
+        poolMinIdle = poolMinIdle,
+        bootstrapAdminPassword = config.bootstrapAdminPassword,
+        isDemoMode = config.isDemoMode,
+    )
 
     fun init(
         url: String,

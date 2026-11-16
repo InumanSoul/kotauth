@@ -110,6 +110,7 @@ import com.kauth.infrastructure.KeyEncryptionMigration
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.Pbkdf2AesGcmBackupEncryption
 import com.kauth.infrastructure.PortalClientProvisioning
+import com.kauth.infrastructure.TenantProvisioner
 import com.kauth.infrastructure.redis.RedisClientFactory
 import com.kauth.infrastructure.redis.RedisClientHolder
 import com.kauth.infrastructure.redis.RedisRateLimiter
@@ -669,6 +670,7 @@ data class ServiceGraph(
                     auditLogPort = auditLogAdapter,
                     transactionRunner = backupTransactionRunner,
                     resourceServerRepository = resourceServerRepository,
+                    tenantProvisioning = TenantProvisioner(keyProvisioning, portalClientProvisioning),
                 )
 
             return ServiceGraph(

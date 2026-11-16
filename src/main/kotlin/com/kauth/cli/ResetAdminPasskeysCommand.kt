@@ -18,13 +18,7 @@ object ResetAdminPasskeysCommand {
         }
 
         val config = EnvironmentConfig.load()
-        DatabaseFactory.init(
-            url = config.dbUrl,
-            user = config.dbUser,
-            password = config.dbPassword,
-            poolMaxSize = 2,
-            poolMinIdle = 1,
-        )
+        DatabaseFactory.init(config, poolMaxSize = 2, poolMinIdle = 1)
 
         val services = ServiceGraph.create(config)
 

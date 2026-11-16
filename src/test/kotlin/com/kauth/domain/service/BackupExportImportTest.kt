@@ -25,6 +25,7 @@ import com.kauth.domain.model.TenantKey
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserAttribute
+import com.kauth.domain.port.TenantProvisioningPort
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuditLogRepository
@@ -107,7 +108,7 @@ class BackupExportImportTest {
             resourceServerRepository = sourceResourceServers,
         )
 
-    private fun importer() =
+    private fun importer(tenantProvisioning: TenantProvisioningPort? = null) =
         BackupImporterService(
             tenantRepository = destTenants,
             userRepository = destUsers,
@@ -124,6 +125,7 @@ class BackupExportImportTest {
             auditLogPort = destAuditPort,
             transactionRunner = txRunner,
             resourceServerRepository = destResourceServers,
+            tenantProvisioning = tenantProvisioning,
         )
 
     @BeforeTest
@@ -723,6 +725,28 @@ class BackupExportImportTest {
         val export = exportSuccessful(ExportOptions()).copy(schemaVersion = 30)
         val r = importer().import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
         assertTrue(r is BackupResult.Success)
+    }
+
+    @Test
+    fun `import hands the new tenant to tenant provisioning`() {
+        val export = exportSuccessful(ExportOptions())
+        val provisioned = mutableListOf<String>()
+
+        val r = importer { provisioned += it.slug }.import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
+
+        assertTrue(r is BackupResult.Success)
+        assertEquals(listOf("acme-staging"), provisioned)
+    }
+
+    @Test
+    fun `a failed import provisions nothing`() {
+        val export = exportSuccessful(ExportOptions())
+        destTenants.add(Tenant(id = TenantId(0), slug = "acme-staging", displayName = "Existing", issuerUrl = null))
+        var calls = 0
+
+        importer { calls++ }.import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
+
+        assertEquals(0, calls)
     }
 
     @Test

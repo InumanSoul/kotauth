@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **An imported workspace could not issue tokens until the server restarted.** A backup exported
+  without its signing keys (the default) was restored with none, and only startup provisioned a
+  key: until a restart its JWKS was empty and the token endpoint answered 500 with "No signing key
+  available for tenant". Import now provisions a fresh RS256 key, and points the built-in
+  `kotauth-portal` client at this deployment's base URL, in the same transaction that creates the
+  workspace. This covers all three import paths (the admin API, the console and
+  `cli import-tenant`), because the step lives in the importer rather than in each caller. A backup
+  that carries its own active key keeps exactly that key. Closes #174.
+
+- **`cli import-tenant` and `cli export-tenant` ignored `KAUTH_BOOTSTRAP_ADMIN_PASSWORD`.** On an
+  empty database the first command to run applies the migrations and seeds the master `admin`. The
+  CLI did that with a generated password, so a deployment that imports before the server's first
+  start never got the password it configured. The CLI commands and the server now seed `admin`
+  through the same config-driven `DatabaseFactory.init`, so demo mode is honoured the same way too.
+
+- **The CLI import summary now includes `resourceServers=`**, matching the REST response.
+
+---
+
 ## [1.26.0] - 2026-09-10
 
 ### Fixed

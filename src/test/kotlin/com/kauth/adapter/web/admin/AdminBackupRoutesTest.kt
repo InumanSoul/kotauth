@@ -32,7 +32,10 @@ import com.kauth.fakes.FakeTransactionRunner
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.ApiKeyPrincipal
+import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.Pbkdf2AesGcmBackupEncryption
+import com.kauth.infrastructure.PortalClientProvisioning
+import com.kauth.infrastructure.TenantProvisioner
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -350,6 +353,9 @@ class AdminBackupRoutesTest {
             val newTenant = tenantRepo.findBySlug("acme-staging")
             assertNotNull(newTenant, "imported tenant must exist on the destination side")
             assertTrue(auditPort.hasEvent(AuditEventType.ADMIN_TENANT_IMPORTED))
+            // The export carried no signing keys; the tenant must be able to sign tokens without a restart.
+            assertEquals(1, tenantKeys.findAllKeys(newTenant.id).size)
+            assertNotNull(tenantKeys.findActiveKey(newTenant.id))
         }
 
     @Test
@@ -454,6 +460,11 @@ class AdminBackupRoutesTest {
                         emailBrandingRepository = FakeTenantEmailBrandingRepository(),
                         auditLogPort = auditPort,
                         transactionRunner = txRunner,
+                        tenantProvisioning =
+                            TenantProvisioner(
+                                KeyProvisioningService(tenantRepo, tenantKeys),
+                                PortalClientProvisioning(tenantRepo, appRepo, baseUrl = "https://auth.example"),
+                            ),
                     ),
                 backupEncryptionPort = crypto,
                 auditLogPort = auditPort,
