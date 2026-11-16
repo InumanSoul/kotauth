@@ -13,7 +13,10 @@ services:
       KAUTH_SECRET_KEY: ${KAUTH_SECRET_KEY:?KAUTH_SECRET_KEY is required (openssl rand -hex 32)}
       KAUTH_DEMO_MODE: ${KAUTH_DEMO_MODE:-false}
       KAUTH_TRUSTED_PROXY: "true"
-      DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/${DB_NAME:-kotauth_db}}
+      DB_URL: ${DB_URL:-}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-kotauth_db}
       DB_USER: ${DB_USER:-kotauth}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       KAUTH_REDIS_URL: ${KAUTH_REDIS_URL:-}

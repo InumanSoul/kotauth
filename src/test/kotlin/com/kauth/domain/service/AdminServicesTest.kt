@@ -31,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -1441,6 +1442,30 @@ class AdminServicesTest {
         assertIs<AdminResult.Success<Tenant>>(result)
         assertEquals("beta-corp", result.value.slug)
         assertEquals("Beta Corp", result.value.displayName)
+    }
+
+    @Test
+    fun `createWorkspace - keeps the previous defaults when the flags are not given`() {
+        val result = wsSvc.createWorkspace(slug = "delta-corp", displayName = "Delta Corp", issuerUrl = null)
+        assertIs<AdminResult.Success<Tenant>>(result)
+        assertTrue(result.value.registrationEnabled)
+        assertFalse(result.value.emailVerificationRequired)
+    }
+
+    @Test
+    fun `createWorkspace - persists the registration and email verification flags it is given`() {
+        val result =
+            wsSvc.createWorkspace(
+                slug = "epsilon-corp",
+                displayName = "Epsilon Corp",
+                issuerUrl = null,
+                registrationEnabled = false,
+                emailVerificationRequired = true,
+            )
+        assertIs<AdminResult.Success<Tenant>>(result)
+        val stored = tenants.findBySlug("epsilon-corp")!!
+        assertFalse(stored.registrationEnabled)
+        assertTrue(stored.emailVerificationRequired)
     }
 
     @Test

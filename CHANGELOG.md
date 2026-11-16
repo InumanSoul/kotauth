@@ -33,6 +33,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The CLI import summary now includes `resourceServers=`**, matching the REST response.
 
+- **`DB_HOST`, `DB_PORT` and `DB_NAME` were documented but never read.** Kotauth only read
+  `DB_URL`, so setting the parts alone connected to `localhost:5432/kauth_db`. It now builds
+  `jdbc:postgresql://DB_HOST:DB_PORT/DB_NAME` when `DB_URL` is unset or blank, each part falling back
+  to its previous default, and a `DB_PORT` that is not a port number stops startup with a clear
+  message. `DB_URL` still wins when set. Both compose files now pass the parts through rather than
+  building `DB_URL` from `DB_NAME` alone, which also made them ignore `DB_HOST` and `DB_PORT`; and
+  `make run` now reaches the `kotauth_db` database it names. Closes #173.
+
+- **Creating a workspace in the console ignored its registration checkboxes.** The form posted
+  `registrationEnabled` and `emailVerificationRequired`, but every new workspace started with
+  self-registration on and email verification off. An operator who left sign-up unticked got an
+  open workspace. Both flags are now written in the same insert as the workspace and recorded on
+  the `ADMIN_TENANT_CREATED` audit event. Closes #176.
+
+- **`/register` showed the sign-up form on a workspace with self-registration off.** Submitting it
+  was refused, but only after the user had filled it in. Both `GET` and `POST /register` now answer
+  403 with a "Registration is closed" page linking back to sign-in, the same status social sign-in
+  uses for closed sign-up. The `POST` check runs before rate limiting and form parsing. Closes #177.
+
+- **The export summary reported `resourceServers: 0`.** The bundle carried them and import restored
+  them; only the count in the export response was missing. `BackupCounts` no longer defaults any
+  count, so a missing one fails to compile. Closes #175.
+
 ---
 
 ## [1.26.0] - 2026-09-10

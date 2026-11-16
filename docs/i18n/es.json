@@ -46,6 +46,8 @@
   "LOGIN_PASSWORDLESS_SUBMIT": "Enviar enlace de inicio de sesión",
 
   "REGISTER_TITLE": "Crear cuenta",
+  "REGISTER_CLOSED_TITLE": "El registro está cerrado",
+  "REGISTER_CLOSED_BODY": "{0} no acepta nuevos registros. Si ya tienes una cuenta, inicia sesión.",
   "REGISTER_SUBTITLE": "Completa tus datos para comenzar",
   "REGISTER_PASSWORDLESS_SUBTITLE": "Completa tus datos — te enviaremos un enlace de inicio de sesión por correo para terminar.",
   "REGISTER_FULL_NAME": "Nombre completo",

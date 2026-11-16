@@ -53,6 +53,9 @@ import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -85,6 +88,7 @@ class AdminBackupRoutesTest {
     private val auditPort = FakeAuditLogPort()
     private val apiKeyRepo = FakeApiKeyRepository()
     private val txRunner = FakeTransactionRunner()
+    private val resourceServers = com.kauth.fakes.FakeResourceServerRepository(appRepo)
     private val crypto = Pbkdf2AesGcmBackupEncryption()
 
     private val master =
@@ -257,6 +261,24 @@ class AdminBackupRoutesTest {
                 }
             assertEquals(HttpStatusCode.OK, response.status)
             assertTrue(auditPort.hasEvent(AuditEventType.ADMIN_TENANT_EXPORTED))
+        }
+
+    @Test
+    fun `export summary counts the workspace's resource servers`() =
+        testApplication {
+            application { installTestApp() }
+            resourceServers.create(acme.id, "https://api.acme.example.com", "Acme API", null, listOf("orders:read"))
+
+            val response =
+                client.post("/admin/api/v1/tenants/acme/export") {
+                    bearerAuth(exportOnlyKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"passphrase":"this-is-a-strong-passphrase"}""")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val summary = Json.parseToJsonElement(response.bodyAsText()).jsonObject["summary"]!!.jsonObject
+            assertEquals(1, summary["resourceServers"]!!.jsonPrimitive.int)
         }
 
     @Test
@@ -443,6 +465,7 @@ class AdminBackupRoutesTest {
                         tenantKeyRepository = tenantKeys,
                         userAttributeRepository = attrs,
                         auditLogRepository = auditRepo,
+                        resourceServerRepository = resourceServers,
                     ),
                 backupImporterService =
                     BackupImporterService(

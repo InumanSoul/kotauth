@@ -272,6 +272,66 @@ class AdminSettingsTest {
         }
 
     // =========================================================================
+    // Create workspace
+    // =========================================================================
+
+    @Test
+    fun `POST create workspace with both boxes unticked creates a closed workspace`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces",
+                    formParameters =
+                        Parameters.build {
+                            append("slug", "closed-corp")
+                            append("displayName", "Closed Corp")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val created = tenantRepo.findBySlug("closed-corp")!!
+            assertFalse(created.registrationEnabled)
+            assertFalse(created.emailVerificationRequired)
+        }
+
+    @Test
+    fun `POST create workspace with both boxes ticked enables registration and email verification`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces",
+                    formParameters =
+                        Parameters.build {
+                            append("slug", "open-corp")
+                            append("displayName", "Open Corp")
+                            append("registrationEnabled", "true")
+                            append("emailVerificationRequired", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val created = tenantRepo.findBySlug("open-corp")!!
+            assertTrue(created.registrationEnabled)
+            assertTrue(created.emailVerificationRequired)
+        }
+
+    // =========================================================================
     // SMTP settings
     // =========================================================================
 

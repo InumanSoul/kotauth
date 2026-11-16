@@ -22,6 +22,23 @@ internal fun envOrFile(
  */
 internal fun isValidBodySizeLimit(bytes: Long): Boolean = bytes in 1..Int.MAX_VALUE.toLong()
 
+/**
+ * `DB_URL` when set; otherwise a PostgreSQL URL from `DB_HOST`, `DB_PORT` and `DB_NAME`, each
+ * defaulting independently. Throws [IllegalArgumentException] for a `DB_PORT` that is not a TCP port.
+ */
+internal fun resolveDbUrl(getenv: (String) -> String? = System::getenv): String {
+    getenv("DB_URL")?.takeIf { it.isNotBlank() }?.let { return it }
+    val host = getenv("DB_HOST")?.takeIf { it.isNotBlank() } ?: "localhost"
+    val port =
+        getenv("DB_PORT")?.takeIf { it.isNotBlank() }?.let { raw ->
+            requireNotNull(raw.trim().toIntOrNull()?.takeIf { it in 1..65_535 }) {
+                "DB_PORT must be a port number between 1 and 65535, got '$raw'."
+            }
+        } ?: 5432
+    val name = getenv("DB_NAME")?.takeIf { it.isNotBlank() } ?: "kauth_db"
+    return "jdbc:postgresql://$host:$port/$name"
+}
+
 /** Database connection config — loadable independently for CLI commands that don't need the full server config. */
 data class DbConfig(
     val dbUrl: String,
@@ -33,7 +50,7 @@ data class DbConfig(
     companion object {
         fun load(): DbConfig =
             DbConfig(
-                dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/kauth_db",
+                dbUrl = EnvironmentConfig.requireDbUrl(),
                 dbUser = System.getenv("DB_USER") ?: "postgres",
                 dbPassword = EnvironmentConfig.requireDbPassword(envOrFile("DB_PASSWORD")),
                 dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
@@ -116,9 +133,7 @@ data class EnvironmentConfig(
                 env = env,
                 isDevelopment = isDevelopment,
                 secretKey = secretKey,
-                dbUrl =
-                    System.getenv("DB_URL")
-                        ?: "jdbc:postgresql://localhost:5432/kauth_db",
+                dbUrl = requireDbUrl(),
                 dbUser = System.getenv("DB_USER") ?: "postgres",
                 dbPassword = requireDbPassword(envOrFile("DB_PASSWORD")),
                 isDemoMode =
@@ -289,6 +304,14 @@ data class EnvironmentConfig(
             }
             return secretKey
         }
+
+        internal fun requireDbUrl(): String =
+            try {
+                resolveDbUrl()
+            } catch (e: IllegalArgumentException) {
+                System.err.println("FATAL: ${e.message}")
+                exitProcess(1)
+            }
 
         internal fun requireDbPassword(dbPassword: String?): String {
             if (dbPassword.isNullOrBlank()) {

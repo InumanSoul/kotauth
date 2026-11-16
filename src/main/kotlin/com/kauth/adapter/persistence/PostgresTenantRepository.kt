@@ -172,6 +172,8 @@ class PostgresTenantRepository(
         slug: String,
         displayName: String,
         issuerUrl: String?,
+        registrationEnabled: Boolean,
+        emailVerificationRequired: Boolean,
     ): Tenant =
         transaction {
             val insertedId =
@@ -179,6 +181,8 @@ class PostgresTenantRepository(
                     it[TenantsTable.slug] = slug
                     it[TenantsTable.displayName] = displayName
                     it[TenantsTable.issuerUrl] = issuerUrl
+                    it[TenantsTable.registrationEnabled] = registrationEnabled
+                    it[TenantsTable.emailVerificationRequired] = emailVerificationRequired
                 } get TenantsTable.id
 
             // Create default security config row for the new tenant

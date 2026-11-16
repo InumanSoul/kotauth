@@ -19,6 +19,8 @@ interface TenantRepository {
         slug: String,
         displayName: String,
         issuerUrl: String? = null,
+        registrationEnabled: Boolean = true,
+        emailVerificationRequired: Boolean = false,
     ): Tenant
 
     /** Persists all mutable fields. Slug and id are immutable. */

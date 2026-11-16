@@ -8,6 +8,7 @@ import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.origin
@@ -29,6 +30,7 @@ internal fun Route.registerRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
+        if (tenant != null && !tenant.registrationEnabled) return@get call.respondRegistrationClosed(ctx)
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
                 identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
@@ -51,6 +53,7 @@ internal fun Route.registerRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
+        if (tenant != null && !tenant.registrationEnabled) return@post call.respondRegistrationClosed(ctx)
         val passwordlessTenant = tenant?.securityConfig?.passwordLoginEnabled == false
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
@@ -132,3 +135,6 @@ internal fun Route.registerRoutes(
         }
     }
 }
+
+private suspend fun ApplicationCall.respondRegistrationClosed(ctx: AuthTenantContext) =
+    respondHtml(HttpStatusCode.Forbidden, AuthView.registrationClosedPage(ctx.slug, ctx.viewContext))

@@ -28,6 +28,8 @@ class WorkspaceSettingsService(
         slug: String,
         displayName: String,
         issuerUrl: String?,
+        registrationEnabled: Boolean = true,
+        emailVerificationRequired: Boolean = false,
     ): AdminResult<Tenant> {
         if (slug.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Slug is required."))
@@ -46,7 +48,8 @@ class WorkspaceSettingsService(
         if (tenantRepository.existsBySlug(slug)) {
             return AdminResult.Failure(AdminError.Validation("A workspace with slug '$slug' already exists."))
         }
-        val tenant = tenantRepository.create(slug, displayName, issuerUrl)
+        val tenant =
+            tenantRepository.create(slug, displayName, issuerUrl, registrationEnabled, emailVerificationRequired)
         auditLog.record(
             AuditEvent(
                 tenantId = tenant.id,
@@ -55,7 +58,13 @@ class WorkspaceSettingsService(
                 eventType = AuditEventType.ADMIN_TENANT_CREATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("slug" to slug, "displayName" to displayName),
+                details =
+                    mapOf(
+                        "slug" to slug,
+                        "displayName" to displayName,
+                        "registrationEnabled" to registrationEnabled.toString(),
+                        "emailVerificationRequired" to emailVerificationRequired.toString(),
+                    ),
             ),
         )
         return AdminResult.Success(tenant)
