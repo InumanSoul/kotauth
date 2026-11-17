@@ -524,6 +524,10 @@ data class ProblemDetail(
     val emailOtpLockoutThreshold: Int,
     val corsAllowCredentials: Boolean,
     val portalLayout: String,
+    val loginIdentifierMode: String,
+    val defaultLocale: String? = null,
+    // Whether the workspace can send email (delivery switched on and configured). Never the credentials.
+    val emailDeliveryReady: Boolean,
 )
 
 @Serializable data class WorkspaceSignInMethodsDto(
@@ -776,5 +780,8 @@ internal fun com.kauth.domain.model.Tenant.toWorkspaceApiDto(): WorkspaceDto {
         emailOtpLockoutThreshold = sc.emailOtpLockoutThreshold,
         corsAllowCredentials = sc.corsAllowCredentials,
         portalLayout = portalConfig.layout.name,
+        loginIdentifierMode = sc.loginIdentifierMode.name,
+        defaultLocale = theme.defaultLocale,
+        emailDeliveryReady = isSmtpReady,
     )
 }

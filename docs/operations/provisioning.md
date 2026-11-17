@@ -73,3 +73,47 @@ Once a workspace exists, a `KAUTH_BOOTSTRAP_API_KEYS` entry can name it, and the
 admin API (`/t/{slug}/api/v1`) takes over from there. Bootstrap entries are applied at startup and
 exit the process for a slug that does not exist yet, so add a workspace's keys after the call that
 creates it, and restart to apply them.
+
+## 4. Workspace settings
+
+A workspace key with the `workspace:write` scope changes the workspace's settings through
+`PATCH /t/{slug}/api/v1/workspace`. Only the fields in the body change, so a script can state just
+what it cares about:
+
+```bash
+curl -sS -X PATCH "$KAUTH_BASE_URL/t/acme/api/v1/workspace" \
+  -H "Authorization: Bearer $KAUTH_ACME_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "registrationEnabled": false,
+        "mfaPolicy": "required",
+        "tokenExpirySeconds": 600,
+        "passwordPolicy": { "minLength": 12, "requireNumber": true },
+        "lockoutMaxAttempts": 5,
+        "defaultLocale": "es",
+        "smtp": {
+          "enabled": true,
+          "host": "smtp.example.com",
+          "port": 587,
+          "username": "acme",
+          "password": "'"$ACME_SMTP_PASSWORD"'",
+          "fromAddress": "no-reply@acme.example"
+        },
+        "signInMethods": { "emailOtp": true, "password": false }
+      }'
+```
+
+The body covers sign-up (`registrationEnabled`, `emailVerificationRequired`), sign-in methods,
+password policy, MFA policy, lockout, token lifetimes, `loginIdentifierMode`, `defaultLocale` and
+SMTP. The full list is in the OpenAPI document at `/api/docs`.
+
+- The request runs the same validation, and records the same audit events, as the console's
+  settings pages. It is applied in one transaction: if any field is refused (`422`), nothing
+  changes.
+- `smtp` is applied first. The same request can therefore configure email delivery and turn on
+  magic links or email codes, or turn password sign-in off, which both need SMTP to be ready.
+- The SMTP password is write-only. It is never returned, and leaving it out keeps the stored one.
+  `GET /workspace` reports `emailDeliveryReady` instead of the SMTP settings.
+- An unknown field is refused with `400` rather than ignored, so a typo cannot pass as a no-op.
+- Sending the same body again is harmless, so the call belongs in the same idempotent script as
+  step 2.

@@ -14,6 +14,8 @@ import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
+import com.kauth.domain.service.WorkspacePatchService
+import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -30,6 +32,7 @@ import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantClaimMapperRepository
 import com.kauth.fakes.FakeTenantRepository
+import com.kauth.fakes.FakeThemeRepository
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebAuthnCredentialRepository
@@ -40,8 +43,12 @@ import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.patch
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -195,6 +202,16 @@ class ApiWorkspaceRoutesTest {
 
     private val jsonCodec = Json { ignoreUnknownKeys = true }
 
+    private val workspacePatchService =
+        WorkspacePatchService(
+            tenantRepository = tenantRepo,
+            workspaceSettingsService =
+                WorkspaceSettingsService(tenantRepo, auditLogPort, themeRepository = FakeThemeRepository()),
+            accountService = adminService,
+            availableLocales = { setOf("en", "es") },
+            transactionRunner = com.kauth.fakes.FakeTransactionRunner(tenantRepo),
+        )
+
     private var rawApiKey: String = ""
 
     @BeforeTest
@@ -211,6 +228,7 @@ class ApiWorkspaceRoutesTest {
         mfaRepo.clear()
 
         tenantRepo.add(tenant)
+        tenantRepo.add(Tenant(id = TenantId(2), slug = "other", displayName = "Other", issuerUrl = null))
 
         rawApiKey =
             (
@@ -314,6 +332,166 @@ class ApiWorkspaceRoutesTest {
         }
 
     // -------------------------------------------------------------------------
+    // PATCH /workspace
+    // -------------------------------------------------------------------------
+
+    private fun writeKey(): String = apiKeyMissingScope(listOf(ApiScope.WORKSPACE_READ, ApiScope.WORKSPACE_WRITE))
+
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.patchWorkspace(
+        body: String,
+        key: String = writeKey(),
+        slug: String = "acme",
+    ) = client.patch("/t/$slug/api/v1/workspace") {
+        bearerAuth(key)
+        contentType(ContentType.Application.Json)
+        setBody(body)
+    }
+
+    @Test
+    fun `PATCH workspace changes the given settings and GET shows them`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                patchWorkspace(
+                    """
+                    {"registrationEnabled": false, "mfaPolicy": "optional", "tokenExpirySeconds": 600,
+                     "signInMethods": {"password": false},
+                     "passwordPolicy": {"minLength": 16},
+                     "lockoutMaxAttempts": 3, "loginIdentifierMode": "email"}
+                    """.trimIndent(),
+                )
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+
+            val body =
+                jsonCodec
+                    .parseToJsonElement(
+                        client.get("/t/acme/api/v1/workspace") { bearerAuth(rawApiKey) }.bodyAsText(),
+                    ).jsonObject
+            assertFalse(body["registrationEnabled"]!!.jsonPrimitive.boolean)
+            assertEquals("optional", body["mfaPolicy"]!!.jsonPrimitive.content)
+            assertEquals(600, body["tokenExpirySeconds"]!!.jsonPrimitive.content.toInt())
+            assertFalse(body["signInMethods"]!!.jsonObject["password"]!!.jsonPrimitive.boolean)
+            assertTrue(body["signInMethods"]!!.jsonObject["emailOtp"]!!.jsonPrimitive.boolean)
+            assertEquals(
+                16,
+                body["passwordPolicy"]!!
+                    .jsonObject["minLength"]!!
+                    .jsonPrimitive.content
+                    .toInt(),
+            )
+            assertEquals(3, body["lockoutMaxAttempts"]!!.jsonPrimitive.content.toInt())
+            assertEquals("EMAIL", body["loginIdentifierMode"]!!.jsonPrimitive.content)
+            // Untouched fields keep their values.
+            assertEquals("Acme Corp", body["displayName"]!!.jsonPrimitive.content)
+            assertTrue(body["passwordPolicy"]!!.jsonObject["requireSpecial"]!!.jsonPrimitive.boolean)
+        }
+
+    @Test
+    fun `PATCH workspace sets defaultLocale`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = patchWorkspace("""{"defaultLocale": "es"}""")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("es", body["defaultLocale"]!!.jsonPrimitive.content)
+        }
+
+    @Test
+    fun `PATCH workspace writes SMTP and never returns the password`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                patchWorkspace(
+                    """{"smtp": {"host": "mail.acme.example", "port": 2525, "password": "new-smtp-secret"}}""",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertFalse(response.bodyAsText().contains("new-smtp-secret"))
+            assertFalse(response.bodyAsText().contains("smtp", ignoreCase = true))
+            val stored = tenantRepo.findBySlug("acme")!!
+            assertEquals("mail.acme.example", stored.smtpHost)
+            assertEquals(2525, stored.smtpPort)
+            assertEquals("new-smtp-secret", stored.smtpPassword)
+            assertEquals("noreply@acme.example", stored.smtpFromAddress)
+        }
+
+    @Test
+    fun `PATCH workspace switches SMTP off and reports email delivery as not ready`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = patchWorkspace("""{"smtp": {"enabled": false}}""")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertFalse(body["emailDeliveryReady"]!!.jsonPrimitive.boolean)
+            assertEquals("super-secret-smtp-password", tenantRepo.findBySlug("acme")!!.smtpPassword)
+        }
+
+    @Test
+    fun `PATCH workspace 403 when key lacks workspace_write scope`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = patchWorkspace("""{"registrationEnabled": false}""", key = rawApiKey)
+
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+            assertTrue(tenantRepo.findBySlug("acme")!!.registrationEnabled)
+        }
+
+    @Test
+    fun `PATCH workspace with a key of another workspace changes nothing`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = patchWorkspace("""{"registrationEnabled": false}""", slug = "other")
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            assertTrue(tenantRepo.findBySlug("other")!!.registrationEnabled)
+        }
+
+    @Test
+    fun `PATCH workspace 400 on an unknown field`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = patchWorkspace("""{"registrationEnabld": false}""")
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+    @Test
+    fun `PATCH workspace 422 on an invalid value, leaving the workspace unchanged`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                patchWorkspace("""{"registrationEnabled": false, "smtp": {"port": 2525}, "mfaPolicy": "sometimes"}""")
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            val stored = tenantRepo.findBySlug("acme")!!
+            assertTrue(stored.registrationEnabled)
+            assertEquals(587, stored.smtpPort)
+        }
+
+    @Test
+    fun `PATCH workspace 422 on an unknown loginIdentifierMode or locale`() =
+        testApplication {
+            application { installTestApp() }
+            val key = writeKey()
+
+            assertEquals(
+                HttpStatusCode.UnprocessableEntity,
+                patchWorkspace("""{"loginIdentifierMode": "phone"}""", key).status,
+            )
+            assertEquals(HttpStatusCode.UnprocessableEntity, patchWorkspace("""{"defaultLocale": "xx"}""", key).status)
+        }
+
+    // -------------------------------------------------------------------------
     // Test wiring
     // -------------------------------------------------------------------------
 
@@ -366,6 +544,7 @@ class ApiWorkspaceRoutesTest {
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
                 userRepository = userRepo,
                 transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
+                workspacePatchService = workspacePatchService,
             )
         }
     }

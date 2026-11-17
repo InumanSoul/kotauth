@@ -26,6 +26,7 @@ import com.kauth.domain.service.ScimGroupMembershipService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
+import com.kauth.domain.service.WorkspacePatchService
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.http.ContentType
@@ -77,6 +78,8 @@ fun Route.apiRoutes(
     // Absent only in tests that predate the identity-provider surface; when it is null the
     // routes are not mounted at all rather than answering with a runtime "not configured".
     identityProviderService: IdentityProviderService? = null,
+    // Absent in tests that only read the workspace; PATCH /workspace is then not mounted.
+    workspacePatchService: WorkspacePatchService? = null,
 ) {
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
@@ -191,7 +194,7 @@ fun Route.apiRoutes(
 
             apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
-            apiWorkspaceRoutes(tenantRepository)
+            apiWorkspaceRoutes(tenantRepository, workspacePatchService)
             apiWebhookRoutes(webhookService)
             apiResourceServerRoutes(resourceServerService, applicationRepository)
             apiApplicationRoutes(applicationRepository, applicationManagementService, roleGroupService)
