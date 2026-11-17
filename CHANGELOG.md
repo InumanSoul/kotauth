@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing could write it, so it was empty in every deployment. Backups now restore it as well.
   `ApplicationDto` returns it, and the OpenAPI spec now documents `audience` too. Closes #163.
 
+- **Set how long a magic link stays valid from the console.** The security policy page has a
+  Magic Links card with a Link expiry field, from 1 to 1440 minutes. The value could already be
+  set over `PATCH /workspace`, but the console had no field for it. The confirmation page and the
+  email both said "15 minutes" whatever the setting; they now quote the configured window, in
+  English and in the Spanish bundle. Closes #132.
+
 ### Security
 
 - **Email-code sign-in no longer tells a known address from an unknown one by response time.**

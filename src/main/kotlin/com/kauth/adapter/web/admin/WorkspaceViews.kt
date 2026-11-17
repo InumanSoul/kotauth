@@ -8,6 +8,7 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.MAGIC_LINK_TTL_MINUTES
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -813,6 +814,23 @@ internal fun securityPolicyPageImpl(
                                 +"Minutes before the account automatically unlocks. "
                                 +"Only applies when Max failed attempts is greater than 0."
                             }
+                        }
+                    }
+                }
+
+                // ── Magic Links ──────────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_MAGIC_LINK_SECTION }
+                    div("edit-row") {
+                        span("edit-row__label") { +EnglishStrings.ADMIN_SECURITY_MAGIC_LINK_TTL_LABEL }
+                        div {
+                            input(type = InputType.number, name = "magicLinkTokenTtlMinutes") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = MAGIC_LINK_TTL_MINUTES.first.toString()
+                                attributes["max"] = MAGIC_LINK_TTL_MINUTES.last.toString()
+                                value = workspace.securityConfig.magicLinkTtlMinutes.toString()
+                            }
+                            div("edit-row__hint") { +EnglishStrings.ADMIN_SECURITY_MAGIC_LINK_TTL_HINT }
                         }
                     }
                 }

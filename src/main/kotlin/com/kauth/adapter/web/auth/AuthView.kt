@@ -883,6 +883,7 @@ object AuthView {
         ctx: ViewContext,
         error: String? = null,
         sent: Boolean = false,
+        linkTtlMinutes: Int = SecurityConfig().magicLinkTtlMinutes,
     ): HTML.() -> Unit =
         {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_MAGIC_LINK", ctx.workspaceName), ctx.theme) }
@@ -893,7 +894,7 @@ object AuthView {
                         h1("card-title") { +ctx.t("MAGIC_LINK_TITLE") }
 
                         if (sent) {
-                            p("card-subtitle") { +ctx.t("MAGIC_LINK_SUBTITLE_SENT") }
+                            p("card-subtitle") { +ctx.t("MAGIC_LINK_SUBTITLE_SENT", linkTtlMinutes) }
                             div("footer-link") {
                                 a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
                             }

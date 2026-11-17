@@ -481,6 +481,12 @@ object EnglishStrings {
     // Admin — Security Policy page section labels
     const val ADMIN_SECURITY_PASSWORD_POLICY_SECTION = "Password Policy"
     const val ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION = "Password Requirements"
+    const val ADMIN_SECURITY_MAGIC_LINK_SECTION = "Magic Links"
+    const val ADMIN_SECURITY_MAGIC_LINK_TTL_LABEL = "Link expiry"
+    const val ADMIN_SECURITY_MAGIC_LINK_TTL_HINT =
+        "Minutes a sign-in link stays valid after it is sent, from 1 to 1440. " +
+            "The email and the confirmation page quote this time. " +
+            "Applies while magic links are on in Sign-in Methods."
 
     // Admin — sign-in identifier (workspace security policy)
     const val ADMIN_SIGNIN_IDENTIFIER_SECTION = "Sign-In Identifier"
@@ -663,7 +669,7 @@ object EnglishStrings {
             "No password needed."
     const val MAGIC_LINK_SUBTITLE_SENT =
         "If an account exists for that email address, you'll receive a sign-in link " +
-            "shortly. The link expires in 15 minutes."
+            "shortly. The link expires in {0} minutes."
     const val MAGIC_LINK_EMAIL_LABEL = "Email address"
     const val MAGIC_LINK_EMAIL_PLACEHOLDER = "you@example.com"
     const val MAGIC_LINK_SUBMIT = "Send sign-in link"
@@ -816,8 +822,9 @@ object EnglishStrings {
             "Click the button below to set your password and activate your account. " +
             "This link expires in 72 hours."
 
+    // {0} = link expiry in minutes
     const val EMAIL_BODY_MAGIC_LINK =
-        "Click the button below to sign in. This link expires in 15 minutes and can only be used once."
+        "Click the button below to sign in. This link expires in {0} minutes and can only be used once."
 
     // {0} = code expiry in minutes
     const val EMAIL_BODY_OTP =
