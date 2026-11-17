@@ -142,6 +142,7 @@ class PostgresApplicationRepository : ApplicationRepository {
         launcherVisible: Boolean,
         launcherDisplayOrder: Int,
         audience: String?,
+        tokenExpiryOverride: Int?,
     ): Application =
         transaction {
             ClientsTable.update({ ClientsTable.id eq appId.value }) {
@@ -153,6 +154,7 @@ class PostgresApplicationRepository : ApplicationRepository {
                 it[ClientsTable.launcherVisible] = launcherVisible
                 it[ClientsTable.launcherDisplayOrder] = launcherDisplayOrder
                 it[ClientsTable.audience] = audience
+                it[ClientsTable.tokenExpiryOverride] = tokenExpiryOverride
             }
             // Replace all redirect URIs atomically
             ClientRedirectUrisTable.deleteWhere { ClientRedirectUrisTable.clientId eq appId.value }

@@ -759,6 +759,25 @@ internal fun editApplicationPageImpl(
                         }
                     }
                 }
+                div("edit-row") {
+                    span("edit-row__label") { +EnglishStrings.APPLICATION_TOKEN_EXPIRY_LABEL }
+                    div {
+                        input(type = InputType.number, name = "tokenExpiryOverride") {
+                            attributes["form"] = "edit-app-form"
+                            classes = setOf("edit-row__field")
+                            this.id = "tokenExpiryOverride"
+                            attributes["min"] = "60"
+                            attributes["max"] = "86400"
+                            placeholder = workspace.tokenExpirySeconds.toString()
+                            value = application.tokenExpiryOverride?.toString() ?: ""
+                        }
+                        div("edit-row__hint") {
+                            +EnglishStrings.APPLICATION_TOKEN_EXPIRY_HINT_PREFIX
+                            +workspace.tokenExpirySeconds.toString()
+                            +EnglishStrings.APPLICATION_TOKEN_EXPIRY_HINT_SUFFIX
+                        }
+                    }
+                }
             }
 
             // ── Launcher card ──────────────────────────────────────

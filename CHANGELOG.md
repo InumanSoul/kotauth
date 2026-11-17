@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Set an application's own access-token lifetime.** The application edit page has an Access
+  Token Lifetime field, and `PUT /t/{slug}/api/v1/applications/{id}` takes `tokenExpiryOverride`,
+  in seconds from 60 to 86400. Blank in the console, or `0` over the API, clears it, so the
+  workspace's lifetime applies again. The value was already honoured on every token path, but
+  nothing could write it, so it was empty in every deployment. Backups now restore it as well.
+  `ApplicationDto` returns it, and the OpenAPI spec now documents `audience` too. Closes #163.
+
 ### Security
 
 - **Email-code sign-in no longer tells a known address from an unknown one by response time.**

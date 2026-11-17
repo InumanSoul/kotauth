@@ -339,6 +339,11 @@ object EnglishStrings {
     const val APPLICATION_AUDIENCE_HINT_SUFFIX =
         " claim in issued JWTs. Leave blank to use the client ID as the audience."
 
+    // Application forms — per-client access-token lifetime
+    const val APPLICATION_TOKEN_EXPIRY_LABEL = "Access Token Lifetime"
+    const val APPLICATION_TOKEN_EXPIRY_HINT_PREFIX = "Seconds, from 60 to 86400. Leave blank to use the workspace's "
+    const val APPLICATION_TOKEN_EXPIRY_HINT_SUFFIX = " seconds."
+
     // Tenant backup / restore (v1.9.0)
     const val BACKUP_NAV_LABEL = "Backup"
     const val BACKUP_PAGE_TITLE = "Backup workspace"

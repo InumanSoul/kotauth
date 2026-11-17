@@ -72,6 +72,7 @@ class PortalClientProvisioning(
                 launcherVisible = portalClient.launcherVisible,
                 launcherDisplayOrder = portalClient.launcherDisplayOrder,
                 audience = portalClient.audience,
+                tokenExpiryOverride = portalClient.tokenExpiryOverride,
             )
         }
     }

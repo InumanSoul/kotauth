@@ -396,4 +396,48 @@ class ApplicationManagementServiceTest {
         assertNull(result.value.plaintextSecret)
         assertNull(applicationRepo.findClientSecretHash(result.value.application.id))
     }
+
+    // ----- per-client access-token lifetime -----
+
+    private fun m2mApp(): ApplicationId {
+        val created =
+            service.createApplication(
+                tenantId = tenantId,
+                clientId = "worker",
+                name = "Worker",
+                description = null,
+                accessType = "confidential",
+                redirectUris = emptyList(),
+                grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+            )
+        return assertIs<AdminResult.Success<CreatedApplication>>(created).value.application.id
+    }
+
+    @Test
+    fun `updateApplication sets, keeps and clears the token lifetime`() {
+        val id = m2mApp()
+
+        assertIs<AdminResult.Success<*>>(service.updateApplication(id, tenantId, tokenExpiryOverride = 900))
+        assertEquals(900, applicationRepo.findById(id)?.tokenExpiryOverride)
+
+        assertIs<AdminResult.Success<*>>(service.updateApplication(id, tenantId, name = "Renamed"))
+        assertEquals(900, applicationRepo.findById(id)?.tokenExpiryOverride)
+
+        assertIs<AdminResult.Success<*>>(service.updateApplication(id, tenantId, tokenExpiryOverride = 0))
+        assertNull(applicationRepo.findById(id)?.tokenExpiryOverride)
+    }
+
+    @Test
+    fun `updateApplication refuses a token lifetime outside 60 to 86400 seconds`() {
+        val id = m2mApp()
+        listOf(-1, 59, 86_401).forEach { value ->
+            val result = service.updateApplication(id, tenantId, tokenExpiryOverride = value)
+            assertIs<AdminResult.Failure>(result, "value $value")
+            assertIs<AdminError.Validation>(result.error)
+        }
+        assertNull(applicationRepo.findById(id)?.tokenExpiryOverride)
+        listOf(60, 86_400).forEach { value ->
+            assertIs<AdminResult.Success<*>>(service.updateApplication(id, tenantId, tokenExpiryOverride = value))
+        }
+    }
 }

@@ -57,6 +57,8 @@ interface ApplicationRepository {
         launcherVisible: Boolean = true,
         launcherDisplayOrder: Int = 0,
         audience: String? = null,
+        // No default: this is a full replace, so a caller that forgot it would reset the override.
+        tokenExpiryOverride: Int?,
     ): Application
 
     /** Enables or disables the application. */

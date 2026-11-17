@@ -441,6 +441,31 @@ class ApiApplicationRoutesTest {
         }
 
     @Test
+    fun `PUT applications sets and clears the token lifetime and GET returns it`() =
+        testApplication {
+            application { installTestApp() }
+            val app = seedApp(clientId = "ttl-app", accessType = "confidential")
+
+            suspend fun put(body: String) =
+                client.put("/t/acme/api/v1/applications/${app.id.value}") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+
+            val set = put("""{"tokenExpiryOverride":900}""")
+            assertEquals(HttpStatusCode.OK, set.status)
+            assertTrue("\"tokenExpiryOverride\":900" in set.bodyAsText())
+            assertEquals(900, appRepo.findById(app.id)!!.tokenExpiryOverride)
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, put("""{"tokenExpiryOverride":30}""").status)
+            assertEquals(900, appRepo.findById(app.id)!!.tokenExpiryOverride)
+
+            assertEquals(HttpStatusCode.OK, put("""{"tokenExpiryOverride":0}""").status)
+            assertEquals(null, appRepo.findById(app.id)!!.tokenExpiryOverride)
+        }
+
+    @Test
     fun `PUT applications with explicit grantTypes replaces the stored set`() =
         testApplication {
             application { installTestApp() }
