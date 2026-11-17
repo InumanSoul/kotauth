@@ -469,6 +469,14 @@ data class ServiceGraph(
                     availableLocales = { translationPort.availableLocales },
                     transactionRunner = ExposedTransactionRunner(),
                 )
+            val workspacePatchService =
+                WorkspacePatchService(
+                    tenantRepository = tenantRepository,
+                    workspaceSettingsService = workspaceSettingsService,
+                    accountService = accountService,
+                    availableLocales = { translationPort.availableLocales },
+                    transactionRunner = ExposedTransactionRunner(),
+                )
             val launcherService =
                 LauncherService(
                     applicationRepository = applicationRepository,
