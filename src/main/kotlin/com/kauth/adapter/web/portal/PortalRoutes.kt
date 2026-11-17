@@ -112,6 +112,8 @@ fun Route.portalRoutes(
         get("/login") {
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            // Master has no portal client; its accounts sign in through the admin console.
+            if (slug == Tenant.MASTER_SLUG) return@get call.respondRedirect("/admin/login")
 
             if (oauthService == null) {
                 // Fallback: show the old login page if OAuth service is not wired

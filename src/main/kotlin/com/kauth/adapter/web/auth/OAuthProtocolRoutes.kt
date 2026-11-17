@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.LoginIdentifierMode
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.ResourceServerRepository
@@ -872,9 +873,12 @@ internal fun Route.oauthProtocolRoutes(
             // KOTAUTH_SSO cookie they just nominally signed out of.
             call.clearSsoCookie(slug)
 
+            // The configured base URL is trusted alongside the request's own origin: behind a proxy
+            // chain the origin Ktor sees can differ from the public URL in scheme or port.
             val postLogoutUri = call.request.queryParameters["post_logout_redirect_uri"]
-            if (postLogoutUri.isNullOrBlank() || !isSafePostLogoutRedirect(postLogoutUri, call.resolvedBaseUrl())) {
-                call.respondRedirect("/t/$slug/authorize")
+            val trustedOrigins = listOfNotNull(call.resolvedBaseUrl(), baseUrl.takeIf { it.isNotBlank() })
+            if (postLogoutUri.isNullOrBlank() || !isSafePostLogoutRedirect(postLogoutUri, trustedOrigins)) {
+                call.respondRedirect(postLogoutFallback(slug))
             } else {
                 call.respondRedirect(postLogoutUri)
             }
@@ -896,9 +900,13 @@ internal fun Route.oauthProtocolRoutes(
     }
 }
 
-private fun isSafePostLogoutRedirect(
+/** Master has no portal client and no hosted login of its own; its sign-in is the admin console. */
+private fun postLogoutFallback(slug: String): String =
+    if (slug == Tenant.MASTER_SLUG) "/admin/login" else "/t/$slug/authorize"
+
+internal fun isSafePostLogoutRedirect(
     uri: String,
-    origin: String,
+    trustedOrigins: List<String>,
 ): Boolean {
     val trimmed = uri.trim()
     // "//evil.com" / "/\evil.com" / "\\evil.com" start with "/" but resolve to external origins.
@@ -906,14 +914,15 @@ private fun isSafePostLogoutRedirect(
     if (trimmed.startsWith("/")) return true
     return try {
         val target = java.net.URI(trimmed)
-        val base = java.net.URI(origin)
+        if (target.userInfo != null || target.host == null) return false
         // Parse + compare scheme/host/port exactly. Prefix string match is bypassable by
         // "https://legit.com.evil.com" against origin "https://legit.com".
-        target.userInfo == null &&
-            target.host != null &&
+        trustedOrigins.any { origin ->
+            val base = java.net.URI(origin)
             target.scheme.equals(base.scheme, ignoreCase = true) &&
-            target.host.equals(base.host, ignoreCase = true) &&
-            effectivePort(target) == effectivePort(base)
+                target.host.equals(base.host, ignoreCase = true) &&
+                effectivePort(target) == effectivePort(base)
+        }
     } catch (_: Exception) {
         false
     }

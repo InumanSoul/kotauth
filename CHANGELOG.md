@@ -23,6 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Signing out of the console behind a reverse proxy ended on a raw 400.** The console sent
+  `KAUTH_BASE_URL/admin/login` as the post-logout URI, but the end-session endpoint compared it with
+  the origin Ktor saw. Behind a proxy chain that origin can differ in scheme or port, so the URI was
+  refused. The fallback then sent the person to `/t/master/authorize`, then to
+  `/t/master/account/login`, which started a portal flow for a client `master` does not have:
+  `{"error":"invalid_request","error_description":"Invalid redirect_uri for client"}`. Three changes,
+  any one of which breaks that chain:
+  - the console now sends the relative `/admin/login`;
+  - end-session also accepts an absolute post-logout URI on the configured `KAUTH_BASE_URL` origin,
+    with the same exact scheme, host and port comparison, so foreign, protocol-relative and
+    userinfo URIs are still refused;
+  - on `master`, a missing or refused post-logout URI, and `/t/master/account/login` itself, now
+    lead to `/admin/login`.
+
 - **An imported workspace could not issue tokens until the server restarted.** A backup exported
   without its signing keys (the default) was restored with none, and only startup provisioned a
   key: until a restart its JWKS was empty and the token endpoint answered 500 with "No signing key

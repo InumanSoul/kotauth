@@ -332,6 +332,29 @@ class AdminSettingsTest {
         }
 
     // =========================================================================
+    // Sign out
+    // =========================================================================
+
+    @Test
+    fun `POST admin logout hands end_session a relative post-logout URI`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response = authed.submitForm(url = "/admin/logout", formParameters = Parameters.build { })
+
+            assertEquals(
+                "/t/master/protocol/openid-connect/logout?post_logout_redirect_uri=%2Fadmin%2Flogin",
+                response.headers["Location"],
+            )
+        }
+
+    // =========================================================================
     // SMTP settings
     // =========================================================================
 
