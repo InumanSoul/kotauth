@@ -4,7 +4,6 @@ import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.decodeJwtPayload
 import com.kauth.adapter.web.generatePkceChallenge
 import com.kauth.adapter.web.generatePkceVerifier
-import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
@@ -38,6 +37,7 @@ import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
+import com.kauth.infrastructure.TenantProvisioner
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.html.respondHtml
@@ -69,6 +69,7 @@ fun Route.adminRoutes(
     auditLogRepository: AuditLogRepository,
     keyProvisioningService: KeyProvisioningService,
     mfaRepository: MfaRepository? = null,
+    workspaceCreationService: com.kauth.domain.service.WorkspaceCreationService? = null,
     portalClientProvisioning: PortalClientProvisioning? = null,
     identityProviderRepository: IdentityProviderRepository? = null,
     identityProviderService: com.kauth.domain.service.IdentityProviderService? = null,
@@ -101,6 +102,13 @@ fun Route.adminRoutes(
     socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
 ) {
     AdminView.setShellAppInfo(appInfo)
+    val workspaceCreation =
+        workspaceCreationService
+            ?: com.kauth.domain.service.WorkspaceCreationService(
+                workspaceSettingsService = workspaceSettingsService,
+                roleGroupService = roleGroupService,
+                tenantProvisioning = TenantProvisioner(keyProvisioningService, portalClientProvisioning),
+            )
 
     route("/admin") {
         if (impersonationService != null) adminImpersonationStopRoute(impersonationService)
@@ -425,7 +433,7 @@ fun Route.adminRoutes(
                         emailVerificationRequired = params["emailVerificationRequired"] == "true",
                     )
                 val created =
-                    workspaceSettingsService.createWorkspace(
+                    workspaceCreation.create(
                         slug = slug,
                         displayName = displayName,
                         issuerUrl = issuerUrl,
@@ -448,26 +456,7 @@ fun Route.adminRoutes(
                             ),
                         )
                     }
-                    is AdminResult.Success -> {
-                        val newTenant = result.value
-                        keyProvisioningService.provisionForTenant(newTenant)
-                        portalClientProvisioning?.provisionRedirectUris()
-                        roleGroupService.createRole(
-                            newTenant.id,
-                            "admin",
-                            "Full administrative access within this workspace",
-                            RoleScope.TENANT,
-                            null,
-                        )
-                        roleGroupService.createRole(
-                            newTenant.id,
-                            "user",
-                            "Standard authenticated user. The default role for self-registrations",
-                            RoleScope.TENANT,
-                            null,
-                        )
-                        call.respondRedirect("/admin/workspaces/$slug")
-                    }
+                    is AdminResult.Success -> call.respondRedirect("/admin/workspaces/$slug")
                 }
             }
 

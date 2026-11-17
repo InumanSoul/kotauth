@@ -293,7 +293,7 @@ fun Route.adminBackupRoutes(
  * tenant. Returns null and writes the appropriate Problem+JSON response on
  * any failure (no API key, key on wrong tenant, key invalid).
  */
-private suspend fun io.ktor.server.application.ApplicationCall.requireMasterAdminKey(
+internal suspend fun io.ktor.server.application.ApplicationCall.requireMasterAdminKey(
     apiKeyService: ApiKeyService,
     tenantRepository: TenantRepository,
 ): com.kauth.domain.model.ApiKey? {

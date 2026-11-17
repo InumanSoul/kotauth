@@ -69,6 +69,9 @@ object ApiScope {
     /** Master-tenant only — import an encrypted backup as a new workspace. */
     const val TENANTS_IMPORT = "tenants:import"
 
+    /** Master-tenant only — create a workspace. */
+    const val TENANTS_WRITE = "tenants:write"
+
     /** Send an email OTP challenge for an applicant (find-or-create user). */
     const val AUTH_SEND_OTP = "auth:send-otp"
 
@@ -124,6 +127,7 @@ object ApiScope {
             IDENTITY_PROVIDERS_WRITE,
             TENANTS_EXPORT,
             TENANTS_IMPORT,
+            TENANTS_WRITE,
             AUTH_SEND_OTP,
             AUTH_VERIFY_OTP,
             WORKSPACE_READ,

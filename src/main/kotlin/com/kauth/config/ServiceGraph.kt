@@ -95,6 +95,7 @@ import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.domain.service.UsernameGenerator
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
+import com.kauth.domain.service.WorkspaceCreationService
 import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.AuditChainHasher
@@ -168,6 +169,7 @@ data class ServiceGraph(
     val emailBrandingRepository: TenantEmailBrandingRepository,
     val emailOtpChallengeRepository: EmailOtpChallengeRepository,
     val keyProvisioningService: KeyProvisioningService,
+    val workspaceCreationService: WorkspaceCreationService,
     val portalClientProvisioning: PortalClientProvisioning,
     val adminClientProvisioning: AdminClientProvisioning,
     val adminSessionKey: ByteArray,
@@ -445,6 +447,13 @@ data class ServiceGraph(
                     applicationRepository = applicationRepository,
                     auditLog = auditLogAdapter,
                 )
+            val workspaceCreationService =
+                WorkspaceCreationService(
+                    workspaceSettingsService = workspaceSettingsService,
+                    roleGroupService = roleGroupService,
+                    tenantProvisioning = TenantProvisioner(keyProvisioning, portalClientProvisioning),
+                    transactionRunner = ExposedTransactionRunner(),
+                )
             val launcherService =
                 LauncherService(
                     applicationRepository = applicationRepository,
@@ -711,6 +720,7 @@ data class ServiceGraph(
                 emailBrandingRepository = emailBrandingRepository,
                 emailOtpChallengeRepository = emailOtpChallengeRepository,
                 keyProvisioningService = keyProvisioning,
+                workspaceCreationService = workspaceCreationService,
                 portalClientProvisioning = portalClientProvisioning,
                 adminClientProvisioning = adminClientProvisioning,
                 adminSessionKey = adminSessionKey,
