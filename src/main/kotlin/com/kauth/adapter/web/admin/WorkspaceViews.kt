@@ -5,6 +5,7 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.EMAIL_OTP_LOCKOUT_THRESHOLD
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
@@ -831,6 +832,33 @@ internal fun securityPolicyPageImpl(
                                 value = workspace.securityConfig.magicLinkTtlMinutes.toString()
                             }
                             div("edit-row__hint") { +EnglishStrings.ADMIN_SECURITY_MAGIC_LINK_TTL_HINT }
+                        }
+                    }
+                }
+
+                // ── Email Codes ──────────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_SECTION }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "emailOtpSignupEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.securityConfig.emailOtpSignupEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_SIGNUP_LABEL }
+                            span("check-row__desc") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_SIGNUP_DESC }
+                        }
+                    }
+                    div("edit-row") {
+                        span("edit-row__label") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_LOCKOUT_LABEL }
+                        div {
+                            input(type = InputType.number, name = "emailOtpLockoutThreshold") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = EMAIL_OTP_LOCKOUT_THRESHOLD.first.toString()
+                                attributes["max"] = EMAIL_OTP_LOCKOUT_THRESHOLD.last.toString()
+                                value = workspace.securityConfig.emailOtpLockoutThreshold.toString()
+                            }
+                            div("edit-row__hint") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_LOCKOUT_HINT }
                         }
                     }
                 }

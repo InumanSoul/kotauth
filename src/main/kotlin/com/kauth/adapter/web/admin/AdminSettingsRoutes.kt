@@ -453,6 +453,9 @@ fun Route.adminSettingsRoutes(
                 hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
+                emailOtpSignupEnabled = params["emailOtpSignupEnabled"] == "true",
+                emailOtpLockoutThreshold =
+                    params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
                 loginIdentifierMode = parsedLoginIdentifierMode ?: s.loginIdentifierMode,
             )
 
