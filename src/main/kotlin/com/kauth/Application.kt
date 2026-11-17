@@ -515,6 +515,7 @@ fun Application.module(
             transactionRunner = s.transactionRunner,
             userRepository = s.userRepository,
             identityProviderService = s.identityProviderService,
+            workspacePatchService = s.workspacePatchService,
         )
 
         adminBackupRoutes(

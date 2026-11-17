@@ -42,6 +42,7 @@ info:
     | `auth:send-otp`         | Trigger an email-OTP challenge for a user |
     | `auth:verify-otp`       | Verify an email-OTP challenge and obtain an authorization code |
     | `workspace:read`        | Read tenant metadata, sign-in methods, and security/MFA policy (no SMTP credentials) |
+    | `workspace:write`       | Change workspace settings: sign-up, sign-in methods, password/MFA/lockout policy, token lifetimes, default locale, SMTP |
     | `webhooks:read`         | List webhook endpoints (never exposes the signing secret) |
     | `webhooks:write`        | Create and delete webhook endpoints       |
     | `resource_servers:read`  | List and retrieve resource servers (RFC 8707 resource indicators) |
@@ -382,7 +383,8 @@ components:
          registrationEnabled, emailVerificationRequired, passkeysEnabled,
          signInMethods, passwordPolicy, mfaPolicy, lockoutMaxAttempts,
          lockoutDurationMinutes, magicLinkTtlMinutes, emailOtpSignupEnabled,
-         emailOtpLockoutThreshold, corsAllowCredentials, portalLayout]
+         emailOtpLockoutThreshold, corsAllowCredentials, portalLayout,
+         loginIdentifierMode, emailDeliveryReady]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -404,6 +406,89 @@ components:
         emailOtpLockoutThreshold: { type: integer }
         corsAllowCredentials: { type: boolean }
         portalLayout: { type: string, enum: [SIDEBAR, CENTERED] }
+        loginIdentifierMode: { type: string, enum: [USERNAME, EMAIL, EITHER] }
+        defaultLocale:
+          type: string
+          nullable: true
+          description: Locale used when the browser asks for none the workspace has. Null means English.
+        emailDeliveryReady:
+          type: boolean
+          description: |
+            True when SMTP is switched on and has a host and a from address. The SMTP
+            settings themselves are never returned.
+
+    UpdateWorkspaceRequest:
+      type: object
+      additionalProperties: false
+      description: |
+        Every field is optional. An absent field keeps its current value; unknown fields are
+        refused with 400. For `issuerUrl` and `defaultLocale` an empty string clears the value.
+      properties:
+        displayName: { type: string }
+        issuerUrl: { type: string }
+        tokenExpirySeconds: { type: integer, format: int64, minimum: 60 }
+        refreshTokenExpirySeconds:
+          type: integer
+          format: int64
+          description: Must be at least `tokenExpirySeconds`.
+        registrationEnabled: { type: boolean }
+        emailVerificationRequired: { type: boolean }
+        signInMethods:
+          type: object
+          additionalProperties: false
+          description: |
+            At least one method must stay on. Turning password sign-in off, or turning on
+            `magicLink` or `emailOtp`, requires SMTP to be ready; `smtp` in the same request
+            counts, since it is applied first. Password sign-in cannot be turned off on `master`.
+          properties:
+            password: { type: boolean }
+            passkey: { type: boolean }
+            magicLink: { type: boolean }
+            emailOtp: { type: boolean }
+        passwordPolicy:
+          type: object
+          additionalProperties: false
+          properties:
+            minLength: { type: integer, minimum: 4, maximum: 128 }
+            requireSpecial: { type: boolean }
+            requireUppercase: { type: boolean }
+            requireNumber: { type: boolean }
+            historyCount: { type: integer, minimum: 0, maximum: 24 }
+            maxAgeDays: { type: integer, minimum: 0, maximum: 365 }
+            blacklistEnabled: { type: boolean }
+            hibpCheckEnabled: { type: boolean }
+        mfaPolicy: { type: string, enum: [optional, required, required_admins] }
+        lockoutMaxAttempts: { type: integer, minimum: 0 }
+        lockoutDurationMinutes: { type: integer, minimum: 1 }
+        magicLinkTtlMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        emailOtpSignupEnabled: { type: boolean }
+        emailOtpLockoutThreshold: { type: integer, minimum: 0, maximum: 50 }
+        corsAllowCredentials: { type: boolean }
+        loginIdentifierMode: { type: string, enum: [USERNAME, EMAIL, EITHER] }
+        defaultLocale:
+          type: string
+          description: One of the locales the server ships or has mounted, e.g. `es`.
+        smtp: { $ref: "#/components/schemas/UpdateSmtpRequest" }
+
+    UpdateSmtpRequest:
+      type: object
+      additionalProperties: false
+      description: |
+        Absent fields keep their current values. For `host`, `username` and `fromName` an
+        empty string clears the value. With `enabled` true, `host` and a valid `fromAddress`
+        are required.
+      properties:
+        enabled: { type: boolean }
+        host: { type: string }
+        port: { type: integer, minimum: 1, maximum: 65535 }
+        username: { type: string }
+        password:
+          type: string
+          writeOnly: true
+          description: Never returned. Absent or blank keeps the stored password.
+        fromAddress: { type: string, format: email }
+        fromName: { type: string }
+        tlsEnabled: { type: boolean }
 
     WorkspaceSignInMethodsDto:
       type: object
@@ -1669,8 +1754,8 @@ paths:
       description: |
         Returns tenant metadata + which sign-in methods are enabled +
         security/password/MFA policy + magic-link/email-OTP limits. SMTP
-        credentials are NEVER returned — configure and inspect SMTP via
-        the admin UI. Not editable via API in v1.21.0.
+        settings are never returned; `emailDeliveryReady` says whether email
+        can be sent. Requires `workspace:read`.
       tags: [Workspace]
       security: [{ bearerAuth: [] }]
       responses:
@@ -1682,6 +1767,48 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateWorkspace
+      summary: Change workspace settings
+      description: |
+        Partial update: only the fields in the body change. Runs the same validation and
+        records the same audit events as the admin console. The whole request is applied
+        in one transaction, so a refused field leaves every setting as it was. Requires
+        `workspace:write`.
+      tags: [Workspace]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateWorkspaceRequest" }
+            example:
+              registrationEnabled: false
+              mfaPolicy: required
+              tokenExpirySeconds: 600
+              defaultLocale: es
+              smtp:
+                enabled: true
+                host: smtp.example.com
+                fromAddress: no-reply@example.com
+                password: "********"
+              signInMethods: { password: false, emailOtp: true }
+      responses:
+        "200":
+          description: The workspace after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkspaceDto" }
+        "400":
+          description: The body is not valid JSON or names an unknown field
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 
   # ==========================================================================
   # Webhooks

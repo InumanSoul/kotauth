@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answers `409`, so a provisioning script can repeat the call safely. See
   [Provisioning workspaces without the console](docs/operations/provisioning.md). Closes #172 and
   #126.
+- **Change a workspace's settings over the API: `PATCH /t/{slug}/api/v1/workspace`.** It needs
+  the new `workspace:write` scope. Only the fields in the body change. It covers sign-up and email
+  verification, sign-in methods, password policy, MFA policy, lockout, token lifetimes,
+  `loginIdentifierMode`, `defaultLocale` and SMTP, including its on/off switch. The SMTP password
+  is write-only. The request goes through the same services, validation and audit events as the
+  console's settings pages, in one transaction, so a refused field leaves everything unchanged.
+  SMTP is applied first, so one request can configure email and switch to passwordless sign-in. An
+  unknown field answers `400`. `GET /workspace` now also returns `loginIdentifierMode`,
+  `defaultLocale` and `emailDeliveryReady`, and still never returns SMTP settings. See
+  [Provisioning workspaces without the console](docs/operations/provisioning.md#4-workspace-settings).
 
 ### Changed
 
@@ -28,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes, and it ignored a failure to create a role. A failure in any step now rolls the whole
   creation back instead of leaving a workspace half set up. Creating a slug that exists is reported
   as a conflict rather than a validation error.
+- **Saving workspace settings follows the sign-in methods page's rules.** Before, saving refused
+  password sign-in turned off unless magic links were on, even with email codes or passkeys
+  enabled. So a workspace switched to email codes on the sign-in methods page could no longer save
+  its general or security settings. A save now needs at least one method on, needs SMTP to be ready
+  before password sign-in is turned off, and needs SMTP to be ready before magic links or email
+  codes are turned on.
 
 ### Security
 

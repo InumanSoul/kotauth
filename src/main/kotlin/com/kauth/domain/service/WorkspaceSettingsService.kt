@@ -193,7 +193,7 @@ class WorkspaceSettingsService(
     private fun validateWorkspaceSettings(
         update: WorkspaceSettingsUpdate,
         tenant: Tenant,
-    ): AdminError.Validation? {
+    ): AdminError? {
         if (update.displayName.isBlank()) {
             return AdminError.Validation("Display name is required.")
         }
@@ -212,10 +212,28 @@ class WorkspaceSettingsService(
         if (tenant.isMaster && !update.passwordLoginEnabled) {
             return AdminError.Validation("Password sign-in cannot be disabled on the master workspace.")
         }
-        if (!update.passwordLoginEnabled && !update.magicLinkEnabled) {
+        return validateSignInMethods(update, tenant)
+    }
+
+    // Same rules as the sign-in methods page (SecurityMethodsService), so a settings save can
+    // never reach a configuration that page would refuse.
+    private fun validateSignInMethods(
+        update: WorkspaceSettingsUpdate,
+        tenant: Tenant,
+    ): AdminError? {
+        val current = tenant.securityConfig
+        if (!update.passwordLoginEnabled) {
+            if (!update.magicLinkEnabled && !update.emailOtpLoginEnabled && !update.passkeysEnabled) {
+                return AdminError.NoMethodsEnabled
+            }
+            if (current.passwordLoginEnabled && !tenant.isSmtpReady) return AdminError.SmtpRequired
+        }
+        val turnsOnEmailMethod =
+            (update.magicLinkEnabled && !current.magicLinkEnabled) ||
+                (update.emailOtpLoginEnabled && !current.emailOtpLoginEnabled)
+        if (turnsOnEmailMethod && !tenant.isSmtpReady) {
             return AdminError.Validation(
-                "At least one email-based sign-in method must remain enabled. " +
-                    "Enable magic links before disabling password sign-in.",
+                "SMTP must be configured and enabled before turning on magic links or email codes.",
             )
         }
         return null

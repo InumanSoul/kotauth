@@ -81,6 +81,9 @@ object ApiScope {
     /** Read tenant metadata, sign-in methods, and security/MFA policy. SMTP credentials excluded. */
     const val WORKSPACE_READ = "workspace:read"
 
+    /** Change workspace settings: sign-up, sign-in methods, security policy, token lifetimes, locale, SMTP. */
+    const val WORKSPACE_WRITE = "workspace:write"
+
     /** List webhook endpoints (never exposes the signing secret). */
     const val WEBHOOKS_READ = "webhooks:read"
 
@@ -131,6 +134,7 @@ object ApiScope {
             AUTH_SEND_OTP,
             AUTH_VERIFY_OTP,
             WORKSPACE_READ,
+            WORKSPACE_WRITE,
             WEBHOOKS_READ,
             WEBHOOKS_WRITE,
             RESOURCE_SERVERS_READ,

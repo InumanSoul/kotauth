@@ -1731,9 +1731,46 @@ class AdminServicesTest {
         assertIs<AdminError.Validation>(result.error)
     }
 
+    private fun signInUpdate(
+        password: Boolean,
+        magicLink: Boolean = false,
+        emailOtp: Boolean = false,
+        passkey: Boolean = false,
+    ) = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!).copy(
+        passwordLoginEnabled = password,
+        magicLinkEnabled = magicLink,
+        emailOtpLoginEnabled = emailOtp,
+        passkeysEnabled = passkey,
+    )
+
     @Test
-    fun `updateWorkspaceSettings rejects disabling both password and magic link`() {
-        val result = callUpdateSettings(passwordLoginEnabled = false, magicLinkEnabled = false)
+    fun `updateWorkspaceSettings rejects turning off every sign-in method`() {
+        val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = false))
+        assertIs<AdminResult.Failure>(result)
+        assertEquals(AdminError.NoMethodsEnabled, result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings allows passwordless with only email codes`() {
+        val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = false, emailOtp = true))
+        assertIs<AdminResult.Success<Tenant>>(result)
+        assertTrue(result.value.securityConfig.emailOtpLoginEnabled)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings refuses passwordless while SMTP is not ready`() {
+        tenants.clear()
+        tenants.add(tenant.copy(smtpEnabled = false, passkeysEnabled = true))
+        val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = false, passkey = true))
+        assertIs<AdminResult.Failure>(result)
+        assertEquals(AdminError.SmtpRequired, result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings refuses turning on magic links while SMTP is not ready`() {
+        tenants.clear()
+        tenants.add(tenant.copy(smtpEnabled = false))
+        val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = true, magicLink = true))
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
