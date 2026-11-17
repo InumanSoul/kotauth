@@ -628,16 +628,20 @@ class BackupImporterService(
     )
 
     /**
-     * `create` cannot set the launcher fields, so anything non-default needs a follow-up `update`.
-     * Skipped entirely when the backup carries only defaults, which keeps pre-1.26 restores to the
-     * same single insert they always did.
+     * `create` cannot set the launcher fields or the token lifetime, so anything non-default needs a
+     * follow-up `update`. Skipped entirely when the backup carries only defaults, which keeps
+     * pre-1.26 restores to the same single insert they always did.
      */
     private fun restoreLauncherFields(
         app: Application,
         ab: ApplicationBackup,
     ) {
         val hasLauncherConfig =
-            ab.launcherUrl != null || ab.iconUrl != null || !ab.launcherVisible || ab.launcherDisplayOrder != 0
+            ab.launcherUrl != null ||
+                ab.iconUrl != null ||
+                !ab.launcherVisible ||
+                ab.launcherDisplayOrder != 0 ||
+                ab.tokenExpiryOverride != null
         if (!hasLauncherConfig) return
         applicationRepository.update(
             appId = app.id,
@@ -651,6 +655,7 @@ class BackupImporterService(
             launcherVisible = ab.launcherVisible,
             launcherDisplayOrder = ab.launcherDisplayOrder,
             audience = ab.audience,
+            tokenExpiryOverride = ab.tokenExpiryOverride,
         )
     }
 

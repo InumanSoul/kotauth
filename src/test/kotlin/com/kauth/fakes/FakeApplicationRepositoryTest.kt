@@ -76,6 +76,7 @@ class FakeApplicationRepositoryTest {
                 launcherVisible = true,
                 launcherDisplayOrder = 0,
                 audience = null,
+                tokenExpiryOverride = null,
             )
 
         assertEquals(setOf(GrantType.AUTHORIZATION_CODE), updated.grantTypes)

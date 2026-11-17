@@ -20,6 +20,9 @@ data class CreatedApplication(
     val plaintextSecret: String?,
 )
 
+/** Bounds for a per-client access-token lifetime: one minute to one day. */
+private val TOKEN_EXPIRY_RANGE = 60..86_400
+
 class ApplicationManagementService(
     private val applicationRepository: ApplicationRepository,
     private val tenantRepository: TenantRepository,
@@ -121,6 +124,7 @@ class ApplicationManagementService(
         return AdminResult.Success(CreatedApplication(created, secret))
     }
 
+    /** A null argument keeps the stored value. For [tokenExpiryOverride], 0 clears it. */
     fun updateApplication(
         appId: ApplicationId,
         tenantId: TenantId,
@@ -134,6 +138,7 @@ class ApplicationManagementService(
         launcherVisible: Boolean? = null,
         launcherDisplayOrder: Int? = null,
         audience: String? = null,
+        tokenExpiryOverride: Int? = null,
     ): AdminResult<Application> {
         val app =
             applicationRepository.findById(appId)
@@ -157,6 +162,8 @@ class ApplicationManagementService(
         val resolvedLauncherDisplayOrder = launcherDisplayOrder ?: app.launcherDisplayOrder
         val resolvedAudience =
             if (audience != null) audience.trim().takeIf { it.isNotBlank() } else app.audience
+        val resolvedTokenExpiry =
+            if (tokenExpiryOverride != null) tokenExpiryOverride.takeIf { it != 0 } else app.tokenExpiryOverride
 
         if (resolvedName.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Name is required."))
@@ -196,6 +203,14 @@ class ApplicationManagementService(
         }
         if (resolvedAudience != null && resolvedAudience.length > 200) {
             return AdminResult.Failure(AdminError.Validation("Token audience must be 200 characters or fewer."))
+        }
+        if (tokenExpiryOverride != null && resolvedTokenExpiry != null && resolvedTokenExpiry !in TOKEN_EXPIRY_RANGE) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "Access token lifetime must be between ${TOKEN_EXPIRY_RANGE.first} and " +
+                        "${TOKEN_EXPIRY_RANGE.last} seconds, or empty to use the workspace's.",
+                ),
+            )
         }
 
         if (resolvedLauncherUrl != null) {
@@ -238,6 +253,7 @@ class ApplicationManagementService(
                 launcherVisible = resolvedLauncherVisible,
                 launcherDisplayOrder = resolvedLauncherDisplayOrder,
                 audience = resolvedAudience,
+                tokenExpiryOverride = resolvedTokenExpiry,
             )
 
         invalidateCors(tenantId)

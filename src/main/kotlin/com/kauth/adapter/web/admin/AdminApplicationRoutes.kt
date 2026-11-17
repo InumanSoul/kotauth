@@ -206,6 +206,9 @@ fun Route.adminApplicationRoutes(
                 val launcherDisplayOrder =
                     params["launcherDisplayOrder"]?.trim()?.toIntOrNull()?.coerceIn(0, 9999) ?: 0
                 val audience = params["audience"]?.trim().orEmpty()
+                // Blank clears the override (0); anything that is not a number fails the range check.
+                val tokenExpiryOverride =
+                    params["tokenExpiryOverride"]?.trim()?.let { if (it.isEmpty()) 0 else it.toIntOrNull() ?: -1 }
                 when (
                     val result =
                         applicationManagementService.updateApplication(
@@ -221,6 +224,7 @@ fun Route.adminApplicationRoutes(
                             launcherVisible = launcherVisible,
                             launcherDisplayOrder = launcherDisplayOrder,
                             audience = audience,
+                            tokenExpiryOverride = tokenExpiryOverride,
                         )
                 ) {
                     is AdminResult.Success ->

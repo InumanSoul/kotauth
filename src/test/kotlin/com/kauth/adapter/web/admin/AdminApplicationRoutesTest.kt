@@ -348,6 +348,74 @@ class AdminApplicationRoutesTest {
             )
         }
 
+    @Test
+    fun `the edit form sets a token lifetime, keeps it when absent, and clears it when blank`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            appRepo.create(
+                tenantId = tenantId,
+                clientId = "ttl-worker",
+                name = "TTL Worker",
+                description = null,
+                accessType = "confidential",
+                redirectUris = emptyList(),
+                grantTypes = setOf(com.kauth.domain.model.GrantType.CLIENT_CREDENTIALS),
+                clientSecretHash = hasher.hash("secret"),
+                audience = null,
+            )
+
+            suspend fun submit(lifetime: String?) =
+                authed.submitForm(
+                    url = "/admin/workspaces/$tenantSlug/applications/ttl-worker/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("name", "TTL Worker")
+                            append("accessType", "confidential")
+                            append("grantTypes", "client_credentials")
+                            lifetime?.let { append("tokenExpiryOverride", it) }
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, submit("900").status)
+            assertEquals(900, appRepo.findByClientId(tenantId, "ttl-worker")?.tokenExpiryOverride)
+
+            assertEquals(HttpStatusCode.Found, submit(null).status)
+            assertEquals(900, appRepo.findByClientId(tenantId, "ttl-worker")?.tokenExpiryOverride)
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, submit("ten").status)
+            assertEquals(900, appRepo.findByClientId(tenantId, "ttl-worker")?.tokenExpiryOverride)
+
+            assertEquals(HttpStatusCode.Found, submit("").status)
+            assertEquals(null, appRepo.findByClientId(tenantId, "ttl-worker")?.tokenExpiryOverride)
+        }
+
+    @Test
+    fun `the edit page shows the workspace lifetime a blank token lifetime falls back to`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            appRepo.create(
+                tenantId = tenantId,
+                clientId = "ttl-page",
+                name = "TTL Page",
+                description = null,
+                accessType = "confidential",
+                redirectUris = emptyList(),
+                grantTypes = setOf(com.kauth.domain.model.GrantType.CLIENT_CREDENTIALS),
+                clientSecretHash = hasher.hash("secret"),
+                audience = null,
+            )
+            val workspaceSeconds = tenantRepo.findById(tenantId)!!.tokenExpirySeconds.toString()
+
+            val html = authed.get("/admin/workspaces/$tenantSlug/applications/ttl-page/edit").bodyAsText()
+
+            assertTrue("name=\"tokenExpiryOverride\"" in html)
+            assertTrue("placeholder=\"$workspaceSeconds\"" in html)
+        }
+
     // =========================================================================
     // GET /applications/{clientId} — Authorized APIs card
     // =========================================================================

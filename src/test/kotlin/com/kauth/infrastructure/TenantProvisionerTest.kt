@@ -101,6 +101,7 @@ class TenantProvisionerTest {
             launcherVisible = false,
             launcherDisplayOrder = 7,
             audience = "https://api.acme.example",
+            tokenExpiryOverride = 900,
         )
 
         provisioner.provision(tenant)
@@ -112,6 +113,7 @@ class TenantProvisionerTest {
         assertEquals("https://acme.example/icon.png", portal.iconUrl)
         assertEquals(false, portal.launcherVisible)
         assertEquals(7, portal.launcherDisplayOrder)
+        assertEquals(900, portal.tokenExpiryOverride)
         assertEquals(setOf(GrantType.AUTHORIZATION_CODE), portal.grantTypes)
     }
 

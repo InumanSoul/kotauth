@@ -298,6 +298,14 @@ components:
         grantTypes:
           type: array
           items: { $ref: "#/components/schemas/GrantType" }
+        audience:
+          type: string
+          nullable: true
+          description: The `aud` claim in this client's tokens. Null means the client ID is used.
+        tokenExpiryOverride:
+          type: integer
+          nullable: true
+          description: Access-token lifetime in seconds for this client. Null means the workspace's applies.
 
     UpdateApplicationRequest:
       type: object
@@ -313,6 +321,14 @@ components:
             Omit to leave the application's grants unchanged. Pass an explicit array —
             including `[]` — to replace them. Required to remove `client_credentials` from a
             confidential application, e.g. before demoting it to `public`.
+        audience:
+          type: string
+          description: The `aud` claim in this client's tokens. An empty string clears it.
+        tokenExpiryOverride:
+          type: integer
+          description: |
+            Access-token lifetime in seconds for this client, 60 to 86400. Omit to keep the current
+            value; `0` clears it, so the workspace's `tokenExpirySeconds` applies again.
 
     CreateApplicationRequest:
       type: object
