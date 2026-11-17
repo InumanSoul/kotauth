@@ -20,9 +20,13 @@ import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.concurrent.Executor
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,6 +64,7 @@ class EmailOtpServiceTest {
             resourceServerRepository = resources,
             roleRepository = roles,
             clock = fixedClock,
+            emailScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
     @BeforeTest
@@ -158,6 +163,47 @@ class EmailOtpServiceTest {
         val created = users.findByEmail(tenant.id, "newcomer@acme.test")!!
         assertEquals(User.SENTINEL_PASSWORD_HASH, created.passwordHash)
         assertFalse(created.emailVerified)
+        assertEquals(1, email.otps.size)
+    }
+
+    @Test
+    fun `sendOtp signs up an address that is not username-shaped under a generated username`() {
+        listOf("mary.o'brien@acme.test", "josé@acme.test").forEach { address ->
+            val result = newService().sendOtp(tenant.slug, address, clientApp.clientId)
+
+            assertTrue(result is OtpSendResult.Success)
+            val created = assertNotNull(users.findByEmail(tenant.id, address), address)
+            assertNotEquals(address, created.username)
+            assertTrue(UsernamePolicy.isValid(created.username), created.username)
+            assertNotNull(challenges.findByChallengeId(result.challengeId), address)
+        }
+        assertEquals(2, email.otps.size)
+    }
+
+    @Test
+    fun `sendOtp returns before the code is mailed`() {
+        val queued = mutableListOf<Runnable>()
+        val deferred = CoroutineScope(Executor { queued.add(it) }.asCoroutineDispatcher())
+        val service =
+            EmailOtpService(
+                tenantRepository = tenants,
+                userRepository = users,
+                challengeRepository = challenges,
+                applicationRepository = apps,
+                authorizationCodeRepository = authCodes,
+                emailPort = email,
+                auditLog = audit,
+                resourceServerRepository = resources,
+                roleRepository = roles,
+                clock = fixedClock,
+                emailScope = deferred,
+            )
+
+        val result = service.sendOtp(tenant.slug, "newcomer@acme.test", clientApp.clientId)
+
+        assertTrue(result is OtpSendResult.Success)
+        assertEquals(0, email.otps.size)
+        queued.toList().forEach { it.run() }
         assertEquals(1, email.otps.size)
     }
 
@@ -396,6 +442,7 @@ class EmailOtpServiceTest {
                 resourceServerRepository = resources,
                 roleRepository = roles,
                 clock = expiredClock,
+                emailScope = CoroutineScope(Dispatchers.Unconfined),
             )
 
         val result = late.verifyOtp(tenant.slug, "handle-1", "123456")

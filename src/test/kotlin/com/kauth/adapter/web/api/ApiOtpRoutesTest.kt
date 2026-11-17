@@ -44,6 +44,8 @@ import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,6 +75,7 @@ class ApiOtpRoutesTest {
             auditLog = audit,
             resourceServerRepository = resources,
             roleRepository = roles,
+            emailScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
     private lateinit var sendKey: String

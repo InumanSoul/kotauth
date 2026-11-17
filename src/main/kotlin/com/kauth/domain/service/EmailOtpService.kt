@@ -20,6 +20,10 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.util.sha256Hex
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -40,8 +44,9 @@ import java.util.UUID
  * endpoint — the BFF never sees the user id, only the opaque challenge handle
  * and the code.
  *
- * Constant-time padding is intentionally a route-layer concern (the route
- * wraps the call with `delay()`); this service stays sync and framework-free.
+ * Constant-time padding is a route-layer concern (the route wraps the call with `delay()`). The
+ * code is mailed on [emailScope], off the request path, so the padding covers every branch: a
+ * synchronous SMTP round-trip outlasts it and would tell a known address from an unknown one.
  */
 class EmailOtpService(
     private val tenantRepository: TenantRepository,
@@ -54,6 +59,8 @@ class EmailOtpService(
     private val resourceServerRepository: ResourceServerRepository,
     private val roleRepository: RoleRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
+    private val usernameGenerator: UsernameGenerator = UsernameGenerator(userRepository),
+    private val emailScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     private val log = LoggerFactory.getLogger(EmailOtpService::class.java)
 
@@ -83,23 +90,20 @@ class EmailOtpService(
         val user =
             existing ?: run {
                 // Signup disabled, or this exact address is already someone ELSE's username (a
-                // cross-namespace collision `IdentifierCollisionCheck` guards elsewhere — the
-                // uniqueness constraint on `users_username_per_tenant` would otherwise turn this
-                // into an unhandled exception). Either way: uniform success with a handle that
-                // never resolves, so this endpoint stays a non-oracle for both cases alike.
-                if (!tenant.securityConfig.emailOtpSignupEnabled ||
-                    !UsernamePolicy.isValid(normalizedEmail) ||
-                    userRepository.existsByUsername(tenant.id, normalizedEmail)
-                ) {
-                    return OtpSendResult.Success(
-                        challengeId = generateChallengeHandle(),
-                        expiresAt = expiresAt,
-                    )
+                // cross-namespace collision `IdentifierCollisionCheck` guards elsewhere). Either
+                // way: uniform success with a handle that never resolves, so this endpoint stays a
+                // non-oracle for both cases alike.
+                if (!tenant.securityConfig.emailOtpSignupEnabled) {
+                    return OtpSendResult.Success(generateChallengeHandle(), expiresAt)
+                }
+                if (userRepository.existsByUsername(tenant.id, normalizedEmail)) {
+                    log.info("OTP sign-up skipped: tenant={} reason=address_is_another_username", tenant.slug)
+                    return OtpSendResult.Success(generateChallengeHandle(), expiresAt)
                 }
                 userRepository.save(
                     User(
                         tenantId = tenant.id,
-                        username = normalizedEmail,
+                        username = usernameFor(tenant.id, normalizedEmail),
                         email = normalizedEmail,
                         fullName = normalizedEmail.substringBefore("@"),
                         passwordHash = User.SENTINEL_PASSWORD_HASH,
@@ -126,24 +130,26 @@ class EmailOtpService(
                 ),
             )
 
-        val deliveryFailure =
-            runCatching {
-                emailPort.sendEmailOtpEmail(
-                    to = user.email,
-                    toName = user.fullName,
-                    code = rawCode,
-                    expiresInMinutes = OTP_TTL_MINUTES,
-                    workspaceName = tenant.emailBranding?.brandName ?: tenant.displayName,
-                    tenant = tenant,
+        emailScope.launch {
+            val deliveryFailure =
+                runCatching {
+                    emailPort.sendEmailOtpEmail(
+                        to = user.email,
+                        toName = user.fullName,
+                        code = rawCode,
+                        expiresInMinutes = OTP_TTL_MINUTES,
+                        workspaceName = tenant.emailBranding?.brandName ?: tenant.displayName,
+                        tenant = tenant,
+                    )
+                }.exceptionOrNull()
+            if (deliveryFailure != null) {
+                log.warn(
+                    "OTP email delivery failed: tenant={} email={} reason={}",
+                    tenant.slug,
+                    user.email,
+                    deliveryFailure.javaClass.simpleName,
                 )
-            }.exceptionOrNull()
-        if (deliveryFailure != null) {
-            log.warn(
-                "OTP email delivery failed: tenant={} email={} reason={}",
-                tenant.slug,
-                user.email,
-                deliveryFailure.javaClass.simpleName,
-            )
+            }
         }
 
         auditLog.record(
@@ -372,6 +378,12 @@ class EmailOtpService(
     private fun isLocked(user: User): Boolean = user.lockedUntil?.isAfter(clock.instant()) == true
 
     private fun generateSixDigitCode(): String = "%06d".format(SECURE_RANDOM.nextInt(1_000_000))
+
+    /** The address itself when it is username-shaped; otherwise a generated handle. */
+    private fun usernameFor(
+        tenantId: TenantId,
+        email: String,
+    ): String = if (UsernamePolicy.isValid(email)) email else usernameGenerator.generate(tenantId, null, email)
 
     private fun generateChallengeHandle(): String {
         val bytes = ByteArray(32)
