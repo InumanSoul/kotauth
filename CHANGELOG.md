@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unknown field answers `400`. `GET /workspace` now also returns `loginIdentifierMode`,
   `defaultLocale` and `emailDeliveryReady`, and still never returns SMTP settings. See
   [Provisioning workspaces without the console](docs/operations/provisioning.md#4-workspace-settings).
+- **A bootstrap key can wait for its workspace.** A `KAUTH_BOOTSTRAP_API_KEYS` entry with
+  `"awaitTenant": true` that names a workspace that does not exist yet is held at startup instead
+  of stopping the server. The key is provisioned when the workspace is created, through
+  `POST /admin/api/v1/tenants` or the console, or imported, in the same transaction. So a fresh
+  deployment can create its workspaces and configure them with their own keys in one run, with no
+  restart. An entry without the flag still stops the server for an unknown slug. Every entry's
+  scopes and workspace are now checked before any key is written, so a bad entry late in the list
+  no longer leaves the earlier ones applied.
 
 ### Changed
 
@@ -59,6 +67,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A negative lockout threshold silently turned lockout off.** Workspace settings coerced
+  `lockoutMaxAttempts` below 0 to 0, which means "no lockout", and enforced no upper bound on it or
+  on the lockout duration. Both are now refused with a validation error outside the ranges the
+  console shows: 0–100 attempts, where 0 turns lockout off, and 1–1440 minutes. A value stored
+  before these bounds is left alone until it is changed.
 - **Signing out of the console behind a reverse proxy ended on a raw 400.** The console sent
   `KAUTH_BASE_URL/admin/login` as the post-logout URI, but the end-session endpoint compared it with
   the origin Ktor saw. Behind a proxy chain that origin can differ in scheme or port, so the URI was

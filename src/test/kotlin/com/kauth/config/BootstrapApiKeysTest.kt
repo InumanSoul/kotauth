@@ -28,6 +28,13 @@ class BootstrapApiKeysTest {
     }
 
     @Test
+    fun `awaitTenant is read from the entry and defaults to false`() {
+        assertEquals(false, parseBootstrapApiKeyEntries(entryJson(null)).single().awaitTenant)
+        val json = "[{\"tenant\":\"orders\",\"name\":\"p\",\"scopes\":[],\"keyHash\":\"h\",\"awaitTenant\":true}]"
+        assertTrue(parseBootstrapApiKeyEntries(json).single().awaitTenant)
+    }
+
+    @Test
     fun `an entry with no scimDialect field carries none`() {
         assertNull(parseBootstrapApiKeyEntries(entryJson(null)).single().scimDialect)
     }

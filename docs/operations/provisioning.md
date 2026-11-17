@@ -69,10 +69,30 @@ on each run and treat `409` as "already there". An existing workspace is never m
 
 ## 3. Workspace keys
 
-Once a workspace exists, a `KAUTH_BOOTSTRAP_API_KEYS` entry can name it, and the workspace's own
-admin API (`/t/{slug}/api/v1`) takes over from there. Bootstrap entries are applied at startup and
-exit the process for a slug that does not exist yet, so add a workspace's keys after the call that
-creates it, and restart to apply them.
+The workspace's own admin API (`/t/{slug}/api/v1`) needs a key of that workspace. Declare it in
+`KAUTH_BOOTSTRAP_API_KEYS` next to the master key, with `"awaitTenant": true`:
+
+```json
+[
+  { "tenant": "master", "name": "provisioner", "scopes": ["tenants:write"], "keyHash": "3f1c..." },
+  {
+    "tenant": "acme",
+    "name": "acme-provisioner",
+    "scopes": ["workspace:read", "workspace:write"],
+    "keyHash": "9b2e...",
+    "awaitTenant": true
+  }
+]
+```
+
+Generate it with `cli hash-api-key --tenant=acme`. An entry marked `awaitTenant` whose workspace
+does not exist yet is held at startup instead of stopping the server. The moment step 2 creates
+the workspace, or an import brings it in, the key is provisioned in the same transaction. It works
+on the next request, with no restart.
+
+Without `awaitTenant`, an entry naming a workspace that does not exist still stops the server at
+startup, so a mistyped slug cannot go unnoticed. Once the workspace exists, every startup applies
+its entries as usual, `awaitTenant` or not.
 
 ## 4. Workspace settings
 
