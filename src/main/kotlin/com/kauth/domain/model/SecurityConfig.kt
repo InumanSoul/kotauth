@@ -27,7 +27,7 @@ data class SecurityConfig(
     // Breach detection — block passwords that appear in HIBP's breach corpus
     val hibpCheckEnabled: Boolean = false,
     val magicLinkEnabled: Boolean = false,
-    // Magic-link expiry window, in minutes. Range 1-1440 enforced at the service layer.
+    // Magic-link expiry window, in minutes. Read it through [magicLinkTtlMinutes].
     val magicLinkTokenTtlMinutes: Int = 15,
     // Disabling password login affects only the password flow; magic-link and
     // social providers are governed by their own per-tenant config.
@@ -41,4 +41,9 @@ data class SecurityConfig(
     val loginIdentifierMode: LoginIdentifierMode = LoginIdentifierMode.USERNAME,
 ) {
     val isLockoutEnabled: Boolean get() = lockoutMaxAttempts > 0
+
+    /** The window a magic link is actually issued with, so the emails and pages can quote it. */
+    val magicLinkTtlMinutes: Int get() = magicLinkTokenTtlMinutes.coerceIn(MAGIC_LINK_TTL_MINUTES)
 }
+
+val MAGIC_LINK_TTL_MINUTES = 1..1440

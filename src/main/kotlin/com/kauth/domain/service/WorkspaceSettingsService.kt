@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.MAGIC_LINK_TTL_MINUTES
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
@@ -276,7 +277,7 @@ class WorkspaceSettingsService(
                     corsAllowCredentials = update.corsAllowCredentials,
                     hibpCheckEnabled = update.hibpCheckEnabled,
                     magicLinkEnabled = update.magicLinkEnabled,
-                    magicLinkTokenTtlMinutes = update.magicLinkTokenTtlMinutes.coerceIn(1, 1440),
+                    magicLinkTokenTtlMinutes = update.magicLinkTokenTtlMinutes.coerceIn(MAGIC_LINK_TTL_MINUTES),
                     passwordLoginEnabled = update.passwordLoginEnabled,
                     emailOtpSignupEnabled = update.emailOtpSignupEnabled,
                     emailOtpLockoutThreshold = update.emailOtpLockoutThreshold.coerceIn(0, 50),

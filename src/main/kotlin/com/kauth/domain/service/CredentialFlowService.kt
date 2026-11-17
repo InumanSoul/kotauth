@@ -603,7 +603,7 @@ class CredentialFlowService(
 
         val (rawToken, tokenHash) = generateToken()
 
-        val ttlMinutes = tenant.securityConfig.magicLinkTokenTtlMinutes.coerceIn(1, 1440)
+        val ttlMinutes = tenant.securityConfig.magicLinkTtlMinutes
         prTokenRepo.deleteByUserAndPurpose(user.id!!, TokenPurpose.MAGIC_LINK)
         prTokenRepo.create(
             PasswordResetToken(

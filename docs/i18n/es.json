@@ -88,7 +88,7 @@
 
   "MAGIC_LINK_TITLE": "Iniciar sesión con correo",
   "MAGIC_LINK_SUBTITLE_FORM": "Introduce tu correo electrónico y te enviaremos un enlace de un solo uso para iniciar sesión. No necesitas contraseña.",
-  "MAGIC_LINK_SUBTITLE_SENT": "Si existe una cuenta con ese correo, recibirás un enlace de inicio de sesión en breve. El enlace caduca en 15 minutos.",
+  "MAGIC_LINK_SUBTITLE_SENT": "Si existe una cuenta con ese correo, recibirás un enlace de inicio de sesión en breve. El enlace caduca en {0} minutos.",
   "MAGIC_LINK_EMAIL_LABEL": "Correo electrónico",
   "MAGIC_LINK_EMAIL_PLACEHOLDER": "tu@ejemplo.com",
   "MAGIC_LINK_SUBMIT": "Enviar enlace de inicio de sesión",
@@ -241,7 +241,7 @@
   "EMAIL_BODY_PASSWORD_CHANGED_LOGIN_HINT": "Inicia sesión en {0} y usa el enlace «¿Olvidaste tu contraseña?».",
   "EMAIL_BODY_TEST": "Este correo confirma que SMTP está configurado correctamente para {0}. El envío de correos (verificación, restablecimiento de contraseña, notificaciones) está operativo.",
   "EMAIL_BODY_INVITE": "Te hemos añadido a {0}. Pulsa el botón de abajo para establecer tu contraseña y activar tu cuenta. Este enlace caduca en 72 horas.",
-  "EMAIL_BODY_MAGIC_LINK": "Pulsa el botón de abajo para iniciar sesión. Este enlace caduca en 15 minutos y solo puede usarse una vez.",
+  "EMAIL_BODY_MAGIC_LINK": "Pulsa el botón de abajo para iniciar sesión. Este enlace caduca en {0} minutos y solo puede usarse una vez.",
   "EMAIL_BODY_OTP": "Usa este código de {0} minutos para terminar de iniciar sesión. No lo compartas con nadie.",
 
   "EMAIL_CTA_VERIFY": "Verificar dirección de correo",

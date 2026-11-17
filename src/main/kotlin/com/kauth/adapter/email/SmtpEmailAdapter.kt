@@ -334,7 +334,9 @@ class SmtpEmailAdapter(
                     tenant = tenant,
                     locale = locale,
                     heading = t("EMAIL_HEADING_MAGIC_LINK", locale, htmlEscape(workspaceName)),
-                    bodyHtml = greetingHtml(toName, locale) + t("EMAIL_BODY_MAGIC_LINK", locale),
+                    bodyHtml =
+                        greetingHtml(toName, locale) +
+                            t("EMAIL_BODY_MAGIC_LINK", locale, tenant.securityConfig.magicLinkTtlMinutes),
                     ctaLabel = t("EMAIL_CTA_MAGIC_LINK", locale),
                     ctaUrl = magicLinkUrl,
                     footerHtml = t("EMAIL_FOOTER_MAGIC_LINK", locale),
@@ -343,7 +345,9 @@ class SmtpEmailAdapter(
                 buildEmailText(
                     workspace = workspaceName,
                     heading = t("EMAIL_HEADING_MAGIC_LINK", locale, workspaceName),
-                    body = greetingText(toName, locale) + t("EMAIL_BODY_MAGIC_LINK", locale),
+                    body =
+                        greetingText(toName, locale) +
+                            t("EMAIL_BODY_MAGIC_LINK", locale, tenant.securityConfig.magicLinkTtlMinutes),
                     url = magicLinkUrl,
                     footer = t("EMAIL_FOOTER_MAGIC_LINK", locale),
                 ),
