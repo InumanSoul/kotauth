@@ -31,6 +31,12 @@ enum class ScimFilterScope(
     internal fun rejection(attribute: String): String = "unsupported attribute '$attribute' for $subject"
 }
 
+/**
+ * Attributes the published schemas declare `caseExact: false`, so `eq` on them ignores case
+ * (RFC 7643 §2.2). The same names mean the same thing in every [ScimFilterScope].
+ */
+internal val CASE_INSENSITIVE_ATTRIBUTES = setOf("userName", "displayName", "value", "type", "display")
+
 // Bounds recursion depth against pathological nesting (e.g. thousands of "("); not a grammar rule.
 private const val MAX_NESTING_DEPTH = 32
 
@@ -53,10 +59,18 @@ sealed interface ScimFilter {
     /** Evaluates this filter against one element of a multi-valued attribute. */
     fun matches(value: ScimValue): Boolean =
         when (this) {
-            is Eq -> resolveAttribute(attr, value) == this.value
+            is Eq -> equalsLiteral(resolveAttribute(attr, value))
             is And -> left.matches(value) && right.matches(value)
             is Or -> left.matches(value) || right.matches(value)
         }
+
+    private fun Eq.equalsLiteral(actual: ScimValue?): Boolean {
+        val expected = value
+        if (attr in CASE_INSENSITIVE_ATTRIBUTES && actual is ScimValue.Str && expected is ScimValue.Str) {
+            return actual.value.equals(expected.value, ignoreCase = true)
+        }
+        return actual == expected
+    }
 }
 
 private fun resolveAttribute(
