@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.ApiKeyRepository
 import com.kauth.domain.port.TenantRepository
 
@@ -15,7 +16,9 @@ import com.kauth.domain.port.TenantRepository
  *
  * Unknown tenant slugs cause a fail-fast result so a typo can't silently
  * leave a partner BFF without its key at startup. Unknown scopes are
- * rejected for the same reason.
+ * rejected for the same reason. The one exception is an entry marked
+ * [Entry.awaitTenant]: it is held until a workspace with that slug is created
+ * or imported, and [applyPendingFor] provisions it then, with no restart.
  *
  * The entry is authoritative for every field it owns, the SCIM dialect included: an entry that
  * names no dialect re-asserts the `rfc` default, so the environment and the running key cannot
@@ -33,6 +36,8 @@ class ApiKeyBootstrapService(
         val keyPrefix: String? = null,
         /** Optional; null means the RFC pass-through. Validated against the registry before it gets here. */
         val scimDialect: String? = null,
+        /** The workspace may not exist yet; hold the entry until it is created instead of failing. */
+        val awaitTenant: Boolean = false,
     )
 
     companion object {
@@ -55,66 +60,96 @@ class ApiKeyBootstrapService(
         val action: Action,
     )
 
-    enum class Action { CREATED, UPDATED, UNCHANGED }
+    enum class Action { CREATED, UPDATED, UNCHANGED, PENDING }
+
+    private val pending = mutableListOf<Entry>()
+
+    /** Entries waiting for their workspace to be created. */
+    val pendingEntries: List<Entry>
+        get() = synchronized(pending) { pending.toList() }
 
     fun ensureBootstrapped(entries: List<Entry>): Result {
-        val outcomes = mutableListOf<Outcome>()
+        // Validate every entry before writing any, so a bad entry late in the list leaves no keys behind.
         for (entry in entries) {
-            val tenant =
-                tenantRepository.findBySlug(entry.tenantSlug)
-                    ?: return Result.Failure(
-                        "Unknown tenant slug '${entry.tenantSlug}' for bootstrap key '${entry.name}'",
-                    )
-
             val invalidScope = entry.scopes.firstOrNull { it !in ApiScope.ALL }
             if (invalidScope != null) {
+                return Result.Failure("Unknown scope '$invalidScope' for bootstrap key '${entry.name}'")
+            }
+            if (!entry.awaitTenant && !tenantRepository.existsBySlug(entry.tenantSlug)) {
                 return Result.Failure(
-                    "Unknown scope '$invalidScope' for bootstrap key '${entry.name}'",
+                    "Unknown tenant slug '${entry.tenantSlug}' for bootstrap key '${entry.name}'. " +
+                        "Set \"awaitTenant\": true if the workspace is created after startup.",
                 )
             }
-
-            val resolvedPrefix = (entry.keyPrefix ?: defaultKeyPrefix(entry.tenantSlug)).take(16)
-            val resolvedDialect = entry.scimDialect ?: ApiKey.DEFAULT_SCIM_DIALECT
-            val existing = apiKeyRepository.findByTenantAndName(tenant.id, entry.name)
-            if (existing == null) {
-                apiKeyRepository.save(
-                    ApiKey(
-                        tenantId = tenant.id,
-                        name = entry.name,
-                        keyPrefix = resolvedPrefix,
-                        keyHash = entry.keyHash,
-                        scopes = entry.scopes,
-                        enabled = true,
-                        bootstrapName = entry.name,
-                        scimDialect = resolvedDialect,
-                    ),
-                )
-                outcomes += Outcome(entry.tenantSlug, entry.name, Action.CREATED)
-                continue
+        }
+        val outcomes = mutableListOf<Outcome>()
+        synchronized(pending) {
+            pending.clear()
+            for (entry in entries) {
+                val tenant = tenantRepository.findBySlug(entry.tenantSlug)
+                if (tenant == null) {
+                    pending += entry
+                    outcomes += Outcome(entry.tenantSlug, entry.name, Action.PENDING)
+                } else {
+                    outcomes += apply(entry, tenant)
+                }
             }
-
-            val hashUnchanged = existing.keyHash == entry.keyHash
-            val scopesUnchanged = existing.scopes.toSet() == entry.scopes.toSet()
-            val brandedAsBootstrap = existing.bootstrapName == entry.name
-            val enabled = existing.enabled
-            val dialectUnchanged = existing.scimDialect == resolvedDialect
-
-            val entryIsUnchanged =
-                hashUnchanged && scopesUnchanged && brandedAsBootstrap && enabled && dialectUnchanged
-            if (entryIsUnchanged) {
-                outcomes += Outcome(entry.tenantSlug, entry.name, Action.UNCHANGED)
-                continue
-            }
-
-            apiKeyRepository.updateBootstrap(
-                id = existing.id!!,
-                keyHash = entry.keyHash,
-                scopes = entry.scopes,
-                bootstrapName = entry.name,
-                scimDialect = resolvedDialect,
-            )
-            outcomes += Outcome(entry.tenantSlug, entry.name, Action.UPDATED)
         }
         return Result.Provisioned(outcomes)
+    }
+
+    /**
+     * Provisions the held entries for [tenant], right after it is created or imported, inside the
+     * creating transaction. Entries stay held: applying one twice is a no-op, and a workspace that
+     * is deleted and created again gets its keys back.
+     */
+    fun applyPendingFor(tenant: Tenant): List<Outcome> =
+        synchronized(pending) {
+            pending.filter { it.tenantSlug == tenant.slug }.map { apply(it, tenant) }
+        }
+
+    private fun apply(
+        entry: Entry,
+        tenant: Tenant,
+    ): Outcome {
+        val resolvedPrefix = (entry.keyPrefix ?: defaultKeyPrefix(entry.tenantSlug)).take(16)
+        val resolvedDialect = entry.scimDialect ?: ApiKey.DEFAULT_SCIM_DIALECT
+        val existing = apiKeyRepository.findByTenantAndName(tenant.id, entry.name)
+        if (existing == null) {
+            apiKeyRepository.save(
+                ApiKey(
+                    tenantId = tenant.id,
+                    name = entry.name,
+                    keyPrefix = resolvedPrefix,
+                    keyHash = entry.keyHash,
+                    scopes = entry.scopes,
+                    enabled = true,
+                    bootstrapName = entry.name,
+                    scimDialect = resolvedDialect,
+                ),
+            )
+            return Outcome(entry.tenantSlug, entry.name, Action.CREATED)
+        }
+
+        val hashUnchanged = existing.keyHash == entry.keyHash
+        val scopesUnchanged = existing.scopes.toSet() == entry.scopes.toSet()
+        val brandedAsBootstrap = existing.bootstrapName == entry.name
+        val enabled = existing.enabled
+        val dialectUnchanged = existing.scimDialect == resolvedDialect
+
+        val entryIsUnchanged =
+            hashUnchanged && scopesUnchanged && brandedAsBootstrap && enabled && dialectUnchanged
+        if (entryIsUnchanged) {
+            return Outcome(entry.tenantSlug, entry.name, Action.UNCHANGED)
+        }
+
+        apiKeyRepository.updateBootstrap(
+            id = existing.id!!,
+            keyHash = entry.keyHash,
+            scopes = entry.scopes,
+            bootstrapName = entry.name,
+            scimDialect = resolvedDialect,
+        )
+        return Outcome(entry.tenantSlug, entry.name, Action.UPDATED)
     }
 }

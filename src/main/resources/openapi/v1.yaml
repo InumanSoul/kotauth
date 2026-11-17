@@ -458,8 +458,12 @@ components:
             blacklistEnabled: { type: boolean }
             hibpCheckEnabled: { type: boolean }
         mfaPolicy: { type: string, enum: [optional, required, required_admins] }
-        lockoutMaxAttempts: { type: integer, minimum: 0 }
-        lockoutDurationMinutes: { type: integer, minimum: 1 }
+        lockoutMaxAttempts:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Failed password attempts before the account is locked. 0 turns lockout off.
+        lockoutDurationMinutes: { type: integer, minimum: 1, maximum: 1440 }
         magicLinkTtlMinutes: { type: integer, minimum: 1, maximum: 1440 }
         emailOtpSignupEnabled: { type: boolean }
         emailOtpLockoutThreshold: { type: integer, minimum: 0, maximum: 50 }

@@ -453,7 +453,12 @@ data class ServiceGraph(
                 WorkspaceCreationService(
                     workspaceSettingsService = workspaceSettingsService,
                     roleGroupService = roleGroupService,
-                    tenantProvisioning = TenantProvisioner(keyProvisioning, portalClientProvisioning),
+                    tenantProvisioning =
+                        TenantProvisioner(
+                            keyProvisioning,
+                            portalClientProvisioning,
+                            apiKeyBootstrapService,
+                        ),
                     transactionRunner = ExposedTransactionRunner(),
                 )
             val workspacePatchService =
@@ -689,7 +694,12 @@ data class ServiceGraph(
                     auditLogPort = auditLogAdapter,
                     transactionRunner = backupTransactionRunner,
                     resourceServerRepository = resourceServerRepository,
-                    tenantProvisioning = TenantProvisioner(keyProvisioning, portalClientProvisioning),
+                    tenantProvisioning =
+                        TenantProvisioner(
+                            keyProvisioning,
+                            portalClientProvisioning,
+                            apiKeyBootstrapService,
+                        ),
                 )
 
             return ServiceGraph(

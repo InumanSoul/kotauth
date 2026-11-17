@@ -1744,6 +1744,38 @@ class AdminServicesTest {
     )
 
     @Test
+    fun `updateWorkspaceSettings refuses a negative lockout threshold instead of turning lockout off`() {
+        val update = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!).copy(lockoutMaxAttempts = -1)
+        val result = wsSvc.updateWorkspaceSettings("acme", update)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings refuses lockout values outside the console's bounds`() {
+        val base = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!)
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutMaxAttempts = 101)))
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutDurationMinutes = 0)))
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutDurationMinutes = 1441)))
+    }
+
+    @Test
+    fun `updateWorkspaceSettings accepts 0 lockout attempts, which turns lockout off`() {
+        val update = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!).copy(lockoutMaxAttempts = 0)
+        val result = wsSvc.updateWorkspaceSettings("acme", update)
+        assertIs<AdminResult.Success<Tenant>>(result)
+        assertFalse(result.value.securityConfig.isLockoutEnabled)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings still saves a workspace whose stored lockout predates the bounds`() {
+        tenants.clear()
+        tenants.add(tenant.copy(securityConfig = tenant.securityConfig.copy(lockoutMaxAttempts = 500)))
+        val update = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!).copy(displayName = "Acme 2")
+        assertIs<AdminResult.Success<Tenant>>(wsSvc.updateWorkspaceSettings("acme", update))
+    }
+
+    @Test
     fun `updateWorkspaceSettings rejects turning off every sign-in method`() {
         val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = false))
         assertIs<AdminResult.Failure>(result)

@@ -209,6 +209,17 @@ class WorkspaceSettingsService(
         if (update.mfaPolicy !in listOf("optional", "required", "required_admins")) {
             return AdminError.Validation("MFA policy must be 'optional', 'required', or 'required_admins'.")
         }
+        // Refused rather than coerced: a negative attempt count used to become 0, which turns lockout
+        // off. Checked only on a change, so a value stored before these bounds still saves.
+        val current = tenant.securityConfig
+        if (update.lockoutMaxAttempts != current.lockoutMaxAttempts && update.lockoutMaxAttempts !in 0..100) {
+            return AdminError.Validation("Max failed attempts must be between 0 (lockout off) and 100.")
+        }
+        if (update.lockoutDurationMinutes != current.lockoutDurationMinutes &&
+            update.lockoutDurationMinutes !in 1..1440
+        ) {
+            return AdminError.Validation("Lockout duration must be between 1 and 1440 minutes.")
+        }
         if (tenant.isMaster && !update.passwordLoginEnabled) {
             return AdminError.Validation("Password sign-in cannot be disabled on the master workspace.")
         }
@@ -260,8 +271,8 @@ class WorkspaceSettingsService(
                     passwordMaxAgeDays = update.passwordPolicyMaxAgeDays.coerceIn(0, 365),
                     passwordBlacklistEnabled = update.passwordPolicyBlacklistEnabled,
                     mfaPolicy = update.mfaPolicy,
-                    lockoutMaxAttempts = update.lockoutMaxAttempts.coerceAtLeast(0),
-                    lockoutDurationMinutes = update.lockoutDurationMinutes.coerceAtLeast(1),
+                    lockoutMaxAttempts = update.lockoutMaxAttempts,
+                    lockoutDurationMinutes = update.lockoutDurationMinutes,
                     corsAllowCredentials = update.corsAllowCredentials,
                     hibpCheckEnabled = update.hibpCheckEnabled,
                     magicLinkEnabled = update.magicLinkEnabled,

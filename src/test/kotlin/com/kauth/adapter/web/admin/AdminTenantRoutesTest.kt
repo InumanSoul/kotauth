@@ -4,11 +4,13 @@ import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.WorkspaceCreationService
 import com.kauth.domain.service.WorkspaceSettingsService
+import com.kauth.domain.util.sha256Hex
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -55,7 +57,9 @@ class AdminTenantRoutesTest {
     private val roleRepo = FakeRoleRepository()
     private val tenantKeys = FakeTenantKeyRepository()
     private val audit = FakeAuditLogPort()
-    private val apiKeyService = ApiKeyService(apiKeyRepository = FakeApiKeyRepository(), tenantRepository = tenantRepo)
+    private val apiKeyRepo = FakeApiKeyRepository()
+    private val apiKeyService = ApiKeyService(apiKeyRepository = apiKeyRepo, tenantRepository = tenantRepo)
+    private val apiKeyBootstrap = ApiKeyBootstrapService(apiKeyRepo, tenantRepo)
 
     private val master = Tenant(TenantId(1), "master", "Master", issuerUrl = null, theme = TenantTheme.DEFAULT)
     private val acme = Tenant(TenantId(2), "acme", "Acme", issuerUrl = null, theme = TenantTheme.DEFAULT)
@@ -93,6 +97,7 @@ class AdminTenantRoutesTest {
                     TenantProvisioner(
                         KeyProvisioningService(tenantRepo, tenantKeys),
                         PortalClientProvisioning(tenantRepo, appRepo, baseUrl = "https://auth.example"),
+                        apiKeyBootstrap,
                     ),
                 transactionRunner = FakeTransactionRunner.passThrough(),
             )
@@ -138,6 +143,30 @@ class AdminTenantRoutesTest {
             assertNotNull(tenantKeys.findActiveKey(created.id), "must sign tokens without a restart")
             assertNotNull(appRepo.findByClientId(created.id, PortalClientProvisioning.PORTAL_CLIENT_ID))
             assertEquals(setOf("admin", "user"), roleRepo.findByTenantId(created.id).map { it.name }.toSet())
+        }
+
+    @Test
+    fun `a bootstrap key waiting for the workspace works as soon as it is created`() =
+        testApplication {
+            val rawKey = "kauth_orders_provisioner-secret"
+            apiKeyBootstrap.ensureBootstrapped(
+                listOf(
+                    ApiKeyBootstrapService.Entry(
+                        tenantSlug = "orders",
+                        name = "orders-provisioner",
+                        scopes = listOf(ApiScope.WORKSPACE_WRITE),
+                        keyHash = sha256Hex(rawKey),
+                        awaitTenant = true,
+                    ),
+                ),
+            )
+            installApp()
+
+            assertEquals(HttpStatusCode.Created, createTenant("""{"slug":"orders","displayName":"Orders"}""").status)
+
+            val orders = assertNotNull(tenantRepo.findBySlug("orders"))
+            val key = assertNotNull(apiKeyService.validate(rawKey, orders.id), "the waiting key must now authenticate")
+            assertEquals(listOf(ApiScope.WORKSPACE_WRITE), key.scopes)
         }
 
     @Test
