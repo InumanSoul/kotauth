@@ -729,6 +729,24 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `GET Groups matches displayName without regard to case`() =
+        testApplication {
+            application { installTestApp() }
+            addGroup("Engineering")
+
+            val response = client.get(groupsUrl("""displayName eq "engineering"""")) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(
+                1,
+                jsonCodec
+                    .parseToJsonElement(response.bodyAsText())
+                    .jsonObject["totalResults"]!!
+                    .jsonPrimitive.int,
+            )
+        }
+
+    @Test
     fun `GET Groups with no filter returns every group in the tenant, scoped to it`() =
         testApplication {
             application { installTestApp() }

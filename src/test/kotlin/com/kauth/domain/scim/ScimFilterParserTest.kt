@@ -2,6 +2,7 @@ package com.kauth.domain.scim
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ScimFilterParserTest {
@@ -69,6 +70,33 @@ class ScimFilterParserTest {
             ok("""value eq "42"""", ScimFilterScope.VALUE_PATH)
                 .matches(ScimValue.Complex(mapOf("value" to ScimValue.Str("42")))),
         )
+    }
+
+    @Test
+    fun `eq ignores case on userName and displayName inside a compound filter`() {
+        val user =
+            ScimValue.Complex(
+                mapOf(
+                    "userName" to ScimValue.Str("dave.smith"),
+                    "displayName" to ScimValue.Str("Dave Smith"),
+                    "active" to ScimValue.Bool(true),
+                ),
+            )
+        assertTrue(ok("""userName eq "Dave.Smith" and active eq true""").matches(user))
+        assertTrue(ok("""displayName eq "DAVE SMITH" or userName eq "x"""").matches(user))
+    }
+
+    @Test
+    fun `eq stays case-sensitive on externalId`() {
+        val user = ScimValue.Complex(mapOf("externalId" to ScimValue.Str("00uAbC"), "active" to ScimValue.Bool(true)))
+        assertTrue(ok("""externalId eq "00uAbC" and active eq true""").matches(user))
+        assertFalse(ok("""externalId eq "00uabc" and active eq true""").matches(user))
+    }
+
+    @Test
+    fun `eq ignores case on a value-path sub-attribute`() {
+        val email = ScimValue.Complex(mapOf("type" to ScimValue.Str("work")))
+        assertTrue(ok("""type eq "Work"""", ScimFilterScope.VALUE_PATH).matches(email))
     }
 
     @Test

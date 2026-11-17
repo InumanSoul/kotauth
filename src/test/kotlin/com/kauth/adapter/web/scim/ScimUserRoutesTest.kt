@@ -626,6 +626,22 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `a compound filter matches a mixed-case userName, as the schema's caseExact false promises`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("dave.smith")
+            addUser("alice")
+
+            val response =
+                client.get(usersUrl("""userName eq "Dave.Smith" and active eq true""")) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val resources = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject["Resources"]!!.jsonArray
+            assertEquals(1, resources.size)
+            assertEquals("dave.smith", resources[0].jsonObject["userName"]!!.jsonPrimitive.content)
+        }
+
+    @Test
     fun `filter by externalId returns only the matching user`() =
         testApplication {
             application { installTestApp() }

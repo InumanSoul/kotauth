@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SCIM filters now ignore case wherever the schema says they do.** `/Schemas` declares
+  `userName`, `displayName` and the `value`, `type` and `display` sub-attributes as
+  `caseExact: false`, but only a lone `userName eq` filter honoured that. A compound filter such
+  as `userName eq "Dave.Smith" and active eq true`, a Group `displayName eq` filter, or a PATCH
+  path like `emails[type eq "Work"]` compared exactly and silently matched nothing. `externalId`
+  and `id` stay case-sensitive. Closes #140.
+
 - **An address outside the username character set could not sign up by email code or JIT.**
   Both paths used the address as the username, and usernames are limited to
   `[a-z0-9._@+-]`. So `mary.o'brien@corp.com` or `josé@corp.com` was a valid address but not a
