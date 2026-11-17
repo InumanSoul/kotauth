@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- **Email-code sign-in no longer tells a known address from an unknown one by response time.**
+  The code was mailed synchronously, inside the request. The route pads every response to 200 ms,
+  but an SMTP round-trip outlasts that. So on a workspace with email-code sign-up off, an address
+  with an account (which gets an email) took measurably longer than one without (which returns at
+  once). The code is now mailed in the
+  background, so every branch finishes well inside the padding. A delivery failure is still logged.
+
+### Fixed
+
+- **An address outside the username character set could not sign up by email code or JIT.**
+  Both paths used the address as the username, and usernames are limited to
+  `[a-z0-9._@+-]`. So `mary.o'brien@corp.com` or `josé@corp.com` was a valid address but not a
+  valid username: email-code sign-up showed "check your inbox" and never sent a code, and JIT
+  refused the sign-in as `DOMAIN_NOT_ALLOWED` for a domain that was allowed. Such an address now
+  gets a generated username, as SCIM and the admin API already do when none is supplied. An address
+  that is a valid username is still used as one. Closes #142.
+
 ## [1.27.0] - 2026-11-17
 
 ### Added

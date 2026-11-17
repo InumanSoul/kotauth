@@ -398,6 +398,7 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     resourceServerRepository = resourceServerRepository,
                     roleRepository = roleRepository,
+                    emailScope = applicationScope,
                 )
             val apiKeyBootstrapService =
                 ApiKeyBootstrapService(apiKeyRepository, tenantRepository)

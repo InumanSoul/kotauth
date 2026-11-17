@@ -115,6 +115,7 @@ class EmailOtpLoginRoutesTest {
             auditLog = auditLog,
             resourceServerRepository = resources,
             roleRepository = roles,
+            emailScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
     private fun selfService() =

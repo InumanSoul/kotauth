@@ -16,6 +16,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -102,6 +103,24 @@ class JitProvisioningServiceTest {
         val user = (outcome as JitOutcome.Provisioned).user
         assertEquals("ada@oriana.com.py", user.username) // matches SCIM's userName, not a local part
         assertNull(user.externalId) // SCIM's column, not ours
+    }
+
+    @Test
+    fun `an address that is not username-shaped is provisioned under a generated username`() {
+        listOf("mary.o'brien@oriana.com.py", "josé@oriana.com.py").forEachIndexed { i, address ->
+            val outcome =
+                service.provision(
+                    tenant,
+                    provider(jit = true, domains = listOf("oriana.com.py")),
+                    profile(email = address, verified = true, providerUserId = "oriana-sub-$i"),
+                )
+            val user = assertIs<JitOutcome.Provisioned>(outcome, address).user
+            assertEquals(address, user.email)
+            assertNotEquals(address, user.username)
+            assertTrue(UsernamePolicy.isValid(user.username), user.username)
+        }
+        assertEquals(2, socialAccounts.all().size)
+        assertEquals(0, auditLog.countOf(AuditEventType.SOCIAL_LOGIN_FAILED))
     }
 
     @Test

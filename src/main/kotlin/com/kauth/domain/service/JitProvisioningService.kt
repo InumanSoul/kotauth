@@ -62,6 +62,7 @@ class JitProvisioningService(
     private val references: BrokeredReferenceHasher,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
+    private val usernameGenerator: UsernameGenerator = UsernameGenerator(userRepository),
 ) {
     fun provision(
         tenant: Tenant,
@@ -84,24 +85,15 @@ class JitProvisioningService(
                 ?.trim()
                 ?.lowercase()
                 ?.ifBlank { null }
-        // The address is also the username (see below), so it must satisfy UsernamePolicy too —
-        // an IdP-supplied local part is not guaranteed to. Folded into the same refusal bucket as
-        // the domain check rather than a new category: both mean "this address is not one we can
-        // provision an account for here", and a distinct message would only tell an attacker more
-        // about which half of the address rule tripped.
-        val addressUsable =
-            email != null &&
-                isDomainAllowed(email, provider.jitAllowedDomains) &&
-                UsernamePolicy.isValid(email)
-        if (!addressUsable) {
+        if (email == null || !isDomainAllowed(email, provider.jitAllowedDomains)) {
             return refuse(tenant, provider, profile, JitRefusal.DOMAIN_NOT_ALLOWED, ipAddress, userAgent)
         }
 
-        // The username is the address, and an admin-created username may contain '@'. Without this
-        // check the insert violates UNIQUE (tenant_id, username) and the exception leaves the
-        // domain as a 500 on every retry, with nothing on the diagnostics panel to explain it.
-        // The caller has already established that no user holds this address as an email, so this
-        // can only be a different person whose username happens to be it.
+        // An admin-created username may contain '@'. Without this check the insert violates
+        // UNIQUE (tenant_id, username) and the exception leaves the domain as a 500 on every retry,
+        // with nothing on the diagnostics panel to explain it. The caller has already established
+        // that no user holds this address as an email, so this can only be a different person
+        // whose username happens to be it.
         if (userRepository.existsByUsername(tenant.id, email)) {
             return refuse(tenant, provider, profile, JitRefusal.USERNAME_CONFLICT, ipAddress, userAgent)
         }
@@ -111,8 +103,14 @@ class JitProvisioningService(
                 User(
                     tenantId = tenant.id,
                     // The email is the username so a SCIM connector later wired to the same IdP
-                    // finds this user by `userName` instead of creating a parallel duplicate.
-                    username = email,
+                    // finds this user by `userName` instead of creating a parallel duplicate. An
+                    // address outside the username character class gets a generated handle.
+                    username =
+                        if (UsernamePolicy.isValid(email)) {
+                            email
+                        } else {
+                            usernameGenerator.generate(tenant.id, null, email)
+                        },
                     email = email,
                     fullName = fullNameOf(profile, email),
                     passwordHash = User.SENTINEL_PASSWORD_HASH,
