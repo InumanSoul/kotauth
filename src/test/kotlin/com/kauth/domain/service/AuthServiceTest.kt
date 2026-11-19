@@ -312,6 +312,15 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `register rejects a username over the length limit before storing anything`() {
+        val tooLong = "a".repeat(UsernamePolicy.MAX_LENGTH + 1)
+        val result = svc.register("acme", tooLong, "long@x.com", "Long", "Password8!", "Password8!", "http://localhost")
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.ValidationError>(result.error)
+        assertTrue(users.findByEmail(TenantId(1), "long@x.com") == null, "over-length username must not be persisted")
+    }
+
+    @Test
     fun `register returns ValidationError when passwords do not match`() {
         val result = svc.register("acme", "bob", "bob@x.com", "Bob", "passA1!x", "passB1!x", "http://localhost")
         assertIs<AuthResult.Failure>(result)
