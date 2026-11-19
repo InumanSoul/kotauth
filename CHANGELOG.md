@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A restore refused for bad usernames now gives a readable error.** The message quoted every
+  offending record, each username twice and at full length, so a backup with hundreds of
+  offenders produced a wall of text. It now lists the first 20, shortens long usernames, and
+  counts the rest.
+
 - **SCIM filters now ignore case wherever the schema says they do.** `/Schemas` declares
   `userName`, `displayName` and the `value`, `type` and `display` sub-attributes as
   `caseExact: false`, but only a lone `userName eq` filter honoured that. A compound filter such
