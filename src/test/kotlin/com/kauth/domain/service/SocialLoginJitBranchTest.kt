@@ -62,8 +62,6 @@ class SocialLoginJitBranchTest {
             socialAccountRepository = socialAccounts,
             userRepository = users,
             tenantRepository = tenants,
-            sessionRepository = sessions,
-            tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
             providerResolver = StaticSocialProviderResolver(mapOf(oriana to adapter)),
@@ -214,7 +212,7 @@ class SocialLoginJitBranchTest {
     // =========================================================================
 
     @Test
-    fun `an unknown user on an allowed domain is provisioned and logged straight in`() {
+    fun `an unknown user on an allowed domain is provisioned and signed in`() {
         idpRepo.add(idp(jitEnabled = true))
         adapter.profileToReturn = profile(email = "grace@oriana.com.py")
 
@@ -224,7 +222,7 @@ class SocialLoginJitBranchTest {
         assertEquals("grace@oriana.com.py", success.value.user.username)
         assertNull(success.value.user.externalId)
         assertTrue(success.value.isNewUser)
-        assertEquals(1, sessions.all().size)
+        assertEquals(0, sessions.all().size, "No session before the second factor; the code exchange opens it")
         assertTrue(auditLog.hasEvent(AuditEventType.JIT_USER_PROVISIONED))
         assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_SUCCESS))
     }

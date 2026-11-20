@@ -49,8 +49,6 @@ class SocialLoginServiceTest {
             socialAccountRepository = socialAccounts,
             userRepository = users,
             tenantRepository = tenants,
-            sessionRepository = sessions,
-            tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
             providerResolver =
@@ -211,13 +209,12 @@ class SocialLoginServiceTest {
     }
 
     @Test
-    fun `handleCallback - existing user via email match auto-links and issues tokens`() {
+    fun `handleCallback - existing user via email match auto-links and signs in without opening a session`() {
         val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost", "1.2.3.4")
         assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
         assertEquals("alice", result.value.user.username)
-        assertNotNull(result.value.tokens.access_token)
         assertEquals(1, socialAccounts.all().size, "Social account should be auto-linked")
-        assertEquals(1, sessions.all().size)
+        assertEquals(0, sessions.all().size, "No session before the second factor; the code exchange opens it")
         assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_SUCCESS))
     }
 
@@ -458,12 +455,11 @@ class SocialLoginServiceTest {
         assertEquals("brandnew", result.value.user.username)
         assertEquals("brand-new@example.com", result.value.user.email)
         assertEquals(true, result.value.user.emailVerified, "Provider-verified email should be trusted")
-        assertNotNull(result.value.tokens.access_token)
         val newSocialAccount = socialAccounts.all().find { it.providerUserId == "new-uid-999" }
         assertNotNull(newSocialAccount, "Social account link should be created")
         assertEquals("brandnew", users.findById(newSocialAccount.userId, TenantId(1))?.username)
         assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_SUCCESS))
-        assertEquals(1, sessions.all().size)
+        assertEquals(0, sessions.all().size, "No session before the second factor; the code exchange opens it")
     }
 
     @Test

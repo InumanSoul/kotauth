@@ -63,8 +63,6 @@ class ClientDefaultRolesRegistrationTest {
             socialAccountRepository = socialAccounts,
             userRepository = users,
             tenantRepository = tenants,
-            sessionRepository = sessions,
-            tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
             providerResolver = StaticSocialProviderResolver(emptyMap()),
