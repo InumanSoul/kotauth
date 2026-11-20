@@ -185,8 +185,15 @@ internal fun applicationDetailPageImpl(
                         classes = "badge badge--id",
                     ) { +workspace.slug }
                 }
+                val lifetime = application.tokenExpiryOverride
+                if (lifetime != null) {
+                    ovRowText(
+                        EnglishStrings.APP_TOKEN_LIFETIME_LABEL,
+                        "$lifetime ${EnglishStrings.APP_TOKEN_LIFETIME_OVERRIDE_SUFFIX}",
+                    )
+                }
                 ovRowInherited(
-                    "Token TTL, security and branding",
+                    if (lifetime != null) EnglishStrings.APP_INHERITED_WITHOUT_TTL else EnglishStrings.APP_INHERITED_ALL,
                     "/admin/workspaces/${workspace.slug}/settings",
                 )
             }

@@ -35,7 +35,10 @@ class ApplicationViewsRenderTest {
             theme = TenantTheme.DEFAULT,
         )
 
-    private fun app(grantTypes: Set<GrantType>): Application =
+    private fun app(
+        grantTypes: Set<GrantType>,
+        tokenExpiryOverride: Int? = null,
+    ): Application =
         Application(
             id = ApplicationId(1),
             tenantId = TenantId(1),
@@ -46,6 +49,7 @@ class ApplicationViewsRenderTest {
             enabled = true,
             redirectUris = emptyList(),
             grantTypes = grantTypes,
+            tokenExpiryOverride = tokenExpiryOverride,
         )
 
     @Test
@@ -86,11 +90,12 @@ class ApplicationViewsRenderTest {
     private fun detail(
         grantTypes: Set<GrantType>,
         availableDefaultRoles: List<Role> = emptyList(),
+        tokenExpiryOverride: Int? = null,
     ): String =
         render(
             applicationDetailPageImpl(
                 workspace = workspace,
-                application = app(grantTypes),
+                application = app(grantTypes, tokenExpiryOverride),
                 allWorkspaces = emptyList(),
                 allApps = emptyList(),
                 loggedInAs = "admin",
@@ -128,5 +133,22 @@ class ApplicationViewsRenderTest {
         assertTrue(placeholder.containsMatchIn(html))
         val selectedOption = Regex("""<option[^>]*selected[^>]*>([^<]*)</option>""").find(html)
         assertTrue(selectedOption?.groupValues?.get(1) == EnglishStrings.APP_DEFAULT_ROLE_PLACEHOLDER)
+    }
+
+    @Test
+    fun `an app with its own token lifetime shows it instead of claiming the workspace's`() {
+        val html = detail(setOf(GrantType.CLIENT_CREDENTIALS), tokenExpiryOverride = 900)
+
+        assertTrue(html.contains("900 ${EnglishStrings.APP_TOKEN_LIFETIME_OVERRIDE_SUFFIX}"))
+        assertTrue(html.contains(EnglishStrings.APP_INHERITED_WITHOUT_TTL))
+        assertFalse(html.contains(EnglishStrings.APP_INHERITED_ALL))
+    }
+
+    @Test
+    fun `an app without its own token lifetime inherits it from the workspace`() {
+        val html = detail(setOf(GrantType.CLIENT_CREDENTIALS))
+
+        assertTrue(html.contains(EnglishStrings.APP_INHERITED_ALL))
+        assertFalse(html.contains(EnglishStrings.APP_TOKEN_LIFETIME_LABEL))
     }
 }

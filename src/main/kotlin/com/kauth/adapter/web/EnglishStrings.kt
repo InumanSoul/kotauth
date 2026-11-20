@@ -214,6 +214,10 @@ object EnglishStrings {
     const val APP_SIGN_IN_LABEL = "Sign-in"
     const val APP_NO_INTERACTIVE_SIGN_IN =
         "None. This client has no interactive grant, so it never signs users in and needs no redirect URIs."
+    const val APP_TOKEN_LIFETIME_LABEL = "Access token lifetime"
+    const val APP_TOKEN_LIFETIME_OVERRIDE_SUFFIX = "seconds, set on this application"
+    const val APP_INHERITED_ALL = "Token TTL, security and branding"
+    const val APP_INHERITED_WITHOUT_TTL = "Security and branding"
     const val ADMIN_TOPBAR_SEARCH_LABEL = "Search users"
     const val ADMIN_USERS_FILTER_LABEL = "Filter users"
     const val ADMIN_AUDIT_EVENT_FILTER_LABEL = "Event type"
