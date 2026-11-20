@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -13,6 +14,7 @@ import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.IdentifierCollisionCheck
+import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.fakes.FakeApplicationRepository
@@ -21,6 +23,7 @@ import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailOtpChallengeRepository
 import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakeEmailVerificationTokenRepository
+import com.kauth.fakes.FakeMfaRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordPolicyPort
 import com.kauth.fakes.FakePasswordResetTokenRepository
@@ -177,7 +180,9 @@ class EmailOtpLoginRoutesTest {
         apps.add(spaApp)
     }
 
-    private fun appBlock(): io.ktor.server.application.Application.() -> Unit =
+    private val mfaRepository = FakeMfaRepository()
+
+    private fun appBlock(mfa: MfaService? = null): io.ktor.server.application.Application.() -> Unit =
         {
             install(ContentNegotiation) { json() }
             routing {
@@ -193,8 +198,63 @@ class EmailOtpLoginRoutesTest {
                     translationPort = EnglishOnlyTranslation(),
                     emailOtpService = otpService(),
                     otpIpRateLimiter = limiter,
+                    mfaService = mfa,
                 )
             }
+        }
+
+    private fun oauthContextCookie(): String =
+        encryptionService.signCookie(
+            listOf(
+                "code",
+                "spa-app",
+                "https://app.example.com/callback",
+                "openid",
+                "",
+                "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                "S256",
+                "",
+                System.currentTimeMillis().toString(),
+            ).joinToString("|"),
+        )
+
+    @Test
+    fun `a correct email code for a user with TOTP goes to the MFA challenge, not the client`() =
+        testApplication {
+            mfaRepository.clear()
+            mfaRepository.saveEnrollment(
+                MfaEnrollment(userId = alice.id!!, tenantId = tenant.id, secret = "secret", verified = true),
+            )
+            application(appBlock(MfaService(mfaRepository, users, tenants, hasher, auditLog)))
+            val noFollow = createClient { followRedirects = false }
+
+            val send =
+                noFollow.submitForm(
+                    url = "/t/acme/email-otp/send",
+                    formParameters = Parameters.build { append("email", "alice@acme.com") },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=${oauthContextCookie()}")
+                }
+            val cookieValue =
+                send.headers["Set-Cookie"]!!.substringAfter("KOTAUTH_AUTH_CONTEXT=").substringBefore(";")
+
+            val verify =
+                noFollow.submitForm(
+                    url = "/t/acme/email-otp/verify",
+                    formParameters = Parameters.build { append("code", emails.otps.single().code) },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$cookieValue")
+                }
+
+            assertEquals(HttpStatusCode.Found, verify.status)
+            assertEquals("/t/acme/mfa-challenge", verify.headers["Location"])
+            assertTrue(
+                verify.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .any { it.startsWith("KOTAUTH_MFA_PENDING=") },
+                "The challenge needs its pending cookie",
+            )
         }
 
     @Test

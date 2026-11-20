@@ -38,6 +38,7 @@ import io.ktor.server.routing.post
  */
 internal fun Route.magicLinkRoutes(
     credentialFlowService: CredentialFlowService,
+    mfaGate: MfaGate,
     rateLimiter: RateLimiterPort,
     encryptionService: EncryptionService,
     oauthService: OAuthService,
@@ -144,14 +145,13 @@ internal fun Route.magicLinkRoutes(
             is SelfServiceResult.Success -> {
                 val user = result.value
                 val ipAddress = call.request.origin.remoteAddress
-                call.completeAuthorizationCodeFlow(
+                call.finishSignIn(
+                    gate = mfaGate,
                     slug = ctx.slug,
                     userId = user.id!!,
-                    tenantId = tenant.id,
+                    tenant = tenant,
                     oauthParams = oauthParams,
                     ipAddress = ipAddress,
-                    authTime = java.time.Instant.now(),
-                    mfaCompleted = false,
                     ssoTtlSeconds = ssoTtlSeconds,
                     secure = secure,
                     oauthService = oauthService,

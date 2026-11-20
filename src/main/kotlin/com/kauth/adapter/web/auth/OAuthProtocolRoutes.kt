@@ -7,15 +7,12 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.ResourceServerRepository
-import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.IntrospectionResult
-import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.EncryptionService
-import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.origin
@@ -77,8 +74,7 @@ internal fun Route.oauthProtocolRoutes(
     identityProviderRepository: IdentityProviderRepository?,
     tokenRateLimiter: RateLimiterPort,
     authService: AuthService,
-    mfaService: MfaService?,
-    roleRepository: RoleRepository?,
+    mfaGate: MfaGate,
     encryptionService: EncryptionService,
     loginRateLimiter: RateLimiterPort,
     resourceServerRepository: ResourceServerRepository? = null,
@@ -549,88 +545,37 @@ internal fun Route.oauthProtocolRoutes(
                     return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
                 }
 
-                // Enforce MFA enrollment policy before issuing a challenge (skip for portal logins)
-                val isPortalLogin = oauthParams.clientId == PortalClientProvisioning.PORTAL_CLIENT_ID
-                if (mfaService != null && !isPortalLogin) {
-                    val mfaPolicy = tenant.mfaPolicy
-                    if (mfaPolicy != "optional") {
-                        val userRoles =
-                            if (mfaPolicy == "required_admins" && roleRepository != null) {
-                                roleRepository.resolveEffectiveRoles(user.id!!, tenant.id)
-                            } else {
-                                emptyList()
-                            }
-
-                        if (mfaService.isMfaRequired(user, mfaPolicy, userRoles) &&
-                            !mfaService.shouldChallengeMfa(user.id!!)
-                        ) {
-                            return@post call.respondHtml(
-                                HttpStatusCode.Forbidden,
-                                AuthView.loginPage(
-                                    tenantSlug = slug,
-                                    ctx = ctx.viewContext,
-                                    error =
-                                        "Multi-factor authentication is required for your account. " +
-                                            "Please sign in to the user portal and enable MFA under Security settings.",
-                                    oauthParams = oauthParams,
-                                    enabledProviders = enabledProviders,
-                                    registrationEnabled = tenant.registrationEnabled,
-                                    magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
-                                    passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
-                                    emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
-                                    passkeysEnabled = tenant.passkeysEnabled,
-                                    loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
-                                ),
-                            )
-                        }
-                    }
-                }
-
-                // MFA challenge — auth context cookie remains active across the redirect
-                if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
-                    val mfaPending = "${user.id.value}|$slug|${System.currentTimeMillis()}"
-                    call.response.cookies.append(
-                        name = "KOTAUTH_MFA_PENDING",
-                        value = encryptionService.signCookie(mfaPending),
-                        maxAge = 300L,
-                        httpOnly = true,
-                        secure = baseUrl.startsWith("https://", ignoreCase = true),
-                        path = "/t/$slug",
+                val renderLoginError: suspend (HttpStatusCode, String) -> Unit = { status, message ->
+                    call.respondHtml(
+                        status,
+                        AuthView.loginPage(
+                            tenantSlug = slug,
+                            ctx = ctx.viewContext,
+                            error = message,
+                            oauthParams = oauthParams,
+                            enabledProviders = enabledProviders,
+                            registrationEnabled = tenant.registrationEnabled,
+                            magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
+                            passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
+                            emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
+                            passkeysEnabled = tenant.passkeysEnabled,
+                            loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
+                        ),
                     )
-                    call.respondRedirect("/t/$slug/mfa-challenge")
-                    return@post
                 }
-
-                call.completeAuthorizationCodeFlow(
+                call.finishSignIn(
+                    gate = mfaGate,
                     slug = slug,
                     userId = user.id!!,
-                    tenantId = tenant.id,
+                    tenant = tenant,
                     oauthParams = oauthParams,
                     ipAddress = ipAddress,
-                    authTime = java.time.Instant.now(),
-                    mfaCompleted = false,
                     ssoTtlSeconds = ssoTtlSeconds,
                     secure = baseUrl.startsWith("https://", ignoreCase = true),
                     oauthService = oauthService,
                     encryptionService = encryptionService,
-                    renderError = { message ->
-                        call.respondHtml(
-                            HttpStatusCode.BadRequest,
-                            AuthView.loginPage(
-                                tenantSlug = slug,
-                                ctx = ctx.viewContext,
-                                error = message,
-                                oauthParams = oauthParams,
-                                enabledProviders = enabledProviders,
-                                registrationEnabled = tenant.registrationEnabled,
-                                magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
-                                passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
-                                emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
-                                passkeysEnabled = tenant.passkeysEnabled,
-                                loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
-                            ),
-                        )
-                    },
+                    renderError = { renderLoginError(HttpStatusCode.BadRequest, it) },
+                    renderMfaRequired = { renderLoginError(HttpStatusCode.Forbidden, it) },
                 )
             }
         }

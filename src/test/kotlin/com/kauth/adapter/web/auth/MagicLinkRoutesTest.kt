@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -14,6 +15,7 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.IdentifierCollisionCheck
+import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.fakes.FakeApplicationRepository
@@ -21,6 +23,7 @@ import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakeEmailVerificationTokenRepository
+import com.kauth.fakes.FakeMfaRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordPolicyPort
 import com.kauth.fakes.FakePasswordResetTokenRepository
@@ -34,6 +37,7 @@ import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
@@ -41,6 +45,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
+import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -240,7 +245,17 @@ class MagicLinkRoutesTest {
 
     private fun extractToken(url: String): String = url.substringAfter("?token=").substringBefore("&")
 
-    private fun appBlock(): io.ktor.server.application.Application.() -> Unit =
+    private val mfaRepository = FakeMfaRepository()
+
+    private fun mfaService() = MfaService(mfaRepository, users, tenants, hasher, auditLog)
+
+    private fun enrollTotp(userId: UserId) {
+        mfaRepository.saveEnrollment(
+            MfaEnrollment(userId = userId, tenantId = tenant.id, secret = "secret", verified = true),
+        )
+    }
+
+    private fun appBlock(mfa: MfaService? = null): io.ktor.server.application.Application.() -> Unit =
         {
             install(ContentNegotiation) { json() }
             routing {
@@ -254,8 +269,94 @@ class MagicLinkRoutesTest {
                     credentialFlowService = credentialFlowService(),
                     encryptionService = encryptionService,
                     translationPort = EnglishOnlyTranslation(),
+                    mfaService = mfa,
                 )
             }
+        }
+
+    private suspend fun ApplicationTestBuilder.consumeAsAlice(): HttpResponse {
+        credentialFlowService().initiateMagicLink(
+            email = "alice@acme.com",
+            tenantSlug = "acme",
+            baseUrl = "http://localhost",
+            ipAddress = null,
+        )
+        val rawToken = extractToken(emails.sent.single { it.type == "magic_link" }.url)
+        return createClient { followRedirects = false }
+            .get("/t/acme/magic-link/consume?token=$rawToken") {
+                header("Cookie", "KOTAUTH_AUTH_CONTEXT=${buildAuthContextCookie()}")
+            }
+    }
+
+    @Test
+    fun `a magic link for a user with TOTP goes to the MFA challenge, not the client`() =
+        testApplication {
+            mfaRepository.clear()
+            enrollTotp(alice.id!!)
+            application(appBlock(mfaService()))
+
+            val response = consumeAsAlice()
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/mfa-challenge", response.headers["Location"])
+            assertTrue(authCodes.all().isEmpty(), "No code may be issued before the second factor")
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .any { it.startsWith("KOTAUTH_MFA_PENDING=") },
+                "The challenge needs its pending cookie",
+            )
+        }
+
+    @Test
+    fun `a user of another workspace with TOTP is refused before any challenge starts`() =
+        testApplication {
+            tenants.add(globex)
+            users.add(bob)
+            mfaRepository.clear()
+            mfaRepository.saveEnrollment(
+                MfaEnrollment(userId = bob.id!!, tenantId = globex.id, secret = "secret", verified = true),
+            )
+            application(appBlock(mfaService()))
+            credentialFlowService().initiateMagicLink(
+                email = "bob@globex.com",
+                tenantSlug = "globex",
+                baseUrl = "http://localhost",
+                ipAddress = null,
+            )
+            val rawToken = extractToken(emails.sent.single { it.type == "magic_link" }.url)
+
+            val response =
+                createClient { followRedirects = false }
+                    .get("/t/acme/magic-link/consume?token=$rawToken") {
+                        header("Cookie", "KOTAUTH_AUTH_CONTEXT=${buildAuthContextCookie()}")
+                    }
+
+            assertTrue(response.headers["Location"].orEmpty().isEmpty(), "No redirect, not even to the challenge")
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.startsWith("KOTAUTH_MFA_PENDING=") },
+                "No challenge may start for a user of another workspace",
+            )
+            assertTrue(authCodes.all().isEmpty())
+        }
+
+    @Test
+    fun `a magic link is refused when the workspace requires MFA the user lacks`() =
+        testApplication {
+            mfaRepository.clear()
+            tenants.clear()
+            tenants.add(tenant.copy(securityConfig = tenant.securityConfig.copy(mfaPolicy = "required")))
+            application(appBlock(mfaService()))
+
+            val response = consumeAsAlice()
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("Multi-factor authentication is required"))
+            assertTrue(authCodes.all().isEmpty(), "No code may be issued without the required second factor")
         }
 
     @Test

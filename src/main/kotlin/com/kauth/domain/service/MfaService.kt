@@ -7,7 +7,6 @@ import com.kauth.domain.model.MfaMethod
 import com.kauth.domain.model.MfaRecoveryCode
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.TenantId
-import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.MfaRepository
@@ -414,10 +413,9 @@ class MfaService(
     // -----------------------------------------------------------------------
 
     /**
-     * Checks whether MFA is required for a given user based on the tenant's policy.
+     * Checks whether the tenant's policy requires MFA of a user holding [userRoles].
      * Returns true if the user must complete MFA enrollment before login can succeed.
      *
-     * @param user            The user attempting to log in.
      * @param tenantMfaPolicy The tenant's configured MFA policy ("optional", "required",
      *                        "required_admins").
      * @param userRoles       The user's effective roles (direct + group-inherited). Only
@@ -425,9 +423,7 @@ class MfaService(
      *                        if roles are not available — the policy will not block login in
      *                        that case (conservative fail-open for the required_admins check).
      */
-    @Suppress("UNUSED_PARAMETER")
     fun isMfaRequired(
-        user: User,
         tenantMfaPolicy: String,
         userRoles: List<Role> = emptyList(),
     ): Boolean =
