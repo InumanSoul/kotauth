@@ -17,7 +17,8 @@
   display: inline-flex;
 }
 
-.tooltip-wrap:has(:disabled) {
+.tooltip-wrap:has(:disabled),
+.tooltip-wrap:has([aria-disabled="true"]) {
   cursor: not-allowed;
 }
 
@@ -44,7 +45,8 @@
   z-index: 10;
 }
 
-.tooltip-wrap[data-tooltip]:hover::after {
+.tooltip-wrap[data-tooltip]:hover::after,
+.tooltip-wrap[data-tooltip]:focus-within::after {
   opacity: 1;
 }
 
@@ -65,3 +67,16 @@
 }
 
 .inline-help:hover { color: var(--color-muted); }
+
+/* Text for screen readers only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

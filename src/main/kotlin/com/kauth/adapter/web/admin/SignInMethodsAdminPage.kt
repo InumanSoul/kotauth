@@ -30,13 +30,14 @@ internal fun HTML.signInMethodsAdminPage(
             adminPage(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
+                "Security" to "/admin/workspaces/$slug/settings/security",
                 title = EnglishStrings.ADMIN_NAV_SIGN_IN_METHODS,
                 subtitle = EnglishStrings.SIGN_IN_METHODS_PAGE_SUB,
                 actions = {
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
                         attributes["form"] = "sign-in-methods-form"
-                        +"Save changes"
+                        +"Save Changes"
                     }
                 },
             )

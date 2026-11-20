@@ -11,12 +11,13 @@ internal fun HTML.passkeysAdminPage(
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     userWithPasskey: List<Pair<User, Boolean>>,
+    baseUrl: String = "",
 ) {
     val slug = workspace.slug
     val enrolledUsers = userWithPasskey.count { (_, hasPasskey) -> hasPasskey }
     val totalUsers = userWithPasskey.size
     val enrollmentRate = if (totalUsers > 0) "${Math.round(enrolledUsers * 100.0 / totalUsers)}%" else "—"
-    val enrollUrl = "/t/$slug/account/passkeys"
+    val enrollUrl = "${baseUrl.trimEnd('/')}/t/$slug/account/passkeys"
     val signInMethodsUrl = "/admin/workspaces/$slug/settings/sign-in-methods"
 
     adminShell(

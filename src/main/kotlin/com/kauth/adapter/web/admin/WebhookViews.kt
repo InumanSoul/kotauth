@@ -56,7 +56,7 @@ internal fun webhooksListPageImpl(
                 div("page-header__actions") {
                     primaryLink(
                         "/admin/workspaces/$slug/settings/webhooks/new",
-                        "New Endpoint",
+                        "Create Endpoint",
                         "plus",
                     )
                 }
@@ -101,7 +101,7 @@ internal fun webhooksListPageImpl(
                             classes = "empty-state__cta",
                         ) {
                             inlineSvgIcon("plus", "New")
-                            +"Add Endpoint"
+                            +"Create Endpoint"
                         }
                     },
                 )
@@ -178,7 +178,7 @@ internal fun webhooksListPageImpl(
             if (deliveries.isNotEmpty()) {
                 div("ov-card") {
                     div("ov-card__section-label") {
-                        +"Recent Delivery History"
+                        h2("ov-card__heading") { +"Recent Delivery History" }
                         span("text-muted text-sm") { +" (last ${deliveries.size})" }
                     }
                     table("data-table") {
@@ -246,7 +246,7 @@ internal fun createWebhookPageImpl(
         val totalEvents = WebhookEventType.entries.size
 
         adminShell(
-            pageTitle = "New Endpoint · ${workspace.displayName}",
+            pageTitle = "Create Endpoint · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -262,14 +262,14 @@ internal fun createWebhookPageImpl(
                 slug to "/admin/workspaces/$slug",
                 "Settings" to "/admin/workspaces/$slug/settings",
                 "Webhooks" to "/admin/workspaces/$slug/settings/webhooks",
-                "Create Webhook Endpoint" to null,
+                "Create Endpoint" to null,
             )
 
             // ── Page header ──────────────────────────────────────────
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
-                        h1("page-header__title") { +"Create Webhook Endpoint" }
+                        h1("page-header__title") { +"Create Endpoint" }
                         p("page-header__sub") {
                             +"KotAuth will POST signed JSON payloads to your endpoint."
                         }
@@ -278,7 +278,7 @@ internal fun createWebhookPageImpl(
                 div("page-header__actions") {
                     button(type = ButtonType.submit, classes = "btn btn--primary") {
                         attributes["form"] = "create-webhook-form"
-                        +"Add Endpoint"
+                        +"Create Endpoint"
                     }
                 }
             }
@@ -289,7 +289,7 @@ internal fun createWebhookPageImpl(
 
             // ── Endpoint details ─────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Endpoint Details" }
+                h2("ov-card__section-label") { +"Endpoint Details" }
                 form(
                     action = "/admin/workspaces/$slug/settings/webhooks",
                     method = FormMethod.post,
@@ -298,9 +298,13 @@ internal fun createWebhookPageImpl(
                     id = "create-webhook-form"
 
                     div("edit-row") {
-                        span("edit-row__label") { +"Target URL" }
+                        label("edit-row__label") {
+                            htmlFor = "field-url"
+                            +"Target URL"
+                        }
                         div {
                             input(type = InputType.url, name = "url") {
+                                this.id = "field-url"
                                 classes = setOf("edit-row__field")
                                 placeholder = "https://your-app.example.com/webhooks/kotauth"
                                 required = true
@@ -310,8 +314,12 @@ internal fun createWebhookPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Description" }
+                        label("edit-row__label") {
+                            htmlFor = "field-description"
+                            +"Description"
+                        }
                         input(type = InputType.text, name = "description") {
+                            this.id = "field-description"
                             classes = setOf("edit-row__field")
                             placeholder = "e.g. Slack alerts integration"
                             maxLength = "256"
@@ -322,7 +330,7 @@ internal fun createWebhookPageImpl(
 
             // ── Events card ──────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Events" }
+                h2("ov-card__section-label") { +"Events" }
                 div {
                     div("chip-grid__header") {
                         span("chip-grid__header-label") { +"Select which events trigger this webhook" }

@@ -114,7 +114,7 @@ internal fun createRolePageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "New Role · ${workspace.displayName}",
+            pageTitle = "Create Role · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -159,11 +159,15 @@ internal fun createRolePageImpl(
                 id = "create-role-form"
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Role Details" }
+                    h2("ov-card__section-label") { +"Role Details" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Name" }
+                        label("edit-row__label") {
+                            htmlFor = "field-name"
+                            +"Name"
+                        }
                         div {
                             input(type = InputType.text, name = "name") {
+                                this.id = "field-name"
                                 classes = setOf("edit-row__field")
                                 required = true
                                 placeholder = "e.g. admin, editor, viewer"
@@ -173,14 +177,21 @@ internal fun createRolePageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Description" }
+                        label("edit-row__label") {
+                            htmlFor = "field-description"
+                            +"Description"
+                        }
                         input(type = InputType.text, name = "description") {
+                            this.id = "field-description"
                             classes = setOf("edit-row__field")
                             placeholder = "Short description of what this role grants"
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Scope" }
+                        label("edit-row__label") {
+                            htmlFor = "roleScope"
+                            +"Scope"
+                        }
                         div {
                             select {
                                 classes = setOf("edit-row__field", "edit-row__field--select")
@@ -204,11 +215,15 @@ internal fun createRolePageImpl(
                     div("edit-row") {
                         id = "appField"
                         style = "display:none;"
-                        span("edit-row__label") { +"Application" }
+                        label("edit-row__label") {
+                            htmlFor = "field-clientId"
+                            +"Application"
+                        }
                         if (apps.isEmpty()) {
                             div("edit-row__hint") { +"No applications in this workspace yet. Create one first." }
                         } else {
                             select {
+                                this.id = "field-clientId"
                                 classes = setOf("edit-row__field", "edit-row__field--select")
                                 name = "clientId"
                                 option {
@@ -272,7 +287,7 @@ internal fun roleDetailPageImpl(
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
                         attributes["form"] = "edit-role-form"
-                        +"Save"
+                        +"Save Changes"
                     }
                     form(
                         action = "/admin/workspaces/$slug/roles/${role.id?.value}/delete",
@@ -296,18 +311,26 @@ internal fun roleDetailPageImpl(
                 id = "edit-role-form"
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Edit Role" }
+                    h2("ov-card__section-label") { +"Edit Role" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Name" }
+                        label("edit-row__label") {
+                            htmlFor = "field-name"
+                            +"Name"
+                        }
                         input(type = InputType.text, name = "name") {
+                            this.id = "field-name"
                             classes = setOf("edit-row__field")
                             required = true
                             value = role.name
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Description" }
+                        label("edit-row__label") {
+                            htmlFor = "field-description"
+                            +"Description"
+                        }
                         input(type = InputType.text, name = "description") {
+                            this.id = "field-description"
                             classes = setOf("edit-row__field")
                             value = role.description ?: ""
                         }
@@ -317,7 +340,7 @@ internal fun roleDetailPageImpl(
 
             // ── Composite children ───────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Composite Children" }
+                h2("ov-card__section-label") { +"Composite Children" }
                 if (role.childRoleIds.isEmpty()) {
                     p("edit-row__hint") {
                         style = "padding:12px 16px;"
@@ -366,6 +389,7 @@ internal fun roleDetailPageImpl(
                             select {
                                 classes = setOf("edit-row__field", "edit-row__field--select")
                                 name = "childRoleId"
+                                attributes["aria-label"] = EnglishStrings.ADMIN_ROLE_CHILD_PICKER_LABEL
                                 availableChildren.forEach { r ->
                                     option {
                                         value = r.id?.value.toString()
@@ -384,7 +408,7 @@ internal fun roleDetailPageImpl(
 
             // ── Assigned users ───────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Assigned Users" }
+                h2("ov-card__section-label") { +"Assigned Users" }
                 if (assignedUsers.isNotEmpty()) {
                     table("data-table") {
                         thead {
@@ -543,7 +567,7 @@ internal fun createGroupPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "New Group · ${workspace.displayName}",
+            pageTitle = "Create Group · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -588,26 +612,38 @@ internal fun createGroupPageImpl(
                 id = "create-group-form"
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Group Details" }
+                    h2("ov-card__section-label") { +"Group Details" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Name" }
+                        label("edit-row__label") {
+                            htmlFor = "field-name"
+                            +"Name"
+                        }
                         input(type = InputType.text, name = "name") {
+                            this.id = "field-name"
                             classes = setOf("edit-row__field")
                             required = true
                             placeholder = "e.g. engineering, marketing, ops"
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Description" }
+                        label("edit-row__label") {
+                            htmlFor = "field-description"
+                            +"Description"
+                        }
                         input(type = InputType.text, name = "description") {
+                            this.id = "field-description"
                             classes = setOf("edit-row__field")
                             placeholder = "What this group represents"
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Parent Group" }
+                        label("edit-row__label") {
+                            htmlFor = "field-parentGroupId"
+                            +"Parent Group"
+                        }
                         div {
                             select {
+                                this.id = "field-parentGroupId"
                                 classes = setOf("edit-row__field", "edit-row__field--select")
                                 name = "parentGroupId"
                                 option {
@@ -684,7 +720,7 @@ internal fun groupDetailPageImpl(
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
                         attributes["form"] = "edit-group-form"
-                        +"Save"
+                        +"Save Changes"
                     }
                     form(
                         action = "/admin/workspaces/$slug/groups/${group.id?.value}/delete",
@@ -732,18 +768,26 @@ internal fun groupDetailPageImpl(
                 id = "edit-group-form"
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Edit Group" }
+                    h2("ov-card__section-label") { +"Edit Group" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Name" }
+                        label("edit-row__label") {
+                            htmlFor = "field-name"
+                            +"Name"
+                        }
                         input(type = InputType.text, name = "name") {
+                            this.id = "field-name"
                             classes = setOf("edit-row__field")
                             required = true
                             value = group.name
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Description" }
+                        label("edit-row__label") {
+                            htmlFor = "field-description"
+                            +"Description"
+                        }
                         input(type = InputType.text, name = "description") {
+                            this.id = "field-description"
                             classes = setOf("edit-row__field")
                             value = group.description ?: ""
                         }
@@ -753,7 +797,7 @@ internal fun groupDetailPageImpl(
 
             // ── Assigned roles ───────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Assigned Roles" }
+                h2("ov-card__section-label") { +"Assigned Roles" }
                 if (group.roleIds.isEmpty()) {
                     p("edit-row__hint") {
                         style = "padding:12px 16px;"
@@ -806,6 +850,7 @@ internal fun groupDetailPageImpl(
                             select {
                                 classes = setOf("edit-row__field", "edit-row__field--select")
                                 name = "roleId"
+                                attributes["aria-label"] = EnglishStrings.ADMIN_GROUP_ROLE_PICKER_LABEL
                                 availableRoles.forEach { r ->
                                     option {
                                         value = r.id?.value.toString()
@@ -824,7 +869,7 @@ internal fun groupDetailPageImpl(
 
             // ── Members ──────────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Members (${members.size})" }
+                h2("ov-card__section-label") { +"Members (${members.size})" }
                 if (members.isEmpty()) {
                     p("edit-row__hint") {
                         style = "padding:12px 16px;"

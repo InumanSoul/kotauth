@@ -41,7 +41,7 @@ internal fun claimMappersListPageImpl(
                     actions = {
                         primaryLink(
                             "/admin/workspaces/$slug/settings/claim-mappers/new",
-                            "Add Mapper",
+                            "Create Mapper",
                             "plus",
                         )
                     },
@@ -64,7 +64,7 @@ internal fun claimMappersListPageImpl(
                     }
                 } else {
                     div("ov-card") {
-                        div("ov-card__section-label") { +"Configured Mappers" }
+                        h2("ov-card__section-label") { +"Configured Mappers" }
                         table("data-table") {
                             thead {
                                 tr {
@@ -122,7 +122,7 @@ internal fun claimMapperFormPageImpl(
         val isEdit = prefill != null
 
         adminShell(
-            pageTitle = "${if (isEdit) "Edit Mapper" else "New Mapper"} — ${workspace.displayName}",
+            pageTitle = "${if (isEdit) "Edit Mapper" else "Create Mapper"} · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -137,14 +137,14 @@ internal fun claimMapperFormPageImpl(
                     slug to "/admin/workspaces/$slug",
                     "Settings" to "/admin/workspaces/$slug/settings",
                     "Claim Mappers" to "/admin/workspaces/$slug/settings/claim-mappers",
-                    (if (isEdit) "Edit Mapper" else "New Mapper") to null,
+                    (if (isEdit) "Edit Mapper" else "Create Mapper") to null,
                 )
 
                 div("page-header") {
                     div("page-header__left") {
                         div("page-header__identity") {
                             h1("page-header__title") {
-                                +(if (isEdit) "Edit Claim Mapper" else "Add Claim Mapper")
+                                +(if (isEdit) "Edit Mapper" else "Create Mapper")
                             }
                             p("page-header__sub") {
                                 +"Project a user attribute into JWT claims under a custom name."
@@ -177,12 +177,16 @@ internal fun claimMapperFormPageImpl(
 
                     // ── Mapper details ──────────────────────────────────
                     div("ov-card") {
-                        div("ov-card__section-label") { +"Mapper Details" }
+                        h2("ov-card__section-label") { +"Mapper Details" }
 
                         div("edit-row") {
-                            span("edit-row__label") { +"Attribute Key" }
+                            label("edit-row__label") {
+                                htmlFor = "field-attributeKey"
+                                +"Attribute Key"
+                            }
                             div {
                                 input(type = InputType.text, name = "attributeKey") {
+                                    this.id = "field-attributeKey"
                                     classes = setOf("edit-row__field")
                                     required = true
                                     maxLength = "64"
@@ -197,9 +201,13 @@ internal fun claimMapperFormPageImpl(
                         }
 
                         div("edit-row") {
-                            span("edit-row__label") { +"Claim Name" }
+                            label("edit-row__label") {
+                                htmlFor = "field-claimName"
+                                +"Claim Name"
+                            }
                             div {
                                 input(type = InputType.text, name = "claimName") {
+                                    this.id = "field-claimName"
                                     classes = setOf("edit-row__field")
                                     required = true
                                     maxLength = "128"
@@ -216,7 +224,7 @@ internal fun claimMapperFormPageImpl(
 
                     // ── Token visibility (toggle-row for each) ──────────
                     div("ov-card") {
-                        div("ov-card__section-label") { +"Token Visibility" }
+                        h2("ov-card__section-label") { +"Token Visibility" }
 
                         div("toggle-row") {
                             div("toggle-row__body") {

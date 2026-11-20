@@ -219,9 +219,13 @@ private fun TD.scimDialectCell(
 /** The dialect selector shared by the API key create form. Options come from the registry. */
 internal fun DIV.scimDialectSelector(selectedId: String) {
     div("edit-row") {
-        span("edit-row__label") { +EnglishStrings.SCIM_DIALECT_FIELD_LABEL }
+        label("edit-row__label") {
+            htmlFor = "field-scimDialect"
+            +EnglishStrings.SCIM_DIALECT_FIELD_LABEL
+        }
         div {
             select {
+                this.id = "field-scimDialect"
                 classes = setOf("edit-row__field")
                 name = "scimDialect"
                 attributes["form"] = "create-api-key-form"

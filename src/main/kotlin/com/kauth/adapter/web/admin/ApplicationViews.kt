@@ -75,6 +75,7 @@ internal fun applicationDetailPageImpl(
 ): HTML.() -> Unit =
     {
         val appPairs = allApps.map { it.clientId to it.name }
+        val interactive = GrantType.AUTHORIZATION_CODE in application.grantTypes
         adminShell(
             pageTitle = "${application.name} · ${workspace.displayName}",
             activeRail = "apps",
@@ -119,10 +120,12 @@ internal fun applicationDetailPageImpl(
                     }
                 }
                 div("page-header__actions") {
-                    ghostLinkExternal(
-                        "/t/${workspace.slug}/authorize?client_id=${application.clientId}",
-                        "Open Login",
-                    )
+                    if (interactive) {
+                        ghostLinkExternal(
+                            "/t/${workspace.slug}/authorize?client_id=${application.clientId}",
+                            "Open Login",
+                        )
+                    }
                     primaryLink(
                         "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
                         "Edit Application",
@@ -151,7 +154,7 @@ internal fun applicationDetailPageImpl(
 
             // ── Overview ────────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Overview" }
+                h2("ov-card__section-label") { +"Overview" }
                 ovRowMono("Client ID", application.clientId, copyable = true)
                 ovRowText("Name", application.name)
                 if (application.description.isNullOrBlank()) {
@@ -173,6 +176,9 @@ internal fun applicationDetailPageImpl(
                         }
                     }
                 }
+                if (!interactive) {
+                    ovRowMuted(EnglishStrings.APP_SIGN_IN_LABEL, EnglishStrings.APP_NO_INTERACTIVE_SIGN_IN)
+                }
                 ovRow("Workspace") {
                     a(
                         href = "/admin/workspaces/${workspace.slug}",
@@ -185,30 +191,32 @@ internal fun applicationDetailPageImpl(
                 )
             }
 
-            // ── Redirect URIs ──────────────────────────────────────
-            div("ov-card") {
-                div("ov-card__section-label") {
-                    +"Redirect URIs"
-                    a(
-                        href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
-                        classes = "btn btn--ghost btn--sm",
-                    ) { +"+ Add URI" }
-                }
-                if (application.redirectUris.isEmpty()) {
-                    emptyState(
-                        iconName = "redirect",
-                        title = "No redirect URIs configured",
-                        description = "Login callbacks will be blocked until at least one allowed URI is registered.",
-                    ) {
+            if (interactive) {
+                // ── Redirect URIs ──────────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") {
+                        h2("ov-card__heading") { +"Redirect URIs" }
                         a(
                             href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
-                            classes = "empty-state__cta",
+                            classes = "btn btn--ghost btn--sm",
                         ) { +"+ Add Redirect URI" }
                     }
-                } else {
-                    application.redirectUris.forEach { uri ->
-                        div("ov-card__row") {
-                            span("ov-card__value ov-card__value--mono") { +uri }
+                    if (application.redirectUris.isEmpty()) {
+                        emptyState(
+                            iconName = "redirect",
+                            title = "No redirect URIs configured",
+                            description = "Login callbacks will be blocked until at least one allowed URI is registered.",
+                        ) {
+                            a(
+                                href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
+                                classes = "empty-state__cta",
+                            ) { +"+ Add Redirect URI" }
+                        }
+                    } else {
+                        application.redirectUris.forEach { uri ->
+                            div("ov-card__row") {
+                                span("ov-card__value ov-card__value--mono") { +uri }
+                            }
                         }
                     }
                 }
@@ -221,7 +229,7 @@ internal fun applicationDetailPageImpl(
                         "${application.clientId}/authorized-apis"
                 div("ov-card") {
                     div("ov-card__section-label") {
-                        +EnglishStrings.AUTHORIZED_APIS_CARD_TITLE
+                        h2("ov-card__heading") { +EnglishStrings.AUTHORIZED_APIS_CARD_TITLE }
                         a(
                             href = authorizedApisHref,
                             classes = "btn btn--ghost btn--sm",
@@ -249,89 +257,91 @@ internal fun applicationDetailPageImpl(
                 }
             }
 
-            // ── Launcher ───────────────────────────────────────────
-            div("ov-card") {
-                div("ov-card__section-label") {
-                    +"Launcher"
-                    a(
-                        href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
-                        classes = "btn btn--ghost btn--sm",
-                    ) { +"Configure" }
-                }
-                if (application.launcherUrl.isNullOrBlank()) {
-                    emptyState(
-                        iconName = "redirect",
-                        title = "Not in the launcher",
-                        description = "Set a launcher URL to surface this app in the workspace launcher.",
-                    ) {
+            if (interactive) {
+                // ── Launcher ───────────────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") {
+                        h2("ov-card__heading") { +"Launcher" }
                         a(
                             href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
-                            classes = "empty-state__cta",
-                        ) { +"+ Set launcher URL" }
+                            classes = "btn btn--ghost btn--sm",
+                        ) { +"Configure" }
                     }
-                } else {
-                    ovRowMono("Launcher URL", application.launcherUrl, copyable = true)
-                    if (!application.iconUrl.isNullOrBlank()) {
-                        ovRowMono("Icon URL", application.iconUrl, copyable = true)
+                    if (application.launcherUrl.isNullOrBlank()) {
+                        emptyState(
+                            iconName = "redirect",
+                            title = "Not in the launcher",
+                            description = "Set a launcher URL to surface this app in the workspace launcher.",
+                        ) {
+                            a(
+                                href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
+                                classes = "empty-state__cta",
+                            ) { +"+ Set launcher URL" }
+                        }
                     } else {
-                        ovRowMuted("Icon URL", "Using letter fallback")
-                    }
-                    ovRow("Visibility") {
-                        if (application.launcherVisible) {
-                            span("badge badge--active") {
-                                span("badge__dot") {}
-                                +"Visible"
-                            }
+                        ovRowMono("Launcher URL", application.launcherUrl, copyable = true)
+                        if (!application.iconUrl.isNullOrBlank()) {
+                            ovRowMono("Icon URL", application.iconUrl, copyable = true)
                         } else {
-                            span("badge badge--inactive") {
-                                span("badge__dot") {}
-                                +"Hidden"
+                            ovRowMuted("Icon URL", "Using letter fallback")
+                        }
+                        ovRow("Visibility") {
+                            if (application.launcherVisible) {
+                                span("badge badge--active") {
+                                    span("badge__dot") {}
+                                    +"Visible"
+                                }
+                            } else {
+                                span("badge badge--inactive") {
+                                    span("badge__dot") {}
+                                    +"Hidden"
+                                }
                             }
                         }
+                        ovRowText("Display order", application.launcherDisplayOrder.toString())
                     }
-                    ovRowText("Display order", application.launcherDisplayOrder.toString())
                 }
-            }
 
-            // ── Registration Defaults ──────────────────────────────
-            div("ov-card") {
-                div("ov-card__section-label") { +"Registration Defaults" }
-                if (defaultRoles.isEmpty()) {
-                    p("edit-row__hint") {
-                        style = "padding:8px 16px 12px;"
-                        +"No default roles configured. Roles added here are granted "
-                        +"automatically to users who self-register through this app."
-                    }
-                } else {
-                    p("edit-row__hint") {
-                        style = "padding:0 16px 4px;"
-                        +"Roles granted automatically to users who self-register through this "
-                        +"application. Does not affect users created by an admin."
-                    }
-                    table("data-table") {
-                        thead {
-                            tr {
-                                th { +"Role" }
-                                th { style = "width:80px;" }
-                            }
+                // ── Registration Defaults ──────────────────────────────
+                div("ov-card") {
+                    h2("ov-card__section-label") { +"Registration Defaults" }
+                    if (defaultRoles.isEmpty()) {
+                        p("edit-row__hint") {
+                            style = "padding:8px 16px 12px;"
+                            +"No default roles configured. Roles added here are granted "
+                            +"automatically to users who self-register through this app."
                         }
-                        tbody {
-                            defaultRoles.forEach { role ->
+                    } else {
+                        p("edit-row__hint") {
+                            style = "padding:0 16px 4px;"
+                            +"Roles granted automatically to users who self-register through this "
+                            +"application. Does not affect users created by an admin."
+                        }
+                        table("data-table") {
+                            thead {
                                 tr {
-                                    td { span("data-table__name") { +role.name } }
-                                    td {
-                                        form(
-                                            action =
-                                                "/admin/workspaces/${workspace.slug}/applications/" +
-                                                    "${application.clientId}/default-roles/remove",
-                                            method = FormMethod.post,
-                                        ) {
-                                            input(type = InputType.hidden, name = "roleId") {
-                                                value = role.id?.value.toString()
-                                            }
-                                            button(type = ButtonType.submit) {
-                                                classes = setOf("btn", "btn--ghost", "btn--sm")
-                                                +"Remove"
+                                    th { +"Role" }
+                                    th { style = "width:80px;" }
+                                }
+                            }
+                            tbody {
+                                defaultRoles.forEach { role ->
+                                    tr {
+                                        td { span("data-table__name") { +role.name } }
+                                        td {
+                                            form(
+                                                action =
+                                                    "/admin/workspaces/${workspace.slug}/applications/" +
+                                                        "${application.clientId}/default-roles/remove",
+                                                method = FormMethod.post,
+                                            ) {
+                                                input(type = InputType.hidden, name = "roleId") {
+                                                    value = role.id?.value.toString()
+                                                }
+                                                button(type = ButtonType.submit) {
+                                                    classes = setOf("btn", "btn--ghost", "btn--sm")
+                                                    +"Remove"
+                                                }
                                             }
                                         }
                                     }
@@ -339,29 +349,37 @@ internal fun applicationDetailPageImpl(
                             }
                         }
                     }
-                }
-                if (availableDefaultRoles.isNotEmpty()) {
-                    div("edit-actions") {
-                        form(
-                            action =
-                                "/admin/workspaces/${workspace.slug}/applications/" +
-                                    "${application.clientId}/default-roles",
-                            method = FormMethod.post,
-                        ) {
-                            style = "display:flex; align-items:center; gap:8px;"
-                            select {
-                                classes = setOf("edit-row__field", "edit-row__field--select")
-                                name = "roleId"
-                                availableDefaultRoles.forEach { role ->
+                    if (availableDefaultRoles.isNotEmpty()) {
+                        div("edit-actions") {
+                            form(
+                                action =
+                                    "/admin/workspaces/${workspace.slug}/applications/" +
+                                        "${application.clientId}/default-roles",
+                                method = FormMethod.post,
+                            ) {
+                                style = "display:flex; align-items:center; gap:8px;"
+                                select {
+                                    classes = setOf("edit-row__field", "edit-row__field--select")
+                                    name = "roleId"
+                                    required = true
+                                    attributes["aria-label"] = EnglishStrings.APP_DEFAULT_ROLE_SELECT_LABEL
                                     option {
-                                        value = role.id?.value.toString()
-                                        +role.name
+                                        value = ""
+                                        disabled = true
+                                        selected = true
+                                        +EnglishStrings.APP_DEFAULT_ROLE_PLACEHOLDER
+                                    }
+                                    availableDefaultRoles.forEach { role ->
+                                        option {
+                                            value = role.id?.value.toString()
+                                            +role.name
+                                        }
                                     }
                                 }
-                            }
-                            button(type = ButtonType.submit) {
-                                classes = setOf("btn", "btn--primary")
-                                +"Add Role"
+                                button(type = ButtonType.submit) {
+                                    classes = setOf("btn", "btn--ghost")
+                                    +"Add Role"
+                                }
                             }
                         }
                     }
@@ -370,7 +388,7 @@ internal fun applicationDetailPageImpl(
 
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
+                h2("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                 div("danger-zone") {
                     dangerZoneCard(
                         title =
@@ -425,7 +443,7 @@ internal fun createApplicationPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "New Application · ${workspace.displayName}",
+            pageTitle = "Create Application · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -468,7 +486,7 @@ internal fun createApplicationPageImpl(
 
             // ── Identity card ──────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Identity" }
+                h2("ov-card__section-label") { +"Identity" }
                 form(
                     action = "/admin/workspaces/${workspace.slug}/applications",
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -477,7 +495,10 @@ internal fun createApplicationPageImpl(
                     id = "create-app-form"
 
                     div("edit-row") {
-                        span("edit-row__label") { +"Client ID" }
+                        label("edit-row__label") {
+                            htmlFor = "clientId"
+                            +"Client ID"
+                        }
                         div {
                             input(type = InputType.text, name = "clientId") {
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
@@ -493,7 +514,10 @@ internal fun createApplicationPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Name" }
+                        label("edit-row__label") {
+                            htmlFor = "name"
+                            +"Name"
+                        }
                         input(type = InputType.text, name = "name") {
                             classes = setOf("edit-row__field")
                             this.id = "name"
@@ -503,7 +527,10 @@ internal fun createApplicationPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Description" }
+                        label("edit-row__label") {
+                            htmlFor = "description"
+                            +"Description"
+                        }
                         div {
                             input(type = InputType.text, name = "description") {
                                 classes = setOf("edit-row__field")
@@ -519,9 +546,12 @@ internal fun createApplicationPageImpl(
 
             // ── Access card ────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Access" }
+                h2("ov-card__section-label") { +"Access" }
                 div("edit-row") {
-                    span("edit-row__label") { +"Access Type" }
+                    label("edit-row__label") {
+                        htmlFor = "accessType"
+                        +"Access Type"
+                    }
                     select {
                         attributes["form"] = "create-app-form"
                         name = "accessType"
@@ -545,7 +575,10 @@ internal fun createApplicationPageImpl(
                     }
                 }
                 div("edit-row") {
-                    span("edit-row__label") { +"Redirect URIs" }
+                    label("edit-row__label") {
+                        htmlFor = "redirectUris"
+                        +"Redirect URIs"
+                    }
                     div {
                         textArea {
                             attributes["form"] = "create-app-form"
@@ -568,7 +601,10 @@ internal fun createApplicationPageImpl(
                     selected = prefill.grantTypes,
                 )
                 div("edit-row") {
-                    span("edit-row__label") { +EnglishStrings.APPLICATION_AUDIENCE_LABEL }
+                    label("edit-row__label") {
+                        htmlFor = "audience"
+                        +EnglishStrings.APPLICATION_AUDIENCE_LABEL
+                    }
                     div {
                         input(type = InputType.text, name = "audience") {
                             attributes["form"] = "create-app-form"
@@ -618,7 +654,7 @@ internal fun editApplicationPageImpl(
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
                 application.clientId to
                     "/admin/workspaces/${workspace.slug}/applications/${application.clientId}",
-                "Edit" to null,
+                "Edit Application" to null,
             )
 
             // ── Page header with external submit ───────────────────
@@ -647,7 +683,7 @@ internal fun editApplicationPageImpl(
 
             // ── Identity card ──────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Identity" }
+                h2("ov-card__section-label") { +"Identity" }
                 form(
                     action = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -656,10 +692,14 @@ internal fun editApplicationPageImpl(
                     id = "edit-app-form"
 
                     div("edit-row") {
-                        span("edit-row__label") { +"Client ID" }
+                        label("edit-row__label") {
+                            htmlFor = "clientId"
+                            +"Client ID"
+                        }
                         div {
                             input(type = InputType.text) {
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
+                                this.id = "clientId"
                                 disabled = true
                                 value = application.clientId
                             }
@@ -669,7 +709,10 @@ internal fun editApplicationPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Name" }
+                        label("edit-row__label") {
+                            htmlFor = "name"
+                            +"Name"
+                        }
                         input(type = InputType.text, name = "name") {
                             classes = setOf("edit-row__field")
                             this.id = "name"
@@ -678,7 +721,10 @@ internal fun editApplicationPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Description" }
+                        label("edit-row__label") {
+                            htmlFor = "description"
+                            +"Description"
+                        }
                         div {
                             input(type = InputType.text, name = "description") {
                                 classes = setOf("edit-row__field")
@@ -694,9 +740,12 @@ internal fun editApplicationPageImpl(
 
             // ── Access card ────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Access" }
+                h2("ov-card__section-label") { +"Access" }
                 div("edit-row") {
-                    span("edit-row__label") { +"Access Type" }
+                    label("edit-row__label") {
+                        htmlFor = "accessType"
+                        +"Access Type"
+                    }
                     select {
                         attributes["form"] = "edit-app-form"
                         name = "accessType"
@@ -720,7 +769,10 @@ internal fun editApplicationPageImpl(
                     }
                 }
                 div("edit-row") {
-                    span("edit-row__label") { +"Redirect URIs" }
+                    label("edit-row__label") {
+                        htmlFor = "redirectUris"
+                        +"Redirect URIs"
+                    }
                     div {
                         textArea {
                             attributes["form"] = "edit-app-form"
@@ -743,7 +795,10 @@ internal fun editApplicationPageImpl(
                     selected = application.grantTypes,
                 )
                 div("edit-row") {
-                    span("edit-row__label") { +EnglishStrings.APPLICATION_AUDIENCE_LABEL }
+                    label("edit-row__label") {
+                        htmlFor = "audience"
+                        +EnglishStrings.APPLICATION_AUDIENCE_LABEL
+                    }
                     div {
                         input(type = InputType.text, name = "audience") {
                             attributes["form"] = "edit-app-form"
@@ -760,7 +815,10 @@ internal fun editApplicationPageImpl(
                     }
                 }
                 div("edit-row") {
-                    span("edit-row__label") { +EnglishStrings.APPLICATION_TOKEN_EXPIRY_LABEL }
+                    label("edit-row__label") {
+                        htmlFor = "tokenExpiryOverride"
+                        +EnglishStrings.APPLICATION_TOKEN_EXPIRY_LABEL
+                    }
                     div {
                         input(type = InputType.number, name = "tokenExpiryOverride") {
                             attributes["form"] = "edit-app-form"
@@ -782,9 +840,12 @@ internal fun editApplicationPageImpl(
 
             // ── Launcher card ──────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Launcher" }
+                h2("ov-card__section-label") { +"Launcher" }
                 div("edit-row") {
-                    span("edit-row__label") { +"Launcher URL" }
+                    label("edit-row__label") {
+                        htmlFor = "launcherUrl"
+                        +"Launcher URL"
+                    }
                     div {
                         input(type = InputType.url, name = "launcherUrl") {
                             attributes["form"] = "edit-app-form"
@@ -801,7 +862,10 @@ internal fun editApplicationPageImpl(
                     }
                 }
                 div("edit-row") {
-                    span("edit-row__label") { +"Icon URL" }
+                    label("edit-row__label") {
+                        htmlFor = "iconUrl"
+                        +"Icon URL"
+                    }
                     div {
                         input(type = InputType.url, name = "iconUrl") {
                             attributes["form"] = "edit-app-form"
@@ -830,7 +894,10 @@ internal fun editApplicationPageImpl(
                     }
                 }
                 div("edit-row") {
-                    span("edit-row__label") { +"Display order" }
+                    label("edit-row__label") {
+                        htmlFor = "launcherDisplayOrder"
+                        +"Display order"
+                    }
                     div {
                         input(type = InputType.number, name = "launcherDisplayOrder") {
                             attributes["form"] = "edit-app-form"

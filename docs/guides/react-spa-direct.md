@@ -22,7 +22,7 @@ For production-grade or regulated apps where tokens must not reach JavaScript, u
 
 In the Kotauth admin console:
 
-1. Navigate to your workspace → **Applications** → **New Application**
+1. Navigate to your workspace → **Applications** → **Create Application**
 2. Set the name (e.g. `web-spa`)
 3. Set **Access Type** to `public` — SPAs use PKCE, not a client secret
 4. Under **Redirect URIs**, add:

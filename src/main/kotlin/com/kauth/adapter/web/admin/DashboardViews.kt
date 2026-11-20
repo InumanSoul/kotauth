@@ -35,7 +35,7 @@ internal fun workspaceListPageImpl(
                     a("/admin/workspaces/import", classes = "btn btn--ghost") {
                         +EnglishStrings.IMPORT_LINK_FROM_LIST
                     }
-                    primaryLink("/admin/workspaces/new", "New Workspace")
+                    primaryLink("/admin/workspaces/new", "Create Workspace")
                 }
             }
 
@@ -48,7 +48,7 @@ internal fun workspaceListPageImpl(
                     a(
                         href = "/admin/workspaces/new",
                         classes = "empty-state__cta",
-                    ) { +"+ New Workspace" }
+                    ) { +"+ Create Workspace" }
                 }
             } else {
                 div("ov-card") {

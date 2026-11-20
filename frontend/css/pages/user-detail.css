@@ -102,6 +102,12 @@
   font-size: 12px;
   color: var(--color-muted);
   padding-top: var(--space-2);
+  /* Reset global label rule (components/form.css) */
+  display: block;
+  margin-bottom: 0;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .read-only-badges {

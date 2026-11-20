@@ -37,7 +37,7 @@ internal fun workspaceBackupPageImpl(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
                     "Settings" to "/admin/workspaces/$slug/settings",
-                    EnglishStrings.BACKUP_NAV_LABEL to null,
+                    EnglishStrings.BACKUP_PAGE_TITLE to null,
                 )
 
                 div("page-header") {
@@ -78,11 +78,15 @@ internal fun workspaceBackupPageImpl(
 
                     // Passphrase + confirm
                     div("ov-card") {
-                        div("ov-card__section-label") { +EnglishStrings.BACKUP_PASSPHRASE_LABEL }
+                        h2("ov-card__section-label") { +EnglishStrings.BACKUP_PASSPHRASE_LABEL }
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.BACKUP_PASSPHRASE_LABEL }
+                            label("edit-row__label") {
+                                htmlFor = "field-passphrase"
+                                +EnglishStrings.BACKUP_PASSPHRASE_LABEL
+                            }
                             div {
                                 input(type = InputType.password, name = "passphrase") {
+                                    this.id = "field-passphrase"
                                     classes = setOf("edit-row__field")
                                     attributes["minlength"] = "16"
                                     attributes["autocomplete"] = "new-password"
@@ -92,8 +96,12 @@ internal fun workspaceBackupPageImpl(
                             }
                         }
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.BACKUP_CONFIRM_PASSPHRASE_LABEL }
+                            label("edit-row__label") {
+                                htmlFor = "field-confirmPassphrase"
+                                +EnglishStrings.BACKUP_CONFIRM_PASSPHRASE_LABEL
+                            }
                             input(type = InputType.password, name = "confirmPassphrase") {
+                                this.id = "field-confirmPassphrase"
                                 classes = setOf("edit-row__field")
                                 attributes["minlength"] = "16"
                                 attributes["autocomplete"] = "new-password"
@@ -104,7 +112,7 @@ internal fun workspaceBackupPageImpl(
 
                     // Optional includes
                     div("ov-card") {
-                        div("ov-card__section-label") { +"Optional" }
+                        h2("ov-card__section-label") { +"Optional" }
                         label("check-row") {
                             input(type = InputType.checkBox, name = "includeSigningKeys") {
                                 attributes["value"] = "true"
@@ -127,11 +135,15 @@ internal fun workspaceBackupPageImpl(
 
                     // Confirm-by-typing-slug gate
                     div("ov-card") {
-                        div("ov-card__section-label") { +EnglishStrings.BACKUP_CONFIRM_SLUG_LABEL }
+                        h2("ov-card__section-label") { +EnglishStrings.BACKUP_CONFIRM_SLUG_LABEL }
                         div("edit-row") {
-                            span("edit-row__label") { +"Workspace slug" }
+                            label("edit-row__label") {
+                                htmlFor = "field-confirmSlug"
+                                +"Workspace slug"
+                            }
                             div {
                                 input(type = InputType.text, name = "confirmSlug") {
+                                    this.id = "field-confirmSlug"
                                     classes = setOf("edit-row__field", "edit-row__field--mono")
                                     attributes["pattern"] = escapeForHtmlPattern(slug)
                                     attributes["required"] = "required"
@@ -220,19 +232,27 @@ internal fun importTenantPageImpl(
                     id = "backup-import-form"
 
                     div("ov-card") {
-                        div("ov-card__section-label") { +"Source" }
+                        h2("ov-card__section-label") { +"Source" }
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.IMPORT_FILE_LABEL }
+                            label("edit-row__label") {
+                                htmlFor = "field-envelope"
+                                +EnglishStrings.IMPORT_FILE_LABEL
+                            }
                             input(type = InputType.file, name = "envelope") {
+                                this.id = "field-envelope"
                                 classes = setOf("edit-row__field")
                                 attributes["accept"] = ".enc,.json,application/octet-stream"
                                 attributes["required"] = "required"
                             }
                         }
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.IMPORT_PASSPHRASE_LABEL }
+                            label("edit-row__label") {
+                                htmlFor = "field-passphrase"
+                                +EnglishStrings.IMPORT_PASSPHRASE_LABEL
+                            }
                             div {
                                 input(type = InputType.password, name = "passphrase") {
+                                    this.id = "field-passphrase"
                                     classes = setOf("edit-row__field")
                                     attributes["autocomplete"] = "off"
                                     attributes["required"] = "required"
@@ -243,11 +263,15 @@ internal fun importTenantPageImpl(
                     }
 
                     div("ov-card") {
-                        div("ov-card__section-label") { +"Destination" }
+                        h2("ov-card__section-label") { +"Destination" }
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.IMPORT_NEW_SLUG_LABEL }
+                            label("edit-row__label") {
+                                htmlFor = "field-newSlug"
+                                +EnglishStrings.IMPORT_NEW_SLUG_LABEL
+                            }
                             div {
                                 input(type = InputType.text, name = "newSlug") {
+                                    this.id = "field-newSlug"
                                     classes = setOf("edit-row__field", "edit-row__field--mono")
                                     attributes["pattern"] = "[a-z0-9][a-z0-9-]{1,49}"
                                     attributes["required"] = "required"
