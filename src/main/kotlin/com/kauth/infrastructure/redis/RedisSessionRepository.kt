@@ -218,8 +218,8 @@ class RedisSessionRepository(
     /**
      * Reads members of an active-set, batch-MGETs the records, and returns the
      * sessions that are still live (record present, not revoked, not expired).
-     * Stale members (record TTL'd out) are opportunistically removed from the
-     * set so it doesn't accumulate orphans.
+     * Members that can no longer be used (record gone, revoked, or both tokens
+     * expired) are opportunistically removed so the set doesn't accumulate orphans.
      *
      * Round trips: 1 ZRANGE + 1 MGET (+ 1 ZREM only if orphans were found).
      */
@@ -252,10 +252,13 @@ class RedisSessionRepository(
                 continue
             }
             val session = records[RedisKeys.record(SessionId(id))]
+            // Only a session that can no longer be used leaves the index. One whose access token
+            // expired but which can still refresh stays, so revoking all of a user's sessions
+            // reaches it.
             when {
                 session == null -> toPrune += member
-                !session.isActive -> toPrune += member
-                else -> live += session
+                !session.isUsable -> toPrune += member
+                session.isActive -> live += session
             }
         }
         if (toPrune.isNotEmpty()) {

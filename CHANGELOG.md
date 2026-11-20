@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Signing a user out everywhere now ends every session they can still use (Redis).** With
+  Redis as the session store, reading a user's sessions dropped any whose access token had
+  expired from the user's index, even when the refresh token was still valid. Every "end all of
+  this user's sessions" path walks that index: the admin's sign-out-everywhere, a password
+  change or reset, and the response to a reused refresh token or authorization code. So those
+  sessions kept refreshing. A session now leaves the index only once neither token works.
+  Sessions dropped from the index before upgrading stay out of reach of those paths until their
+  refresh token expires. To end them now, delete the `kauth:session:*` keys from Redis, which
+  signs every user out.
 - **Social sign-in no longer opens a session before the second factor.** Every successful
   provider callback created a session and a full token set, even though the browser was sent on
   with an authorization code and never received those tokens. The session appeared in the
