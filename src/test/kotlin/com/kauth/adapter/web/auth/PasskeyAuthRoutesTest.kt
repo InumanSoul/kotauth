@@ -271,6 +271,103 @@ class PasskeyAuthRoutesTest {
             assertEquals("10", body["user_id"]?.jsonPrimitive?.content)
         }
 
+    private fun credentialSigning(challenge: String): String {
+        val clientData =
+            java.util.Base64
+                .getUrlEncoder()
+                .withoutPadding()
+                .encodeToString("""{"type":"webauthn.get","challenge":"$challenge"}""".toByteArray())
+        return """{"credential":{"type":"public-key","id":"${FakeRelyingPartyAdapter.CANNED_CREDENTIAL_ID}",""" +
+            """"response":{"clientDataJSON":"$clientData"}}}"""
+    }
+
+    @Test
+    fun `finish verifies against the challenge the authenticator signed when several are pending`() =
+        testApplication {
+            // The sign-in page's autofill and its button, or two open tabs, each start a ceremony.
+            application(appBlock())
+            val cookieClient = createClient { install(HttpCookies) }
+            relyingParty.nextAssertionChallenges.addAll(listOf("Y2hhbGxlbmdlLWE", "Y2hhbGxlbmdlLWI"))
+            cookieClient.post("/t/acme/passkeys/authenticate/start")
+            cookieClient.post("/t/acme/passkeys/authenticate/start")
+
+            val response =
+                cookieClient.post("/t/acme/passkeys/authenticate/finish") {
+                    contentType(ContentType.Application.Json)
+                    setBody(credentialSigning("Y2hhbGxlbmdlLWE"))
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue("Y2hhbGxlbmdlLWE" in relyingParty.verifiedAssertionRequests.single())
+        }
+
+    @Test
+    fun `a challenge used for sign-in is dropped while the others stay pending`() =
+        testApplication {
+            application(appBlock())
+            val cookieClient = createClient { install(HttpCookies) }
+            relyingParty.nextAssertionChallenges.addAll(listOf("Y2hhbGxlbmdlLWE", "Y2hhbGxlbmdlLWI"))
+            cookieClient.post("/t/acme/passkeys/authenticate/start")
+            cookieClient.post("/t/acme/passkeys/authenticate/start")
+            relyingParty.queueAssertion()
+            relyingParty.queueAssertion(FakeRelyingPartyAdapter.DEFAULT_ASSERTION_RESULT.copy(newSignCounter = 2L))
+
+            listOf("Y2hhbGxlbmdlLWE", "Y2hhbGxlbmdlLWI", "Y2hhbGxlbmdlLWE").forEach { challenge ->
+                cookieClient.post("/t/acme/passkeys/authenticate/finish") {
+                    contentType(ContentType.Application.Json)
+                    setBody(credentialSigning(challenge))
+                }
+            }
+
+            val verified = relyingParty.verifiedAssertionRequests
+            assertTrue("Y2hhbGxlbmdlLWE" in verified[0])
+            assertTrue("Y2hhbGxlbmdlLWI" in verified[1])
+            assertTrue(
+                verified.size == 2,
+                "a spent challenge must not reach verification again, got $verified",
+            )
+        }
+
+    @Test
+    fun `a challenge cookie from before several could be pending is still accepted`() =
+        testApplication {
+            application(appBlock())
+            val legacy =
+                encryptionService.signCookie(
+                    java.util.Base64
+                        .getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(FakeRelyingPartyAdapter.CANNED_ASSERTION_REQUEST_JSON.toByteArray()),
+                )
+
+            val response =
+                client.post("/t/acme/passkeys/authenticate/finish") {
+                    header(HttpHeaders.Cookie, "KOTAUTH_PASSKEY_AUTH=$legacy")
+                    contentType(ContentType.Application.Json)
+                    setBody(credentialSigning(FakeRelyingPartyAdapter.CANNED_CHALLENGE))
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+
+    @Test
+    fun `only the three most recent challenges stay pending`() =
+        testApplication {
+            application(appBlock())
+            val cookieClient = createClient { install(HttpCookies) }
+            val challenges = listOf("YzE", "YzI", "YzM", "YzQ")
+            relyingParty.nextAssertionChallenges.addAll(challenges)
+            repeat(challenges.size) { cookieClient.post("/t/acme/passkeys/authenticate/start") }
+
+            cookieClient.post("/t/acme/passkeys/authenticate/finish") {
+                contentType(ContentType.Application.Json)
+                setBody(credentialSigning("YzE"))
+            }
+
+            // The oldest fell out, so verification gets the newest request and refuses the signature.
+            assertTrue("YzQ" in relyingParty.verifiedAssertionRequests.single())
+        }
+
     @Test
     fun `POST passkeys authenticate finish returns 400 on counter replay`() =
         testApplication {

@@ -45,6 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offenders produced a wall of text. It now lists the first 20, shortens long usernames, and
   counts the rest.
 
+- **"Sign in with a passkey" failed in browsers that offer passkey autofill.** The sign-in page
+  starts an autofill request when it loads, and the button started a second one. The server
+  kept only one pending challenge per browser, so the button's sign-in was checked against the
+  wrong challenge and refused with a generic error. This hit Chrome, Safari and Edge users. The
+  button now cancels the autofill request first, and the server keeps the three most recent
+  challenges and checks the one the device signed. Sign-in also works with the page open in more
+  than one tab.
+
 - **SCIM filters now ignore case wherever the schema says they do.** `/Schemas` declares
   `userName`, `displayName` and the `value`, `type` and `display` sub-attributes as
   `caseExact: false`, but only a lone `userName eq` filter honoured that. A compound filter such
