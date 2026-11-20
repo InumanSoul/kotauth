@@ -248,6 +248,7 @@ class EmailOtpLoginRoutesTest {
 
             assertEquals(HttpStatusCode.Found, verify.status)
             assertEquals("/t/acme/mfa-challenge", verify.headers["Location"])
+            assertTrue(authCodes.all().isEmpty(), "No authorization code may exist before the second factor")
             assertTrue(
                 verify.headers
                     .getAll("Set-Cookie")

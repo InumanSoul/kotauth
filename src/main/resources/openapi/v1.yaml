@@ -904,6 +904,40 @@ components:
           maxLength: 6
           description: The 6-digit numeric code received in email.
 
+    VerifyMfaRequest:
+      type: object
+      required: [mfaToken, code]
+      properties:
+        mfaToken:
+          type: string
+          description: The token from the `mfa_required` answer of verify-otp.
+        code:
+          type: string
+          description: A 6-digit TOTP code, or one of the user's recovery codes.
+
+    MfaRequiredProblem:
+      type: object
+      required: [type, title, status, detail, error, mfaToken, mfaRequirements, expiresAt]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer, example: 403 }
+        detail: { type: string }
+        error:
+          type: string
+          enum: [mfa_required]
+        mfaToken:
+          type: string
+          description: Opaque, signed. Pass unchanged to verify-mfa.
+        mfaRequirements:
+          type: array
+          items:
+            type: string
+            enum: [otp, recovery-code]
+        expiresAt:
+          type: string
+          format: date-time
+
     VerifyOtpResponse:
       type: object
       required: [authorizationCode, expiresAt, redirectUri]
@@ -2602,6 +2636,13 @@ paths:
         `email_otp_lockout_threshold`, default 5) lock the user using the
         tenant's existing lockout window. The lock never leaks back —
         locked users always get `too_many_attempts`.
+
+        **Second factor.** When the user has TOTP enrolled, no authorization
+        code is issued here. The response is `403` with `error: mfa_required`,
+        an `mfaToken` (valid 5 minutes) and `mfaRequirements`; send the token
+        with a TOTP or recovery code to `/auth/verify-mfa` to get the code.
+        When the workspace requires MFA and the user has not enrolled, the
+        response is `403` with `mfa_enrollment_required`.
       tags: [Auth — Email OTP]
       security: [{ bearerAuth: [auth:verify-otp] }]
       requestBody:
@@ -2616,7 +2657,17 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/VerifyOtpResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403":
+          description: |
+            The API key lacks the scope, or the user owes a second factor
+            (`mfa_required`, body is `MfaRequiredProblem`) or must enroll one
+            first (`mfa_enrollment_required`).
+          content:
+            application/problem+json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/MfaRequiredProblem" }
+                  - { $ref: "#/components/schemas/ProblemDetail" }
         "404":
           description: Tenant not found
           content:
@@ -2629,6 +2680,56 @@ paths:
               schema: { $ref: "#/components/schemas/ProblemDetail" }
         "422":
           description: Invalid code, too many attempts, or originating client misconfigured
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "503":
+          description: The server cannot issue MFA tokens, so a user who owes the second factor is refused
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+
+  /auth/verify-mfa:
+    post:
+      summary: Complete the second factor after an email OTP
+      description: |
+        Takes the `mfaToken` from a `403 mfa_required` answer of
+        `/auth/verify-otp` and a TOTP code (6 digits) or a recovery code.
+        On success, issues the same single-use authorization code
+        `/auth/verify-otp` would have. The token is bound to the workspace
+        and the user and expires 5 minutes after issue. Attempts share the
+        user's TOTP lockout.
+      tags: [Auth — Email OTP]
+      security: [{ bearerAuth: [auth:verify-otp] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyMfaRequest" }
+      responses:
+        "200":
+          description: Second factor verified; authorization code issued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerifyOtpResponse" }
+        "401":
+          description: Missing API key, or the mfaToken is invalid, expired or for another workspace (`invalid_mfa_token`)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "410":
+          description: The verified email challenge is too old to complete
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422":
+          description: Wrong TOTP or recovery code (`invalid_mfa_code`), or originating client misconfigured
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "429":
+          description: Too many attempts, or TOTP locked (`mfa_locked`)
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/ProblemDetail" }

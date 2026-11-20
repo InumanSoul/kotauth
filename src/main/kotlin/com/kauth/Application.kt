@@ -516,6 +516,8 @@ fun Application.module(
             userRepository = s.userRepository,
             identityProviderService = s.identityProviderService,
             workspacePatchService = s.workspacePatchService,
+            encryptionService = s.encryptionService,
+            mfaRateLimiter = s.mfaRateLimiter,
         )
 
         adminBackupRoutes(

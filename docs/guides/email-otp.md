@@ -32,5 +32,40 @@ authorized for that client.
 Omit `resources` to retain the legacy Email OTP behavior. The field defaults to
 an empty list, so existing integrations remain compatible.
 
+## Users with a second factor
+
+When the user has TOTP enrolled, `/auth/verify-otp` issues no authorization
+code. It answers `403` with a body like:
+
+```json
+{
+  "type": "https://kotauth.dev/errors/403",
+  "title": "MFA required",
+  "status": 403,
+  "detail": "Send a TOTP or recovery code with this mfaToken to verify-mfa.",
+  "error": "mfa_required",
+  "mfaToken": "…",
+  "mfaRequirements": ["otp", "recovery-code"],
+  "expiresAt": "2026-11-20T21:45:00Z"
+}
+```
+
+Ask the user for a code from their authenticator app (or a recovery code) and
+send it with the token:
+
+```json
+POST /t/{tenantSlug}/api/v1/auth/verify-mfa
+{ "mfaToken": "…", "code": "123456" }
+```
+
+The success response is the same as `/auth/verify-otp`'s. The token expires five
+minutes after issue and only works in the workspace that issued it; wrong codes
+count toward the user's TOTP lockout. If the workspace requires MFA and the user
+has not enrolled, `/auth/verify-otp` answers `403` with
+`mfa_enrollment_required`; the user must enroll in the account portal first.
+
+This mirrors Auth0's `mfa_required` / `mfa_token` exchange, so the second factor
+can never be skipped by signing in through the API instead of the hosted pages.
+
 See [ADR-15](../adr/ADR-15-email-otp-passwordless-primitive.md) for the Email
 OTP security model and challenge lifecycle.

@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user's session list, predated the TOTP challenge, and stayed behind if the challenge was never
   finished. Social sign-in now issues nothing; the authorization code exchange opens the session,
   as it does for every other sign-in method.
+- **The email-code API asks for the second factor.** `POST /auth/verify-otp` handed the calling
+  backend an authorization code even when the user had TOTP enrolled or the workspace required
+  MFA, so a backend-driven sign-in skipped the second factor. It now answers `403 mfa_required`
+  with a short-lived `mfaToken`; the new `POST /auth/verify-mfa` takes the token with a TOTP or
+  recovery code and returns the authorization code. A user who must enroll first gets
+  `mfa_enrollment_required`. This follows Auth0's `mfa_required` / `mfa_token` exchange.
+  **Integrations whose users have TOTP must handle the new response.**
+
+### Fixed
+
+- **Hosted email-code sign-in no longer creates an unused authorization code.** Verifying the
+  code issued one that was never sent anywhere, before the sign-in issued the real one.
 
 ## [1.28.1] - 2026-11-20
 

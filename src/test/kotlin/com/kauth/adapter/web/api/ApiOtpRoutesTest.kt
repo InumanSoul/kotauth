@@ -33,6 +33,7 @@ import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -43,6 +44,7 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
+import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +64,11 @@ class ApiOtpRoutesTest {
     private val audit = FakeAuditLogPort()
     private val resources = FakeResourceServerRepository()
     private val apiKeys = FakeApiKeyRepository()
+    private val mfaRepository = com.kauth.fakes.FakeMfaRepository()
+    private val signer = com.kauth.infrastructure.EncryptionService("test-secret-key-32-chars-minimum-len")
+    private val totpSecret =
+        com.kauth.infrastructure.TotpUtil
+            .generateSecret()
 
     private val apiKeyService = ApiKeyService(apiKeys, tenants)
     private val otpService =
@@ -93,6 +100,7 @@ class ApiOtpRoutesTest {
         audit.clear()
         resources.clear()
         apiKeys.clear()
+        mfaRepository.clear()
 
         val tenant =
             tenants.add(
@@ -320,6 +328,175 @@ class ApiOtpRoutesTest {
             assertTrue("""invalid_otp""" in verify.bodyAsText())
         }
 
+    // -- Second factor -------------------------------------------------------
+
+    private fun aliceWithTotp(): com.kauth.domain.model.User {
+        val tenantId = tenants.findBySlug("acme")!!.id
+        val alice =
+            users.add(
+                com.kauth.domain.model.User(
+                    tenantId = tenantId,
+                    username = "alice",
+                    email = "alice@acme.test",
+                    fullName = "Alice",
+                    passwordHash = "",
+                    emailVerified = true,
+                ),
+            )
+        mfaRepository.saveEnrollment(
+            com.kauth.domain.model.MfaEnrollment(
+                userId = alice.id!!,
+                tenantId = tenantId,
+                secret = totpSecret,
+                verified = true,
+            ),
+        )
+        return alice
+    }
+
+    private suspend fun ApplicationTestBuilder.verifyEmailCode(): HttpResponse {
+        client.post("/t/acme/api/v1/auth/send-otp") {
+            bearerAuth(sendKey)
+            contentType(ContentType.Application.Json)
+            setBody("""{"email":"alice@acme.test","originatingClientId":"acme-bff"}""")
+        }
+        val challengeId = challenges.all().single().challengeId
+        return client.post("/t/acme/api/v1/auth/verify-otp") {
+            bearerAuth(verifyKey)
+            contentType(ContentType.Application.Json)
+            setBody("""{"challengeId":"$challengeId","otp":"${email.otps.single().code}"}""")
+        }
+    }
+
+    private fun mfaTokenFrom(response: String): String =
+        kotlinx.serialization.json.Json
+            .parseToJsonElement(response)
+            .let { it as kotlinx.serialization.json.JsonObject }["mfaToken"]
+            .toString()
+            .trim('"')
+
+    private suspend fun ApplicationTestBuilder.verifyMfa(
+        token: String,
+        code: String,
+    ) = client.post("/t/acme/api/v1/auth/verify-mfa") {
+        bearerAuth(verifyKey)
+        contentType(ContentType.Application.Json)
+        setBody("""{"mfaToken":"$token","code":"$code"}""")
+    }
+
+    @Test
+    fun `verify-otp asks for the second factor instead of issuing a code when the user has TOTP`() =
+        testApplication {
+            aliceWithTotp()
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
+
+            val verify = verifyEmailCode()
+
+            assertEquals(HttpStatusCode.Forbidden, verify.status)
+            val body = verify.bodyAsText()
+            assertTrue(""""error":"mfa_required"""" in body, body)
+            assertTrue(""""mfaRequirements":["otp","recovery-code"]""" in body, body)
+            assertTrue(mfaTokenFrom(body).isNotBlank())
+            assertTrue(authCodes.all().isEmpty(), "No code may exist before the second factor")
+        }
+
+    @Test
+    fun `verify-mfa with a TOTP code returns the authorization code`() =
+        testApplication {
+            aliceWithTotp()
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
+            val token = mfaTokenFrom(verifyEmailCode().bodyAsText())
+
+            val response =
+                verifyMfa(
+                    token,
+                    com.kauth.infrastructure.TotpUtil
+                        .generateCode(totpSecret),
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            assertTrue(""""authorizationCode"""" in response.bodyAsText())
+            assertEquals(1, authCodes.all().size)
+        }
+
+    @Test
+    fun `verify-mfa accepts a recovery code`() =
+        testApplication {
+            val alice = aliceWithTotp()
+            mfaRepository.saveRecoveryCodes(
+                listOf(
+                    com.kauth.domain.model.MfaRecoveryCode(
+                        userId = alice.id!!,
+                        tenantId = alice.tenantId,
+                        codeHash =
+                            com.kauth.fakes
+                                .FakePasswordHasher()
+                                .hash("recovery-code-one"),
+                    ),
+                ),
+            )
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
+            val token = mfaTokenFrom(verifyEmailCode().bodyAsText())
+
+            val response = verifyMfa(token, "recovery-code-one")
+
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+        }
+
+    @Test
+    fun `verify-mfa refuses a wrong code and issues nothing`() =
+        testApplication {
+            aliceWithTotp()
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
+            val token = mfaTokenFrom(verifyEmailCode().bodyAsText())
+
+            val response = verifyMfa(token, "000000")
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertTrue(authCodes.all().isEmpty())
+        }
+
+    @Test
+    fun `verify-mfa refuses a forged or tampered token`() =
+        testApplication {
+            aliceWithTotp()
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
+            val token = mfaTokenFrom(verifyEmailCode().bodyAsText())
+            val code =
+                com.kauth.infrastructure.TotpUtil
+                    .generateCode(totpSecret)
+
+            assertEquals(HttpStatusCode.Unauthorized, verifyMfa("not-a-token", code).status)
+            assertEquals(HttpStatusCode.Unauthorized, verifyMfa(token.replaceFirst("otp-mfa", "otp-mfb"), code).status)
+            assertTrue(authCodes.all().isEmpty())
+        }
+
+    @Test
+    fun `verify-otp refuses when the workspace requires MFA the user lacks`() =
+        testApplication {
+            val acme = tenants.findBySlug("acme")!!
+            tenants.update(acme.copy(securityConfig = acme.securityConfig.copy(mfaPolicy = "required")))
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
+
+            val verify = verifyEmailCode()
+
+            assertEquals(HttpStatusCode.Forbidden, verify.status)
+            assertTrue("mfa_enrollment_required" in verify.bodyAsText())
+            assertTrue(authCodes.all().isEmpty())
+        }
+
+    @Test
+    fun `without a signing key a user who owes MFA is refused, not let through`() =
+        testApplication {
+            aliceWithTotp()
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter(), encryptionService = null) }
+
+            val verify = verifyEmailCode()
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, verify.status)
+            assertTrue(authCodes.all().isEmpty())
+        }
+
     private fun stubSelfService(audit: com.kauth.fakes.FakeAuditLogPort) =
         com.kauth.domain.service.CredentialFlowService(
             userRepository = users,
@@ -357,7 +534,7 @@ class ApiOtpRoutesTest {
         users: com.kauth.fakes.FakeUserRepository,
         audit: com.kauth.fakes.FakeAuditLogPort,
     ) = com.kauth.domain.service.MfaService(
-        mfaRepository = com.kauth.fakes.FakeMfaRepository(),
+        mfaRepository = mfaRepository,
         userRepository = users,
         tenantRepository = tenants,
         passwordHasher = com.kauth.fakes.FakePasswordHasher(),
@@ -367,6 +544,7 @@ class ApiOtpRoutesTest {
     private fun io.ktor.server.application.Application.installApp(
         emailLimiter: RateLimiterPort,
         ipLimiter: RateLimiterPort,
+        encryptionService: com.kauth.infrastructure.EncryptionService? = signer,
     ) {
         install(ContentNegotiation) { json() }
         install(Authentication) {
@@ -443,6 +621,8 @@ class ApiOtpRoutesTest {
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
                 userRepository = users,
                 transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
+                encryptionService = encryptionService,
+                mfaRateLimiter = AlwaysAllowLimiter(),
             )
         }
     }

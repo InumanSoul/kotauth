@@ -273,3 +273,15 @@ threshold field was previously disabled based on `emailOtpSignupEnabled`
 only. Enabling login-OTP without signup would have left the login flow
 without a brute-force guard. The disable condition now checks both
 toggles.
+
+## Addendum — second factor on the API path
+
+Verifying the email code and issuing the authorization code are now separate
+steps (`EmailOtpService.verifyOtp` then `issueAuthorizationCode`), so nothing a
+client can redeem exists before the second factor passes. The hosted page goes
+through the shared MFA gate like every other sign-in. The API path follows
+Auth0's embedded-login shape: `verify-otp` answers `403 mfa_required` with a
+signed, workspace- and user-bound `mfaToken` (5 minutes), and `verify-mfa`
+takes that token with a TOTP or recovery code and returns the code. A user who
+must enroll first gets `mfa_enrollment_required`. If the server cannot sign MFA
+tokens, a user who owes the second factor is refused, never let through.
