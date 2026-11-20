@@ -139,8 +139,11 @@ class PasskeyAuthRoutesTest {
         relyingParty.throwOnFinishAssertion = null
     }
 
+    private val mfaRepository = com.kauth.fakes.FakeMfaRepository()
+
     private fun appBlock(
         rateLimiter: InMemoryRateLimiter = limiter,
+        mfa: com.kauth.domain.service.MfaService? = null,
     ): io.ktor.server.application.Application.() -> Unit =
         {
             install(ContentNegotiation) { json() }
@@ -181,6 +184,7 @@ class PasskeyAuthRoutesTest {
                     translationPort = EnglishOnlyTranslation(),
                     webAuthnService = buildWebAuthnService(),
                     passkeyRateLimiter = rateLimiter,
+                    mfaService = mfa,
                 )
             }
         }
@@ -445,67 +449,104 @@ class PasskeyAuthRoutesTest {
     @Test
     fun `POST passkeys authenticate finish with OAuth context redirects to authorization code`() =
         testApplication {
-            val app =
-                com.kauth.domain.model.Application(
-                    id =
-                        com.kauth.domain.model
-                            .ApplicationId(1),
-                    tenantId = TenantId(1),
-                    clientId = "spa-app",
-                    name = "SPA",
-                    description = null,
-                    accessType = com.kauth.domain.model.AccessType.CONFIDENTIAL,
-                    enabled = true,
-                    redirectUris = listOf("https://app.example.com/callback"),
-                    grantTypes =
-                        com.kauth.domain.model.GrantType
-                            .defaultsFor(com.kauth.domain.model.AccessType.CONFIDENTIAL),
-                )
-            apps.add(app)
             application(appBlock())
-
-            // Use a plain client (no HttpCookies plugin) so we can control cookies manually
-            val plainClient = createClient { followRedirects = false }
-
-            // Step 1: obtain challenge cookie from start
-            val startResponse = plainClient.post("/t/acme/passkeys/authenticate/start")
-            val rawSetCookie = startResponse.headers[HttpHeaders.SetCookie].orEmpty()
-            val challengeCookieValue = rawSetCookie.substringAfter("KOTAUTH_PASSKEY_AUTH=").substringBefore(";")
-
-            // Step 2: build a signed auth-context cookie carrying OAuth params
-            val oauthCookieValue =
-                buildAuthContextCookieValue(
-                    params =
-                        AuthView.OAuthParams(
-                            responseType = "code",
-                            clientId = "spa-app",
-                            redirectUri = "https://app.example.com/callback",
-                            scope = "openid",
-                        ),
-                    encryptionService = encryptionService,
-                )
-
-            // Step 3: finish with both cookies sent manually
-            val response =
-                plainClient.post("/t/acme/passkeys/authenticate/finish") {
-                    contentType(ContentType.Application.Json)
-                    setBody(
-                        """{"credential":{"type":"public-key","id":"${FakeRelyingPartyAdapter.CANNED_CREDENTIAL_ID}"}}""",
-                    )
-                    header(
-                        "Cookie",
-                        "KOTAUTH_PASSKEY_AUTH=$challengeCookieValue; KOTAUTH_AUTH_CONTEXT=$oauthCookieValue",
-                    )
-                }
-            // Should respond with JSON redirect_url pointing to the callback URI
-            assertEquals(HttpStatusCode.OK, response.status)
-            val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-            val redirectUrl = body["redirect_url"]?.jsonPrimitive?.content.orEmpty()
+            val redirectUrl = finishWithOAuthContext()
             assertTrue(
                 redirectUrl.startsWith("https://app.example.com/callback?code="),
                 "Expected redirect_url to callback with code, got: $redirectUrl",
             )
         }
+
+    @Test
+    fun `a verified passkey counts as both factors even when the user has TOTP`() =
+        testApplication {
+            mfaRepository.clear()
+            enrollTotp()
+            application(appBlock(mfa = mfaService()))
+            val redirectUrl = finishWithOAuthContext()
+            assertTrue(
+                redirectUrl.startsWith("https://app.example.com/callback?code="),
+                "A passkey with user verification needs no TOTP, got: $redirectUrl",
+            )
+        }
+
+    @Test
+    fun `a passkey without user verification still owes the TOTP challenge`() =
+        testApplication {
+            mfaRepository.clear()
+            enrollTotp()
+            relyingParty.queueAssertion(FakeRelyingPartyAdapter.DEFAULT_ASSERTION_RESULT.copy(userVerified = false))
+            application(appBlock(mfa = mfaService()))
+            assertEquals("/t/acme/mfa-challenge", finishWithOAuthContext())
+            assertTrue(authCodes.all().isEmpty(), "No code may be issued before the second factor")
+        }
+
+    private fun mfaService() =
+        com.kauth.domain.service
+            .MfaService(mfaRepository, userRepo, tenantRepo, hasher, auditLog)
+
+    private fun enrollTotp() {
+        mfaRepository.saveEnrollment(
+            com.kauth.domain.model.MfaEnrollment(
+                userId = alice.id!!,
+                tenantId = tenant.id,
+                secret = "secret",
+                verified = true,
+            ),
+        )
+    }
+
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.finishWithOAuthContext(): String {
+        apps.add(
+            com.kauth.domain.model.Application(
+                id =
+                    com.kauth.domain.model
+                        .ApplicationId(1),
+                tenantId = TenantId(1),
+                clientId = "spa-app",
+                name = "SPA",
+                description = null,
+                accessType = com.kauth.domain.model.AccessType.CONFIDENTIAL,
+                enabled = true,
+                redirectUris = listOf("https://app.example.com/callback"),
+                grantTypes =
+                    com.kauth.domain.model.GrantType
+                        .defaultsFor(com.kauth.domain.model.AccessType.CONFIDENTIAL),
+            ),
+        )
+        val plainClient = createClient { followRedirects = false }
+        val startResponse = plainClient.post("/t/acme/passkeys/authenticate/start")
+        val challengeCookieValue =
+            startResponse.headers[HttpHeaders.SetCookie]
+                .orEmpty()
+                .substringAfter("KOTAUTH_PASSKEY_AUTH=")
+                .substringBefore(";")
+        val oauthCookieValue =
+            buildAuthContextCookieValue(
+                params =
+                    AuthView.OAuthParams(
+                        responseType = "code",
+                        clientId = "spa-app",
+                        redirectUri = "https://app.example.com/callback",
+                        scope = "openid",
+                    ),
+                encryptionService = encryptionService,
+            )
+        val response =
+            plainClient.post("/t/acme/passkeys/authenticate/finish") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """{"credential":{"type":"public-key","id":"${FakeRelyingPartyAdapter.CANNED_CREDENTIAL_ID}"}}""",
+                )
+                header(
+                    "Cookie",
+                    "KOTAUTH_PASSKEY_AUTH=$challengeCookieValue; KOTAUTH_AUTH_CONTEXT=$oauthCookieValue",
+                )
+            }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        return body["redirect_url"]?.jsonPrimitive?.content.orEmpty()
+    }
 
     // =========================================================================
     // Helpers

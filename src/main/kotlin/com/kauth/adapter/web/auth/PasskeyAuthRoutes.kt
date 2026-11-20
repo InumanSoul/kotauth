@@ -25,7 +25,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.time.Instant
 import java.util.Base64
 
 private const val AUTH_COOKIE = "KOTAUTH_PASSKEY_AUTH"
@@ -41,6 +40,7 @@ private const val MAX_PENDING_CHALLENGES = 3
 
 internal fun Route.passkeyAuthRoutes(
     webAuthnService: WebAuthnService,
+    mfaGate: MfaGate,
     oauthService: OAuthService,
     encryptionService: EncryptionService,
     rateLimiter: RateLimiterPort,
@@ -105,14 +105,15 @@ internal fun Route.passkeyAuthRoutes(
                 val oauthParams = call.getAuthContext(encryptionService) ?: AuthView.OAuthParams()
                 if (oauthParams.isOAuthFlow) {
                     val redirectUrl =
-                        call.buildAuthorizationCodeRedirectUrl(
+                        call.signInRedirectUrl(
+                            gate = mfaGate,
                             slug = slug,
                             userId = result.value.userId,
-                            tenantId = tenant.id,
+                            tenant = tenant,
                             oauthParams = oauthParams,
                             ipAddress = ipAddress,
-                            authTime = Instant.now(),
-                            mfaCompleted = result.value.userVerified,
+                            // A passkey with user verification is already two factors (ADR-16).
+                            secondFactorDone = result.value.userVerified,
                             ssoTtlSeconds = ssoTtlSeconds,
                             secure = secure,
                             oauthService = oauthService,

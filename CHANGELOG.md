@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Every sign-in now asks for the second factor.** Only password sign-in asked for an enrolled
+  TOTP code. Magic link, email code, social sign-in and passkeys without user verification issued
+  the authorization code straight away, and a workspace that required MFA let those sign-ins
+  through without it. All of them now go through the same step: a user with TOTP is sent to the
+  challenge, and a user who lacks MFA the workspace requires is refused. A passkey with user
+  verification still counts as both factors. A social sign-in that arrives without an OAuth
+  request now returns to the account sign-in page instead of answering with tokens.
+
 ## [1.28.0] - 2026-11-20
 
 ### Added

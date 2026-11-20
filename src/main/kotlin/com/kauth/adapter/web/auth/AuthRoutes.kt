@@ -94,6 +94,7 @@ fun Route.authRoutes(
                     )
                 }
             }
+        val mfaGate = MfaGate(mfaService, roleRepository)
         install(authTenantPlugin)
 
         registerRoutes(
@@ -121,6 +122,7 @@ fun Route.authRoutes(
         )
 
         magicLinkRoutes(
+            mfaGate = mfaGate,
             credentialFlowService = credentialFlowService,
             rateLimiter = registerRateLimiter,
             encryptionService = encryptionService,
@@ -131,6 +133,7 @@ fun Route.authRoutes(
 
         if (emailOtpService != null && otpIpRateLimiter != null) {
             emailOtpLoginRoutes(
+                mfaGate = mfaGate,
                 emailOtpService = emailOtpService,
                 oauthService = oauthService,
                 perIpLimiter = otpIpRateLimiter,
@@ -142,6 +145,7 @@ fun Route.authRoutes(
 
         if (webAuthnService != null && passkeyRateLimiter != null) {
             passkeyAuthRoutes(
+                mfaGate = mfaGate,
                 webAuthnService = webAuthnService,
                 oauthService = oauthService,
                 encryptionService = encryptionService,
@@ -161,6 +165,7 @@ fun Route.authRoutes(
         )
 
         socialLoginRoutes(
+            mfaGate = mfaGate,
             oauthService = oauthService,
             socialLoginService = socialLoginService,
             identityProviderRepository = identityProviderRepository,
@@ -176,8 +181,7 @@ fun Route.authRoutes(
             identityProviderRepository = identityProviderRepository,
             tokenRateLimiter = tokenRateLimiter,
             authService = authService,
-            mfaService = mfaService,
-            roleRepository = roleRepository,
+            mfaGate = mfaGate,
             encryptionService = encryptionService,
             loginRateLimiter = loginRateLimiter,
             resourceServerRepository = resourceServerRepository,

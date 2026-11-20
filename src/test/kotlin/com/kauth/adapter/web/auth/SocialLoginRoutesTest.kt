@@ -42,6 +42,7 @@ import com.kauth.infrastructure.InMemoryRateLimiter
 import com.kauth.installTrustedProxyHeaders
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -50,6 +51,7 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
@@ -279,10 +281,13 @@ class SocialLoginRoutesTest {
         header("Cookie", "${stateCookieName(parts[0], parts[1])}=${encryptionService.signCookie(parts[2])}")
     }
 
+    private val mfaRepository = com.kauth.fakes.FakeMfaRepository()
+
     private fun ApplicationTestBuilder.installSocialRoutes(
         socialLimiter: RateLimiterPort = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60),
         baseUrl: String = "",
         trustedProxy: Boolean = false,
+        mfa: com.kauth.domain.service.MfaService? = null,
     ) {
         application {
             install(ContentNegotiation) { json() }
@@ -305,10 +310,127 @@ class SocialLoginRoutesTest {
                     socialRateLimiter = socialLimiter,
                     baseUrl = baseUrl,
                     auditLogPort = auditLog,
+                    mfaService = mfa,
                 )
             }
         }
     }
+
+    private suspend fun ApplicationTestBuilder.signInWithOriana(
+        withOAuthRequest: Boolean = true,
+        client: io.ktor.client.HttpClient =
+            createClient {
+                followRedirects = false
+                install(HttpCookies)
+            },
+    ): HttpResponse {
+        idpRepo.seed(TenantId(1), "oriana")
+        userRepo.add(alice)
+        appRepo.add(spaApp)
+        orianaAdapter.shouldFail = false
+        orianaAdapter.profileToReturn =
+            SocialUserProfile(
+                providerUserId = "oriana|42",
+                email = alice.email,
+                name = "Alice",
+                emailVerified = true,
+            )
+        val query =
+            if (withOAuthRequest) {
+                "?response_type=code&client_id=spa-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback" +
+                    "&state=client-state&code_challenge=client-challenge&code_challenge_method=S256"
+            } else {
+                ""
+            }
+        val redirect = client.get("/t/acme/auth/social/oriana/redirect$query")
+        return client.get(
+            "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+        )
+    }
+
+    private val totpSecret =
+        com.kauth.infrastructure.TotpUtil
+            .generateSecret()
+
+    private fun enrollAliceInTotp(): com.kauth.domain.service.MfaService {
+        mfaRepository.clear()
+        mfaRepository.saveEnrollment(
+            com.kauth.domain.model.MfaEnrollment(
+                userId = alice.id!!,
+                tenantId = TenantId(1),
+                secret = totpSecret,
+                verified = true,
+            ),
+        )
+        return com.kauth.domain.service
+            .MfaService(mfaRepository, userRepo, tenantRepo, hasher, auditLog)
+    }
+
+    @Test
+    fun `a social sign-in for a user with TOTP goes to the MFA challenge, not the client`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes(mfa = enrollAliceInTotp())
+
+            val response = signInWithOriana()
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/mfa-challenge", response.headers["Location"])
+            assertTrue(authCodeRepo.all().isEmpty(), "No code may be issued before the second factor")
+            val setCookies = response.headers.getAll("Set-Cookie").orEmpty()
+            assertTrue(
+                setCookies.any { it.startsWith("KOTAUTH_MFA_PENDING=") },
+                "The challenge needs its pending cookie",
+            )
+            assertTrue(
+                setCookies.any { it.startsWith("KOTAUTH_AUTH_CONTEXT=") },
+                "The OAuth request rode in the social state, so the challenge needs it written back",
+            )
+        }
+
+    @Test
+    fun `after the TOTP challenge a social sign-in returns to the client it started from`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes(mfa = enrollAliceInTotp())
+            val client =
+                createClient {
+                    followRedirects = false
+                    install(HttpCookies)
+                }
+            signInWithOriana(client = client)
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/mfa-challenge",
+                    formParameters =
+                        Parameters.build {
+                            append(
+                                "code",
+                                com.kauth.infrastructure.TotpUtil
+                                    .generateCode(totpSecret),
+                            )
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"].orEmpty()
+            assertTrue(location.startsWith("https://app.example.com/callback?code="), "Got: $location")
+            assertTrue(location.contains("state=client-state"), "The client's own state must come back")
+        }
+
+    @Test
+    fun `a social sign-in without an OAuth request hands the browser no tokens`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            val response = signInWithOriana(withOAuthRequest = false)
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/account/login", response.headers["Location"])
+            assertTrue(!response.bodyAsText().contains("access_token"), "Tokens must not reach the browser")
+        }
 
     @Test
     fun `a callback whose state is older than the max age is rejected`() =

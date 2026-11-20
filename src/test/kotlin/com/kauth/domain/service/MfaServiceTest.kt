@@ -386,12 +386,12 @@ class MfaServiceTest {
 
     @Test
     fun `isMfaRequired - optional policy returns false`() {
-        assertFalse(svc.isMfaRequired(testUser, tenantMfaPolicy = "optional"))
+        assertFalse(svc.isMfaRequired(tenantMfaPolicy = "optional"))
     }
 
     @Test
     fun `isMfaRequired - required policy returns true for any user`() {
-        assertTrue(svc.isMfaRequired(testUser, tenantMfaPolicy = "required"))
+        assertTrue(svc.isMfaRequired(tenantMfaPolicy = "required"))
     }
 
     @Test
@@ -400,19 +400,19 @@ class MfaServiceTest {
         val viewerRole = Role(id = RoleId(2), tenantId = TenantId(1), name = "viewer")
 
         assertTrue(
-            svc.isMfaRequired(testUser, tenantMfaPolicy = "required_admins", userRoles = listOf(adminRole)),
+            svc.isMfaRequired(tenantMfaPolicy = "required_admins", userRoles = listOf(adminRole)),
         )
         assertFalse(
-            svc.isMfaRequired(testUser, tenantMfaPolicy = "required_admins", userRoles = listOf(viewerRole)),
+            svc.isMfaRequired(tenantMfaPolicy = "required_admins", userRoles = listOf(viewerRole)),
         )
         assertFalse(
-            svc.isMfaRequired(testUser, tenantMfaPolicy = "required_admins", userRoles = emptyList()),
+            svc.isMfaRequired(tenantMfaPolicy = "required_admins", userRoles = emptyList()),
         )
     }
 
     @Test
     fun `isMfaRequired - unknown policy returns false (fail-open)`() {
-        assertFalse(svc.isMfaRequired(testUser, tenantMfaPolicy = "unknown_policy"))
+        assertFalse(svc.isMfaRequired(tenantMfaPolicy = "unknown_policy"))
     }
 
     // =========================================================================

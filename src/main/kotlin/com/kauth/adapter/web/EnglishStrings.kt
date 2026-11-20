@@ -792,6 +792,9 @@ object EnglishStrings {
     const val MFA_CODE_LABEL = "Authentication code"
     const val MFA_CODE_PLACEHOLDER = "Enter 6-digit code or recovery code"
     const val MFA_VERIFY_BUTTON = "Verify"
+    const val MFA_ENROLLMENT_REQUIRED =
+        "Multi-factor authentication is required for your account. " +
+            "Please sign in to the user portal and enable MFA under Security settings."
 
     // Transactional emails — see SmtpEmailAdapter. {0} is workspace name unless otherwise noted.
     // Subjects

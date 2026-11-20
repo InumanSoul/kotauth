@@ -327,6 +327,7 @@ private fun constantTimeEquals(
 
 internal fun Route.socialLoginRoutes(
     oauthService: OAuthService,
+    mfaGate: MfaGate,
     socialLoginService: SocialLoginService?,
     identityProviderRepository: IdentityProviderRepository?,
     encryptionService: EncryptionService,
@@ -652,14 +653,13 @@ internal fun Route.socialLoginRoutes(
                 if (restoredParams.isOAuthFlow) {
                     val activeTenant =
                         tenant ?: return@get call.respond(HttpStatusCode.NotFound)
-                    call.completeAuthorizationCodeFlow(
+                    call.finishSignIn(
+                        gate = mfaGate,
                         slug = slug,
                         userId = loginSuccess.user.id!!,
-                        tenantId = activeTenant.id,
+                        tenant = activeTenant,
                         oauthParams = restoredParams,
                         ipAddress = ipAddress,
-                        authTime = java.time.Instant.now(),
-                        mfaCompleted = false,
                         ssoTtlSeconds = ssoTtlSeconds,
                         secure = baseUrl.startsWith("https://", ignoreCase = true),
                         oauthService = oauthService,
@@ -680,7 +680,9 @@ internal fun Route.socialLoginRoutes(
                         },
                     )
                 } else {
-                    call.respond(loginSuccess.tokens)
+                    // Without an OAuth request there is no client to return to, and handing the
+                    // browser tokens here would skip the second factor.
+                    call.respondRedirect("/t/$slug/account/login")
                 }
             }
         }
@@ -800,14 +802,13 @@ internal fun Route.socialLoginRoutes(
                 val restoredParams = parseQueryStringToOAuthParams(pending.oauthParamsRaw)
 
                 if (restoredParams.isOAuthFlow) {
-                    call.completeAuthorizationCodeFlow(
+                    call.finishSignIn(
+                        gate = mfaGate,
                         slug = slug,
                         userId = loginSuccess.user.id!!,
-                        tenantId = tenant.id,
+                        tenant = tenant,
                         oauthParams = restoredParams,
                         ipAddress = ipAddress,
-                        authTime = java.time.Instant.now(),
-                        mfaCompleted = false,
                         ssoTtlSeconds = ssoTtlSeconds,
                         secure = baseUrl.startsWith("https://", ignoreCase = true),
                         oauthService = oauthService,

@@ -23,6 +23,7 @@ private const val PER_IP_RATE_PREFIX = "otp_login_ip"
 
 internal fun Route.emailOtpLoginRoutes(
     emailOtpService: EmailOtpService,
+    mfaGate: MfaGate,
     oauthService: OAuthService,
     perIpLimiter: RateLimiterPort,
     encryptionService: EncryptionService,
@@ -69,7 +70,7 @@ internal fun Route.emailOtpLoginRoutes(
     }
 
     post("/email-otp/verify") {
-        handleVerifyOtp(call, emailOtpService, oauthService, encryptionService, ssoTtlSeconds, secure)
+        handleVerifyOtp(call, emailOtpService, mfaGate, oauthService, encryptionService, ssoTtlSeconds, secure)
     }
 }
 
@@ -146,6 +147,7 @@ private suspend fun handleSendOtp(
 private suspend fun handleVerifyOtp(
     call: ApplicationCall,
     emailOtpService: EmailOtpService,
+    mfaGate: MfaGate,
     oauthService: OAuthService,
     encryptionService: EncryptionService,
     ssoTtlSeconds: Long,
@@ -199,14 +201,13 @@ private suspend fun handleVerifyOtp(
         is OtpVerifyResult.Success -> {
             val tenant = ctx.tenant
             val oauthParams = call.getAuthContext(encryptionService) ?: AuthView.OAuthParams()
-            call.completeAuthorizationCodeFlow(
+            call.finishSignIn(
+                gate = mfaGate,
                 slug = ctx.slug,
                 userId = result.userId,
-                tenantId = tenant.id,
+                tenant = tenant,
                 oauthParams = oauthParams,
                 ipAddress = ipAddress,
-                authTime = java.time.Instant.now(),
-                mfaCompleted = false,
                 ssoTtlSeconds = ssoTtlSeconds,
                 secure = secure,
                 oauthService = oauthService,
