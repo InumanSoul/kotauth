@@ -24,6 +24,7 @@ internal fun mfaSettingsPageImpl(
     enrolledUsers: Int = 0,
     enrolledUserList: List<User> = emptyList(),
     notEnrolledUserList: List<User> = emptyList(),
+    baseUrl: String = "",
 ): HTML.() -> Unit =
     {
         val notEnrolled = totalUsers - enrolledUsers
@@ -35,7 +36,7 @@ internal fun mfaSettingsPageImpl(
             }
         val isRequired = workspace.mfaPolicy == "required" || workspace.mfaPolicy == "required_admins"
         val enrollmentRate = if (totalUsers > 0) "${enrolledUsers * 100 / totalUsers}%" else "—"
-        val enrollUrl = "/t/${workspace.slug}/account/mfa/enroll"
+        val enrollUrl = "${baseUrl.trimEnd('/')}/t/${workspace.slug}/account/mfa/enroll"
         val securityPolicyUrl = "/admin/workspaces/${workspace.slug}/settings/security"
 
         adminShell(
@@ -65,12 +66,6 @@ internal fun mfaSettingsPageImpl(
                                 else -> "badge--inactive"
                             }
                         span("badge $badgeMod") { +policyLabel }
-                    },
-                    actions = {
-                        a(securityPolicyUrl, classes = "btn btn--ghost") {
-                            inlineSvgIcon("lock", "Security")
-                            +"Security Policy"
-                        }
                     },
                 )
 
@@ -252,7 +247,7 @@ internal fun identityProvidersIndexPageImpl(
                 val configured = providers.sortedBy { it.provider.value }
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +EnglishStrings.IDP_CONFIGURED_HEADING }
+                    h2("ov-card__section-label") { +EnglishStrings.IDP_CONFIGURED_HEADING }
                     if (configured.isEmpty()) {
                         // Deliberately no call to action: the catalog below is the one.
                         emptyState(
@@ -282,7 +277,7 @@ internal fun identityProvidersIndexPageImpl(
                 }
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +EnglishStrings.IDP_ADD_HEADING }
+                    h2("ov-card__section-label") { +EnglishStrings.IDP_ADD_HEADING }
                     div("provider-grid") {
                         // The reserved keys are a fixed set, so their tiles go straight to the
                         // provider's own page. Everything else needs a key named first.
@@ -490,7 +485,7 @@ internal fun identityProviderDetailPageImpl(
                     hiddenInput(name = "enabled") { value = (existing?.enabled ?: true).toString() }
 
                     div("ov-card") {
-                        div("ov-card__section-label") { +EnglishStrings.IDP_CONNECTION_HEADING }
+                        h2("ov-card__section-label") { +EnglishStrings.IDP_CONNECTION_HEADING }
 
                         div("setup-row") {
                             div("setup-row__text") { providerSetupInstructions(provider, heading) }
@@ -511,9 +506,13 @@ internal fun identityProviderDetailPageImpl(
                         if (isNew) {
                             hiddenInput(name = "kind") { value = ProviderKind.OIDC.value }
                             div("edit-row") {
-                                span("edit-row__label") { +EnglishStrings.IDP_KEY_LABEL }
+                                label("edit-row__label") {
+                                    htmlFor = "field-providerKey"
+                                    +EnglishStrings.IDP_KEY_LABEL
+                                }
                                 div {
                                     input(type = InputType.text, name = "providerKey") {
+                                        this.id = "field-providerKey"
                                         classes = setOf("edit-row__field")
                                         placeholder = EnglishStrings.IDP_KEY_PLACEHOLDER
                                         required = true
@@ -553,9 +552,13 @@ internal fun identityProviderDetailPageImpl(
                         )
 
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.IDP_CLIENT_SECRET_LABEL }
+                            label("edit-row__label") {
+                                htmlFor = "field-clientSecret"
+                                +EnglishStrings.IDP_CLIENT_SECRET_LABEL
+                            }
                             div {
                                 input(type = InputType.password, name = "clientSecret") {
+                                    this.id = "field-clientSecret"
                                     classes = setOf("edit-row__field")
                                     placeholder = "••••••••••"
                                     attributes["autocomplete"] = "new-password"
@@ -625,7 +628,7 @@ internal fun identityProviderDetailPageImpl(
                     }
 
                     div("ov-card") {
-                        div("ov-card__section-label") { +EnglishStrings.IDP_JIT_TITLE }
+                        h2("ov-card__section-label") { +EnglishStrings.IDP_JIT_TITLE }
                         jitControls(existing)
                     }
                 }
@@ -644,12 +647,12 @@ internal fun identityProviderDetailPageImpl(
 
                 if (existing != null) {
                     div("ov-card") {
-                        div("ov-card__section-label") { +EnglishStrings.IDP_FAILURES_HEADING }
+                        h2("ov-card__section-label") { +EnglishStrings.IDP_FAILURES_HEADING }
                         identityProviderFailuresPanel(failures)
                     }
 
                     div("ov-card") {
-                        div("ov-card__section-label ov-card__section-label--danger") {
+                        h2("ov-card__section-label ov-card__section-label--danger") {
                             +EnglishStrings.DANGER_ZONE_HEADING
                         }
                         div("danger-zone") {
@@ -768,9 +771,13 @@ private fun FlowContent.jitControls(existing: IdentityProvider?) {
     }
 
     div("edit-row") {
-        span("edit-row__label") { +EnglishStrings.IDP_JIT_DOMAIN_ADD_LABEL }
+        label("edit-row__label") {
+            htmlFor = "field-jitAllowedDomainToAdd"
+            +EnglishStrings.IDP_JIT_DOMAIN_ADD_LABEL
+        }
         div {
             input(type = InputType.text, name = "jitAllowedDomainToAdd") {
+                this.id = "field-jitAllowedDomainToAdd"
                 classes = setOf("edit-row__field")
                 placeholder = EnglishStrings.IDP_JIT_DOMAIN_ADD_PLACEHOLDER
                 attributes["autocomplete"] = "off"
@@ -862,9 +869,13 @@ private fun FlowContent.idpTextRow(
     required: Boolean = false,
 ) {
     div("edit-row") {
-        span("edit-row__label") { +label }
+        label("edit-row__label") {
+            htmlFor = "field-$fieldName"
+            +label
+        }
         div {
             input(type = InputType.text, name = fieldName) {
+                this.id = "field-$fieldName"
                 classes = setOf("edit-row__field")
                 this.placeholder = placeholder
                 this.required = required
@@ -923,7 +934,7 @@ internal fun apiKeysListPageImpl(
             div("page-header__actions") {
                 primaryLink(
                     "/admin/workspaces/$slug/settings/api-keys/new",
-                    "New API Key",
+                    "Create API Key",
                     "plus",
                 )
             }
@@ -1083,7 +1094,7 @@ internal fun createApiKeyPageImpl(
     val totalScopes = scopes.size
 
     adminShell(
-        pageTitle = "New API Key · ${workspace.displayName}",
+        pageTitle = "Create API Key · ${workspace.displayName}",
         activeRail = "settings",
         allWorkspaces = allWorkspaces,
         workspaceName = workspace.displayName,
@@ -1126,7 +1137,7 @@ internal fun createApiKeyPageImpl(
 
         // ── Form ─────────────────────────────────────────────────
         div("ov-card") {
-            div("ov-card__section-label") { +"Key Details" }
+            h2("ov-card__section-label") { +"Key Details" }
             form(
                 action = "/admin/workspaces/$slug/settings/api-keys",
                 method = FormMethod.post,
@@ -1135,9 +1146,13 @@ internal fun createApiKeyPageImpl(
                 id = "create-api-key-form"
 
                 div("edit-row") {
-                    span("edit-row__label") { +"Name" }
+                    label("edit-row__label") {
+                        htmlFor = "field-name"
+                        +"Name"
+                    }
                     div {
                         input(type = InputType.text, name = "name") {
+                            this.id = "field-name"
                             classes = setOf("edit-row__field")
                             placeholder = "e.g. CI/CD pipeline"
                             required = true
@@ -1148,9 +1163,13 @@ internal fun createApiKeyPageImpl(
                 }
 
                 div("edit-row") {
-                    span("edit-row__label") { +"Expiry" }
+                    label("edit-row__label") {
+                        htmlFor = "field-expiresAt"
+                        +"Expiry"
+                    }
                     div {
                         input(type = InputType.date, name = "expiresAt") {
+                            this.id = "field-expiresAt"
                             classes = setOf("edit-row__field")
                         }
                         div("edit-row__hint") { +"Leave blank for keys that never expire." }
@@ -1161,7 +1180,7 @@ internal fun createApiKeyPageImpl(
 
         // ── Scopes card ──────────────────────────────────────────
         div("ov-card") {
-            div("ov-card__section-label") { +"Scopes" }
+            h2("ov-card__section-label") { +"Scopes" }
             div {
                 div("chip-grid__header") {
                     span("chip-grid__header-label") { +"Select permissions for this key" }

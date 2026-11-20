@@ -280,8 +280,8 @@ explicit per-client grant rather than everything its API declares. See ADR-23.
 **Backups reproduce a workspace's configuration** as of v1.26.0 — identity providers, resource
 servers with their per-client scope grants, and application audience and launcher settings all
 survive a round trip. Client secrets, provider secrets, the SMTP password and MFA seeds remain
-excluded by design and are listed in the export manifest. One field is exported but not restored:
-`tokenExpiryOverride`, which has no writer anywhere in the codebase (#163).
+excluded by design and are listed in the export manifest. A client's own access-token lifetime
+round-trips too, as of v1.28.0.
 
 **Cross-namespace collision prevention is a read-before-write.** Two concurrent creates with mirrored identifiers can both pass the check, because no database constraint spans the username and email namespaces. The runtime refusal bounds the consequence to two users seeing a generic failure until an administrator intervenes.
 

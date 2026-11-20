@@ -13,6 +13,7 @@ private data class BootstrapEntryJson(
     val keyHash: String,
     val keyPrefix: String? = null,
     val scimDialect: String? = null,
+    val awaitTenant: Boolean = false,
 )
 
 private val parser = Json { ignoreUnknownKeys = true }
@@ -37,6 +38,7 @@ fun parseBootstrapApiKeyEntries(json: String): List<ApiKeyBootstrapService.Entry
             keyHash = e.keyHash,
             keyPrefix = e.keyPrefix,
             scimDialect = e.scimDialect?.let { requireRegisteredDialect(it, e.name) },
+            awaitTenant = e.awaitTenant,
         )
     }
 }

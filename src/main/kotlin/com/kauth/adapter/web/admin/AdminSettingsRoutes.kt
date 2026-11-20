@@ -453,6 +453,9 @@ fun Route.adminSettingsRoutes(
                 hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
+                emailOtpSignupEnabled = params["emailOtpSignupEnabled"] == "true",
+                emailOtpLockoutThreshold =
+                    params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
                 loginIdentifierMode = parsedLoginIdentifierMode ?: s.loginIdentifierMode,
             )
 
@@ -647,7 +650,7 @@ fun Route.adminSettingsRoutes(
         val userWithPasskey = users.map { u -> u to (u.id in enrolledUserIds) }
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.passkeysPage(workspace, wsPairs, session.username, userWithPasskey),
+            AdminView.passkeysPage(workspace, wsPairs, session.username, userWithPasskey, baseUrl),
         )
     }
 
@@ -676,6 +679,7 @@ fun Route.adminSettingsRoutes(
                 enrolledUsers = enrolled.size,
                 enrolledUserList = enrolled,
                 notEnrolledUserList = notEnrolled,
+                baseUrl = baseUrl,
             ),
         )
     }

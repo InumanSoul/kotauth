@@ -119,6 +119,30 @@ fun DIV.pageHeader(
     }
 }
 
+/**
+ * A button that can't be used right now, with the reason shown on hover and keyboard focus
+ * and announced to screen readers. `aria-disabled` keeps it focusable, unlike `disabled`.
+ */
+fun FlowContent.disabledButtonWithReason(
+    label: String,
+    reason: String,
+    reasonId: String,
+    btnClass: String = "btn btn--ghost",
+) {
+    span("tooltip-wrap") {
+        attributes["data-tooltip"] = reason
+        button(type = ButtonType.button, classes = btnClass) {
+            attributes["aria-disabled"] = "true"
+            attributes["aria-describedby"] = reasonId
+            +label
+        }
+        span("sr-only") {
+            id = reasonId
+            +reason
+        }
+    }
+}
+
 /** Starts an ov-card block. Content lambda receives the DIV to add rows. */
 fun DIV.ovCard(content: DIV.() -> Unit) {
     div("ov-card") { content() }
@@ -197,7 +221,7 @@ fun FlowContent.ovProseTerm(
 
 /** Section label divider row inside an ov-card. */
 fun FlowContent.ovSectionLabel(label: String) {
-    div("ov-card__section-label") { +label }
+    h2("ov-card__section-label") { +label }
 }
 
 /** Inherited-from-workspace row. */
@@ -448,6 +472,7 @@ fun DIV.entityPicker(
                 autoComplete = "off"
                 attributes["spellcheck"] = "false"
                 attributes["role"] = "combobox"
+                attributes["aria-label"] = placeholder
                 attributes["aria-autocomplete"] = "list"
                 attributes["aria-expanded"] = "false"
                 attributes["aria-controls"] = "$pickerId-results"

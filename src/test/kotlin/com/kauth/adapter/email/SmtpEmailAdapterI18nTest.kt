@@ -1,5 +1,6 @@
 package com.kauth.adapter.email
 
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -155,6 +156,17 @@ class SmtpEmailAdapterI18nTest {
         assertTrue(rendered.html.contains("Use this 10-minute code"))
         assertTrue(rendered.html.contains("482190"))
         assertTrue(rendered.text.contains("482190"))
+    }
+
+    @Test
+    fun `magic-link email quotes the workspace's link expiry`() {
+        val adapter = SmtpEmailAdapter(EnglishOnlyTranslation())
+        val tenant = englishOnlyTenant.copy(securityConfig = SecurityConfig(magicLinkTokenTtlMinutes = 45))
+
+        val rendered = adapter.renderMagicLink("Alice", "https://acme.example.com/ml", "Acme", tenant)
+
+        assertTrue(rendered.html.contains("This link expires in 45 minutes"))
+        assertTrue(rendered.text.contains("This link expires in 45 minutes"))
     }
 
     private fun inMemoryTranslator(vararg bundles: Pair<String, Map<String, String>>): TranslationPort {

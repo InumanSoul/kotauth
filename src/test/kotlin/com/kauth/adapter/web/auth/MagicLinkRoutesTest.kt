@@ -34,6 +34,7 @@ import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
@@ -453,6 +454,20 @@ class MagicLinkRoutesTest {
             val response = noFollow.get("/t/acme/magic-link/consume?token=anything")
             assertEquals(HttpStatusCode.Found, response.status)
             assertTrue(response.headers["Location"]?.contains("/account/login") == true)
+        }
+
+    @Test
+    fun `the sent page quotes the workspace's link expiry`() =
+        testApplication {
+            tenants.clear()
+            tenants.add(
+                tenant.copy(securityConfig = SecurityConfig(magicLinkEnabled = true, magicLinkTokenTtlMinutes = 45)),
+            )
+            application(appBlock())
+
+            val body = client.get("/t/acme/magic-link?sent=true").bodyAsText()
+
+            assertTrue(body.contains("The link expires in 45 minutes."), body)
         }
 
     // =========================================================================

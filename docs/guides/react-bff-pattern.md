@@ -46,7 +46,7 @@ For small internal tools with no backend, the [browser-direct SPA pattern](react
 
 In the Kotauth admin console:
 
-1. Navigate to your workspace → **Applications** → **New Application**
+1. Navigate to your workspace → **Applications** → **Create Application**
 2. Set **Access Type** to `confidential` — the BFF holds a client secret server-side
 3. Under **Redirect URIs**, add:
    ```

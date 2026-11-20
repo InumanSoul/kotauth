@@ -406,8 +406,8 @@ class BackupImporterService(
                         "user record for email '${ub.email}' has a username of " +
                             "${rewritten.length} characters, over the ${UsernamePolicy.MAX_LENGTH} limit"
                     UsernamePolicy.Violation.INVALID_FORMAT ->
-                        "user record for email '${ub.email}' has username '${ub.username}', which " +
-                            "rewrites to '$rewritten' — usually a username made entirely of " +
+                        "user record for email '${ub.email}' has username '${clip(ub.username)}', which " +
+                            "rewrites to '${clip(rewritten)}' — usually a username made entirely of " +
                             "characters outside ${UsernamePolicy.USERNAME_PATTERN.pattern}, such " +
                             "as a non-Latin script"
                 }
@@ -416,7 +416,7 @@ class BackupImporterService(
             error(
                 "Backup import rejected: ${unrewritable.size} user record(s) have usernames that " +
                     "cannot be rewritten into a valid one. Rename these users on the source " +
-                    "deployment and export again. Offending records: ${unrewritable.joinToString("; ")}.",
+                    "deployment and export again. Offending records: ${listForError(unrewritable)}.",
             )
         }
 
@@ -425,15 +425,15 @@ class BackupImporterService(
                 .groupBy { UsernamePolicy.rewriteLegacy(it.username) }
                 .filterValues { it.size > 1 }
                 .map { (rewritten, records) ->
-                    "'$rewritten' would be produced by ${records.size} records: " +
-                        records.joinToString(", ") { "'${it.username}' (${it.email})" }
+                    "'${clip(rewritten)}' would be produced by ${records.size} records: " +
+                        records.joinToString(", ") { "'${clip(it.username)}' (${it.email})" }
                 }
         if (collisions.isNotEmpty()) {
             error(
                 "Backup import rejected: ${collisions.size} username(s) would collide after " +
                     "rewriting. Merging or dropping identity rows is not an acceptable restore " +
                     "outcome, so these must be de-duplicated on the source deployment and " +
-                    "exported again. Collisions: ${collisions.joinToString("; ")}.",
+                    "exported again. Collisions: ${listForError(collisions)}.",
             )
         }
 
@@ -628,16 +628,20 @@ class BackupImporterService(
     )
 
     /**
-     * `create` cannot set the launcher fields, so anything non-default needs a follow-up `update`.
-     * Skipped entirely when the backup carries only defaults, which keeps pre-1.26 restores to the
-     * same single insert they always did.
+     * `create` cannot set the launcher fields or the token lifetime, so anything non-default needs a
+     * follow-up `update`. Skipped entirely when the backup carries only defaults, which keeps
+     * pre-1.26 restores to the same single insert they always did.
      */
     private fun restoreLauncherFields(
         app: Application,
         ab: ApplicationBackup,
     ) {
         val hasLauncherConfig =
-            ab.launcherUrl != null || ab.iconUrl != null || !ab.launcherVisible || ab.launcherDisplayOrder != 0
+            ab.launcherUrl != null ||
+                ab.iconUrl != null ||
+                !ab.launcherVisible ||
+                ab.launcherDisplayOrder != 0 ||
+                ab.tokenExpiryOverride != null
         if (!hasLauncherConfig) return
         applicationRepository.update(
             appId = app.id,
@@ -651,6 +655,7 @@ class BackupImporterService(
             launcherVisible = ab.launcherVisible,
             launcherDisplayOrder = ab.launcherDisplayOrder,
             audience = ab.audience,
+            tokenExpiryOverride = ab.tokenExpiryOverride,
         )
     }
 
@@ -722,3 +727,16 @@ data class UsernameRewrite(
     val to: String,
     val email: String,
 )
+
+private const val MAX_LISTED_OFFENDERS = 20
+private const val MAX_QUOTED_USERNAME = 64
+
+/** Keeps a restore error readable when a backup has hundreds of bad or very long usernames. */
+private fun listForError(items: List<String>): String {
+    val listed = items.take(MAX_LISTED_OFFENDERS).joinToString("; ")
+    val rest = items.size - MAX_LISTED_OFFENDERS
+    return if (rest > 0) "$listed; and $rest more" else listed
+}
+
+private fun clip(username: String): String =
+    if (username.length <= MAX_QUOTED_USERNAME) username else username.take(MAX_QUOTED_USERNAME) + "…"

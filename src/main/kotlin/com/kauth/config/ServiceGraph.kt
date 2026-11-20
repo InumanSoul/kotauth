@@ -96,6 +96,7 @@ import com.kauth.domain.service.UsernameGenerator
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
 import com.kauth.domain.service.WorkspaceCreationService
+import com.kauth.domain.service.WorkspacePatchService
 import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.AuditChainHasher
@@ -170,6 +171,7 @@ data class ServiceGraph(
     val emailOtpChallengeRepository: EmailOtpChallengeRepository,
     val keyProvisioningService: KeyProvisioningService,
     val workspaceCreationService: WorkspaceCreationService,
+    val workspacePatchService: WorkspacePatchService,
     val portalClientProvisioning: PortalClientProvisioning,
     val adminClientProvisioning: AdminClientProvisioning,
     val adminSessionKey: ByteArray,
@@ -396,6 +398,7 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     resourceServerRepository = resourceServerRepository,
                     roleRepository = roleRepository,
+                    emailScope = applicationScope,
                 )
             val apiKeyBootstrapService =
                 ApiKeyBootstrapService(apiKeyRepository, tenantRepository)
@@ -451,7 +454,20 @@ data class ServiceGraph(
                 WorkspaceCreationService(
                     workspaceSettingsService = workspaceSettingsService,
                     roleGroupService = roleGroupService,
-                    tenantProvisioning = TenantProvisioner(keyProvisioning, portalClientProvisioning),
+                    tenantProvisioning =
+                        TenantProvisioner(
+                            keyProvisioning,
+                            portalClientProvisioning,
+                            apiKeyBootstrapService,
+                        ),
+                    transactionRunner = ExposedTransactionRunner(),
+                )
+            val workspacePatchService =
+                WorkspacePatchService(
+                    tenantRepository = tenantRepository,
+                    workspaceSettingsService = workspaceSettingsService,
+                    accountService = accountService,
+                    availableLocales = { translationPort.availableLocales },
                     transactionRunner = ExposedTransactionRunner(),
                 )
             val launcherService =
@@ -679,7 +695,12 @@ data class ServiceGraph(
                     auditLogPort = auditLogAdapter,
                     transactionRunner = backupTransactionRunner,
                     resourceServerRepository = resourceServerRepository,
-                    tenantProvisioning = TenantProvisioner(keyProvisioning, portalClientProvisioning),
+                    tenantProvisioning =
+                        TenantProvisioner(
+                            keyProvisioning,
+                            portalClientProvisioning,
+                            apiKeyBootstrapService,
+                        ),
                 )
 
             return ServiceGraph(
@@ -721,6 +742,7 @@ data class ServiceGraph(
                 emailOtpChallengeRepository = emailOtpChallengeRepository,
                 keyProvisioningService = keyProvisioning,
                 workspaceCreationService = workspaceCreationService,
+                workspacePatchService = workspacePatchService,
                 portalClientProvisioning = portalClientProvisioning,
                 adminClientProvisioning = adminClientProvisioning,
                 adminSessionKey = adminSessionKey,

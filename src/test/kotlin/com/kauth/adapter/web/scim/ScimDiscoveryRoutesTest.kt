@@ -8,6 +8,8 @@ import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.scim.CASE_INSENSITIVE_ATTRIBUTES
+import com.kauth.domain.scim.ScimFilterScope
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
@@ -56,6 +58,8 @@ import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -372,6 +376,35 @@ class ScimDiscoveryRoutesTest {
 
             assertEquals(true, externalId["caseExact"]?.jsonPrimitive?.boolean)
             assertEquals("server", externalId["uniqueness"]?.jsonPrimitive?.content)
+        }
+
+    @Test
+    fun `filters ignore case on exactly the string attributes the schemas declare caseExact false`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = client.get("/t/acme/scim/v2/Schemas") { bearerAuth(scimKey) }
+            val filterable = ScimFilterScope.entries.flatMap { it.supportedAttributes }.toSet()
+
+            fun JsonArray.strings(): List<JsonObject> =
+                flatMap { element ->
+                    val attr = element.jsonObject
+                    listOf(attr) + ((attr["subAttributes"] as? JsonArray)?.strings() ?: emptyList())
+                }.filter { it["type"]?.jsonPrimitive?.content == "string" }
+
+            val advertised =
+                jsonCodec
+                    .parseToJsonElement(response.bodyAsText())
+                    .jsonObject["Resources"]!!
+                    .jsonArray
+                    .flatMap { it.jsonObject["attributes"]!!.jsonArray.strings() }
+                    .filter { it["name"]!!.jsonPrimitive.content in filterable }
+            assertTrue(advertised.isNotEmpty())
+            advertised.forEach { attr ->
+                val name = attr["name"]!!.jsonPrimitive.content
+                val caseExact = attr["caseExact"]!!.jsonPrimitive.boolean
+                assertEquals(!caseExact, name in CASE_INSENSITIVE_ATTRIBUTES, "filter matching drifted for $name")
+            }
         }
 
     // -------------------------------------------------------------------------

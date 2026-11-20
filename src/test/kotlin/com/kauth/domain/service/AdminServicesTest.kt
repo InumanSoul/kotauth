@@ -414,10 +414,8 @@ class AdminServicesTest {
     }
 
     @Test
-    fun `createUser rejects an email equal to another users username in different case`() {
-        // Production never stores a mixed-case username (see UsernamePolicy) — the case
-        // difference this test exercises comes from the NEW request's email instead, which
-        // createUser itself lowercases before the collision check runs.
+    fun `createUser lowercases a mixed-case email before checking it against other usernames`() {
+        // Stored usernames are always lowercase, so the case difference here is on the request side.
         users.add(alice.copy(id = UserId(52), username = "dave2@example.com", email = "dave-alt2@example.com"))
         val result =
             userSvc.createUser(
@@ -1731,9 +1729,78 @@ class AdminServicesTest {
         assertIs<AdminError.Validation>(result.error)
     }
 
+    private fun signInUpdate(
+        password: Boolean,
+        magicLink: Boolean = false,
+        emailOtp: Boolean = false,
+        passkey: Boolean = false,
+    ) = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!).copy(
+        passwordLoginEnabled = password,
+        magicLinkEnabled = magicLink,
+        emailOtpLoginEnabled = emailOtp,
+        passkeysEnabled = passkey,
+    )
+
     @Test
-    fun `updateWorkspaceSettings rejects disabling both password and magic link`() {
-        val result = callUpdateSettings(passwordLoginEnabled = false, magicLinkEnabled = false)
+    fun `updateWorkspaceSettings refuses a negative lockout threshold instead of turning lockout off`() {
+        val update = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!).copy(lockoutMaxAttempts = -1)
+        val result = wsSvc.updateWorkspaceSettings("acme", update)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings refuses lockout values outside the console's bounds`() {
+        val base = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!)
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutMaxAttempts = 101)))
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutDurationMinutes = 0)))
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutDurationMinutes = 1441)))
+    }
+
+    @Test
+    fun `updateWorkspaceSettings accepts 0 lockout attempts, which turns lockout off`() {
+        val update = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!).copy(lockoutMaxAttempts = 0)
+        val result = wsSvc.updateWorkspaceSettings("acme", update)
+        assertIs<AdminResult.Success<Tenant>>(result)
+        assertFalse(result.value.securityConfig.isLockoutEnabled)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings still saves a workspace whose stored lockout predates the bounds`() {
+        tenants.clear()
+        tenants.add(tenant.copy(securityConfig = tenant.securityConfig.copy(lockoutMaxAttempts = 500)))
+        val update = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!).copy(displayName = "Acme 2")
+        assertIs<AdminResult.Success<Tenant>>(wsSvc.updateWorkspaceSettings("acme", update))
+    }
+
+    @Test
+    fun `updateWorkspaceSettings rejects turning off every sign-in method`() {
+        val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = false))
+        assertIs<AdminResult.Failure>(result)
+        assertEquals(AdminError.NoMethodsEnabled, result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings allows passwordless with only email codes`() {
+        val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = false, emailOtp = true))
+        assertIs<AdminResult.Success<Tenant>>(result)
+        assertTrue(result.value.securityConfig.emailOtpLoginEnabled)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings refuses passwordless while SMTP is not ready`() {
+        tenants.clear()
+        tenants.add(tenant.copy(smtpEnabled = false, passkeysEnabled = true))
+        val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = false, passkey = true))
+        assertIs<AdminResult.Failure>(result)
+        assertEquals(AdminError.SmtpRequired, result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings refuses turning on magic links while SMTP is not ready`() {
+        tenants.clear()
+        tenants.add(tenant.copy(smtpEnabled = false))
+        val result = wsSvc.updateWorkspaceSettings("acme", signInUpdate(password = true, magicLink = true))
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }

@@ -64,6 +64,7 @@ class ProvisioningGrantsTest {
             launcherVisible = false,
             launcherDisplayOrder = 3,
             audience = "https://api.example.com",
+            tokenExpiryOverride = 900,
         )
 
         provisioning(baseUrl = "https://new.example.com").provision()
@@ -75,6 +76,7 @@ class ProvisioningGrantsTest {
         assertEquals("https://old.example.com/icon.png", after.iconUrl)
         assertEquals(false, after.launcherVisible)
         assertEquals(3, after.launcherDisplayOrder)
+        assertEquals(900, after.tokenExpiryOverride)
     }
 
     @Test
@@ -114,6 +116,7 @@ class ProvisioningGrantsTest {
             launcherVisible = true,
             launcherDisplayOrder = 0,
             audience = null,
+            tokenExpiryOverride = null,
         )
 
         provisioning(baseUrl = "https://new.example.com").provision()

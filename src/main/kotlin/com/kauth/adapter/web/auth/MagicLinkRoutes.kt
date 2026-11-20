@@ -46,9 +46,9 @@ internal fun Route.magicLinkRoutes(
 ) {
     get("/magic-link") {
         val ctx = call.attributes[AuthTenantAttr]
-        if (ctx.tenant?.securityConfig?.magicLinkEnabled != true) {
-            return@get call.respondRedirect("/t/${ctx.slug}/account/login")
-        }
+        val tenant =
+            ctx.tenant?.takeIf { it.securityConfig.magicLinkEnabled }
+                ?: return@get call.respondRedirect("/t/${ctx.slug}/account/login")
         val sent = call.request.queryParameters["sent"] == "true"
         call.respondHtml(
             HttpStatusCode.OK,
@@ -56,6 +56,7 @@ internal fun Route.magicLinkRoutes(
                 tenantSlug = ctx.slug,
                 ctx = ctx.viewContext,
                 sent = sent,
+                linkTtlMinutes = tenant.securityConfig.magicLinkTtlMinutes,
             ),
         )
     }

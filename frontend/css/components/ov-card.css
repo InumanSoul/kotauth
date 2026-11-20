@@ -155,3 +155,11 @@
   color: var(--color-text);
   margin-bottom: var(--space-1);
 }
+
+/* Heading text inside a section-label row that also holds actions */
+.ov-card__heading {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  margin: 0;
+}

@@ -269,6 +269,26 @@ class BackupImporterUsernameValidationTest {
     }
 
     @Test
+    fun `a restore with hundreds of bad usernames lists the first few and counts the rest`() {
+        val export = exportAcme()
+        val template = export.users.single()
+        val offenders =
+            (1..300).map { i -> template.copy(username = "用".repeat(500), email = "user$i@acme.example.com") }
+
+        val result =
+            importer().import(
+                export.copy(users = offenders),
+                newSlug = "acme-restored",
+                currentSchemaVersion = 1,
+            )
+
+        val error = assertIs<BackupError.InvalidPayload>(assertIs<BackupResult.Failure>(result).error)
+        assertContains(error.message, "user1@acme.example.com")
+        assertContains(error.message, "and 280 more")
+        assertTrue(error.message.length < 10_000, "message was ${error.message.length} characters")
+    }
+
+    @Test
     fun `import accepts a username that normalizes cleanly`() {
         val export = exportAcme()
         val messyExport = export.copy(users = listOf(export.users.single().copy(username = "  Alice ")))

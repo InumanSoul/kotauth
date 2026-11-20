@@ -129,6 +129,65 @@ class ApiKeyBootstrapServiceTest {
         assertTrue(apiKeys.findById(saved.id!!, tenant.id)!!.enabled)
     }
 
+    private fun awaiting(
+        slug: String,
+        name: String = "$slug-provisioner",
+    ) = ApiKeyBootstrapService.Entry(
+        tenantSlug = slug,
+        name = name,
+        scopes = listOf(ApiScope.WORKSPACE_WRITE),
+        keyHash = "hash-$name",
+        awaitTenant = true,
+    )
+
+    @Test
+    fun `an awaitTenant entry for a missing workspace is held instead of failing`() {
+        val result = service.ensureBootstrapped(listOf(awaiting("orders")))
+
+        assertTrue(result is ApiKeyBootstrapService.Result.Provisioned)
+        assertEquals(ApiKeyBootstrapService.Action.PENDING, result.applied.single().action)
+        assertEquals(listOf("orders"), service.pendingEntries.map { it.tenantSlug })
+    }
+
+    @Test
+    fun `an awaitTenant entry for an existing workspace is applied at once`() {
+        val result = service.ensureBootstrapped(listOf(awaiting("zion")))
+
+        assertTrue(result is ApiKeyBootstrapService.Result.Provisioned)
+        assertEquals(ApiKeyBootstrapService.Action.CREATED, result.applied.single().action)
+        assertTrue(service.pendingEntries.isEmpty())
+    }
+
+    @Test
+    fun `held entries are applied when their workspace is created, and only theirs`() {
+        service.ensureBootstrapped(listOf(awaiting("orders"), awaiting("billing")))
+        val orders = tenants.create(slug = "orders", displayName = "Orders", issuerUrl = null)
+
+        val outcomes = service.applyPendingFor(orders)
+
+        assertEquals(listOf("orders-provisioner"), outcomes.map { it.name })
+        assertEquals(ApiKeyBootstrapService.Action.CREATED, outcomes.single().action)
+        val key = apiKeys.findByTenantAndName(orders.id, "orders-provisioner")!!
+        assertEquals("hash-orders-provisioner", key.keyHash)
+        assertEquals(listOf(ApiScope.WORKSPACE_WRITE), key.scopes)
+        // Applying again is a no-op.
+        assertEquals(ApiKeyBootstrapService.Action.UNCHANGED, service.applyPendingFor(orders).single().action)
+    }
+
+    @Test
+    fun `a bad entry anywhere in the list fails before any key is written`() {
+        val result =
+            service.ensureBootstrapped(
+                listOf(
+                    ApiKeyBootstrapService.Entry("zion", "good", listOf(ApiScope.AUTH_SEND_OTP), "h1"),
+                    ApiKeyBootstrapService.Entry("zion", "bad", listOf("not:a-scope"), "h2"),
+                ),
+            )
+
+        assertTrue(result is ApiKeyBootstrapService.Result.Failure)
+        assertEquals(null, apiKeys.findByTenantAndName(tenant.id, "good"))
+    }
+
     @Test
     fun `fails fast on unknown tenant slug`() {
         val result =

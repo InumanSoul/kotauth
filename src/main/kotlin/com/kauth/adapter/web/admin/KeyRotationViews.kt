@@ -50,7 +50,7 @@ internal fun keyManagementPageImpl(
                 }
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Signing Key History" }
+                    h2("ov-card__section-label") { +"Signing Key History" }
                     if (keys.isEmpty()) {
                         emptyState(
                             iconName = "security",

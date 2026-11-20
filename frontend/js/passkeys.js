@@ -85,7 +85,19 @@
     return await finishResp.json();
   }
 
+  // A button press aborts the page's autofill request first, so the browser never runs two
+  // passkey ceremonies at once and the autofill prompt doesn't linger behind the button's.
+  let conditionalAbort = null;
+
+  function abortConditionalMediation() {
+    if (conditionalAbort) {
+      conditionalAbort.abort();
+      conditionalAbort = null;
+    }
+  }
+
   async function signInWithPasskey(basePath, oauthContext) {
+    abortConditionalMediation();
     const startResp = await fetch(basePath + '/authenticate/start', { method: 'POST', credentials: 'include' });
     if (!startResp.ok) throw new Error('start failed');
     const optionsJson = await startResp.json();
@@ -117,12 +129,23 @@
     if (!window.PublicKeyCredential) return;
     if (typeof PublicKeyCredential.isConditionalMediationAvailable !== 'function') return;
     if (!(await PublicKeyCredential.isConditionalMediationAvailable())) return;
+    abortConditionalMediation();
+    const controller = new AbortController();
+    conditionalAbort = controller;
     try {
-      const startResp = await fetch(basePath + '/authenticate/start', { method: 'POST', credentials: 'include' });
+      const startResp = await fetch(basePath + '/authenticate/start', {
+        method: 'POST',
+        credentials: 'include',
+        signal: controller.signal,
+      });
       if (!startResp.ok) return;
       const optionsJson = await startResp.json();
       const options = decodeGetOptions(optionsJson);
-      const credential = await navigator.credentials.get({ publicKey: options, mediation: 'conditional' });
+      const credential = await navigator.credentials.get({
+        publicKey: options,
+        mediation: 'conditional',
+        signal: controller.signal,
+      });
       if (!credential) return; // user dismissed autofill, no-op
       const finishResp = await fetch(basePath + '/authenticate/finish', {
         method: 'POST',
@@ -201,6 +224,8 @@
               await Kotauth.passkeys.signInWithPasskey(base);
             } catch (err) {
               showError(classifyException(err, strings));
+              // Put autofill back, so the username field still offers passkeys after a failed press.
+              Kotauth.passkeys.startConditionalMediation(base);
             }
           });
         });

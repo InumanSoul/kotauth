@@ -324,6 +324,8 @@ data class ProblemDetail(
     /** Omit to leave grants unchanged. Pass an explicit list — including `[]` — to replace them. */
     val grantTypes: List<String>? = null,
     val audience: String? = null,
+    /** Access-token lifetime in seconds for this client. Omit to keep it; `0` clears it. */
+    val tokenExpiryOverride: Int? = null,
 )
 
 @Serializable data class SetDefaultRolesRequest(
@@ -435,6 +437,7 @@ data class ProblemDetail(
     val redirectUris: List<String>,
     val grantTypes: List<String>,
     val audience: String? = null,
+    val tokenExpiryOverride: Int? = null,
 )
 
 /**
@@ -524,6 +527,10 @@ data class ProblemDetail(
     val emailOtpLockoutThreshold: Int,
     val corsAllowCredentials: Boolean,
     val portalLayout: String,
+    val loginIdentifierMode: String,
+    val defaultLocale: String? = null,
+    // Whether the workspace can send email (delivery switched on and configured). Never the credentials.
+    val emailDeliveryReady: Boolean,
 )
 
 @Serializable data class WorkspaceSignInMethodsDto(
@@ -659,6 +666,7 @@ internal fun com.kauth.domain.model.Application.toApiDto() =
         redirectUris = redirectUris,
         grantTypes = grantTypes.map { it.value },
         audience = audience,
+        tokenExpiryOverride = tokenExpiryOverride,
     )
 
 internal fun com.kauth.domain.model.Session.toApiDto() =
@@ -776,5 +784,8 @@ internal fun com.kauth.domain.model.Tenant.toWorkspaceApiDto(): WorkspaceDto {
         emailOtpLockoutThreshold = sc.emailOtpLockoutThreshold,
         corsAllowCredentials = sc.corsAllowCredentials,
         portalLayout = portalConfig.layout.name,
+        loginIdentifierMode = sc.loginIdentifierMode.name,
+        defaultLocale = theme.defaultLocale,
+        emailDeliveryReady = isSmtpReady,
     )
 }

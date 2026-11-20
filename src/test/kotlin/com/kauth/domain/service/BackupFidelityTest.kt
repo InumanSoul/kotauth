@@ -119,6 +119,7 @@ class BackupFidelityTest {
                     iconUrl = "https://cdn.acme.example.com/ingest.png",
                     launcherVisible = false,
                     launcherDisplayOrder = 7,
+                    tokenExpiryOverride = 900,
                 ),
             )
 
@@ -218,6 +219,22 @@ class BackupFidelityTest {
         assertEquals("https://cdn.acme.example.com/ingest.png", app.iconUrl)
         assertFalse(app.launcherVisible)
         assertEquals(7, app.launcherDisplayOrder)
+        assertEquals(900, app.tokenExpiryOverride)
+    }
+
+    @Test
+    fun `a per-client token lifetime is restored without any launcher configuration`() {
+        val export = exportAcme()
+        val bare =
+            export.copy(
+                applications =
+                    export.applications.map {
+                        it.copy(launcherUrl = null, iconUrl = null, launcherVisible = true, launcherDisplayOrder = 0)
+                    },
+            )
+        val destTenant = destTenants.findBySlug(restore(bare).newTenantSlug)!!
+
+        assertEquals(900, destApps.findByTenantId(destTenant.id).single().tokenExpiryOverride)
     }
 
     @Test

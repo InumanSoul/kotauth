@@ -11,6 +11,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Set an application's own access-token lifetime.** The application edit page has an Access
+  Token Lifetime field, and `PUT /t/{slug}/api/v1/applications/{id}` takes `tokenExpiryOverride`,
+  in seconds from 60 to 86400. Blank in the console, or `0` over the API, clears it, so the
+  workspace's lifetime applies again. The value was already honoured on every token path, but
+  nothing could write it, so it was empty in every deployment. Backups now restore it as well.
+  `ApplicationDto` returns it, and the OpenAPI spec now documents `audience` too. Closes #163.
+
+- **Set how long a magic link stays valid from the console.** The security policy page has a
+  Magic Links card with a Link expiry field, from 1 to 1440 minutes. The value could already be
+  set over `PATCH /workspace`, but the console had no field for it. The confirmation page and the
+  email both said "15 minutes" whatever the setting; they now quote the configured window, in
+  English and in the Spanish bundle. Closes #132.
+
+- **Email-code sign-up and lockout are now in the console.** The security policy page has an
+  Email Codes card. One switch decides whether a code sent to an unknown address creates an
+  account, and a field sets how many wrong codes, across separate requests, lock the account
+  (0 to 50, 0 turns it off). Both could only be set over `PATCH /workspace` before.
+
+### Changed
+
+- **The admin console uses one set of words.** Every create flow says "Create" in its button,
+  tab title, breadcrumb, heading and submit button. Before, a claim mapper alone went through
+  "Add Mapper", "New Mapper", "Add Claim Mapper" and "Create Mapper". Every edit page saves with
+  "Save Changes". Breadcrumbs match their headings, and every Security page sits under Security in
+  the trail. Closes #134.
+
+- **The admin console works with a keyboard and a screen reader.** Every form label is tied to
+  its field, so clicking a label focuses the field and screen readers announce it. Search boxes,
+  pickers and color fields that had no visible label now have an accessible name. Pages have a
+  heading outline: the user page's name is its heading, and card titles are section headings. A
+  disabled button's reason ("Configure SMTP to enable password reset emails") now shows on
+  keyboard focus as well as hover, and is read out with the button.
+
+- **An application that never signs users in no longer shows sign-in settings.** An app without
+  the Authorization Code grant hides Redirect URIs, Launcher, Registration Defaults and the Open
+  Login button, and its Overview says it needs no redirect URIs.
+
+- **The audit log colors every event by what it means.** Failed passkey sign-ins, rejected
+  passkey replays, policy-rejected logins and TOTP lockouts are red; passkey and MFA resets,
+  forced password changes and impersonation are amber. Many of these were plain grey. Adding an
+  event type without choosing a color no longer compiles.
+
+- **Impersonate is no longer the page's primary button.** On the user page it is now amber, like
+  other actions that need care, rather than the blue reserved for the main action.
+
+### Security
+
+- **Email-code sign-in no longer tells a known address from an unknown one by response time.**
+  The code was mailed synchronously, inside the request. The route pads every response to 200 ms,
+  but an SMTP round-trip outlasts that. So on a workspace with email-code sign-up off, an address
+  with an account (which gets an email) took measurably longer than one without (which returns at
+  once). The code is now mailed in the
+  background, so every branch finishes well inside the padding. A delivery failure is still logged.
+
+### Fixed
+
+- **A restore refused for bad usernames now gives a readable error.** The message quoted every
+  offending record, each username twice and at full length, so a backup with hundreds of
+  offenders produced a wall of text. It now lists the first 20, shortens long usernames, and
+  counts the rest.
+
+- **"Sign in with a passkey" failed in browsers that offer passkey autofill.** The sign-in page
+  starts an autofill request when it loads, and the button started a second one. The server
+  kept only one pending challenge per browser, so the button's sign-in was checked against the
+  wrong challenge and refused with a generic error. This hit Chrome, Safari and Edge users. The
+  button now cancels the autofill request first, and the server keeps the three most recent
+  challenges and checks the one the device signed. Sign-in also works with the page open in more
+  than one tab.
+
+- **SCIM filters now ignore case wherever the schema says they do.** `/Schemas` declares
+  `userName`, `displayName` and the `value`, `type` and `display` sub-attributes as
+  `caseExact: false`, but only a lone `userName eq` filter honoured that. A compound filter such
+  as `userName eq "Dave.Smith" and active eq true`, a Group `displayName eq` filter, or a PATCH
+  path like `emails[type eq "Work"]` compared exactly and silently matched nothing. `externalId`
+  and `id` stay case-sensitive. Closes #140.
+
+- **An address outside the username character set could not sign up by email code or JIT.**
+  Both paths used the address as the username, and usernames are limited to
+  `[a-z0-9._@+-]`. So `mary.o'brien@corp.com` or `josé@corp.com` was a valid address but not a
+  valid username: email-code sign-up showed "check your inbox" and never sent a code, and JIT
+  refused the sign-in as `DOMAIN_NOT_ALLOWED` for a domain that was allowed. Such an address now
+  gets a generated username, as SCIM and the admin API already do when none is supplied. An address
+  that is a valid username is still used as one. Closes #142.
+
+- **Registration Defaults no longer starts on the first role.** The role picker on an
+  application page preselected the first role, often `admin`, next to the Add Role button, so one
+  click granted it to everyone who signs up through that app. It now starts on "Select a role…"
+  and requires a choice.
+
+- **The MFA and passkey enrollment links can be shared as they are.** They showed and copied a
+  path such as `/t/acme/account/mfa/enroll`; they are now full URLs built from `KAUTH_BASE_URL`.
+
+- **The Authorized APIs breadcrumb no longer links to a missing page.** Its Applications crumb
+  pointed at a URL that answered 404.
+
+## [1.27.0] - 2026-11-17
+
+### Added
+
 - **Create a workspace over the API: `POST /admin/api/v1/tenants`.** It needs a master API key
   with the new `tenants:write` scope, which a `KAUTH_BOOTSTRAP_API_KEYS` entry on `master` can
   hold. A deployment can now be provisioned from configuration alone, with no console session and
@@ -20,6 +119,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answers `409`, so a provisioning script can repeat the call safely. See
   [Provisioning workspaces without the console](docs/operations/provisioning.md). Closes #172 and
   #126.
+- **Change a workspace's settings over the API: `PATCH /t/{slug}/api/v1/workspace`.** It needs
+  the new `workspace:write` scope. Only the fields in the body change. It covers sign-up and email
+  verification, sign-in methods, password policy, MFA policy, lockout, token lifetimes,
+  `loginIdentifierMode`, `defaultLocale` and SMTP, including its on/off switch. The SMTP password
+  is write-only. The request goes through the same services, validation and audit events as the
+  console's settings pages, in one transaction, so a refused field leaves everything unchanged.
+  SMTP is applied first, so one request can configure email and switch to passwordless sign-in. An
+  unknown field answers `400`. `GET /workspace` now also returns `loginIdentifierMode`,
+  `defaultLocale` and `emailDeliveryReady`, and still never returns SMTP settings. See
+  [Provisioning workspaces without the console](docs/operations/provisioning.md#4-workspace-settings).
+- **A bootstrap key can wait for its workspace.** A `KAUTH_BOOTSTRAP_API_KEYS` entry with
+  `"awaitTenant": true` that names a workspace that does not exist yet is held at startup instead
+  of stopping the server. The key is provisioned when the workspace is created, through
+  `POST /admin/api/v1/tenants` or the console, or imported, in the same transaction. So a fresh
+  deployment can create its workspaces and configure them with their own keys in one run, with no
+  restart. An entry without the flag still stops the server for an unknown slug. Every entry's
+  scopes and workspace are now checked before any key is written, so a bad entry late in the list
+  no longer leaves the earlier ones applied.
 
 ### Changed
 
@@ -28,6 +145,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes, and it ignored a failure to create a role. A failure in any step now rolls the whole
   creation back instead of leaving a workspace half set up. Creating a slug that exists is reported
   as a conflict rather than a validation error.
+- **Saving workspace settings follows the sign-in methods page's rules.** Before, saving refused
+  password sign-in turned off unless magic links were on, even with email codes or passkeys
+  enabled. So a workspace switched to email codes on the sign-in methods page could no longer save
+  its general or security settings. A save now needs at least one method on, needs SMTP to be ready
+  before password sign-in is turned off, and needs SMTP to be ready before magic links or email
+  codes are turned on.
 
 ### Security
 
@@ -43,6 +166,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A negative lockout threshold silently turned lockout off.** Workspace settings coerced
+  `lockoutMaxAttempts` below 0 to 0, which means "no lockout", and enforced no upper bound on it or
+  on the lockout duration. Both are now refused with a validation error outside the ranges the
+  console shows: 0–100 attempts, where 0 turns lockout off, and 1–1440 minutes. A value stored
+  before these bounds is left alone until it is changed.
 - **Signing out of the console behind a reverse proxy ended on a raw 400.** The console sent
   `KAUTH_BASE_URL/admin/login` as the post-logout URI, but the end-session endpoint compared it with
   the origin Ktor saw. Behind a proxy chain that origin can differ in scheme or port, so the URI was

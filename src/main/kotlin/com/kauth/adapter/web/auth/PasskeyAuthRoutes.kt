@@ -10,19 +10,34 @@ import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.ContentType
 import io.ktor.http.Cookie
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.util.Base64
 
 private const val AUTH_COOKIE = "KOTAUTH_PASSKEY_AUTH"
 private const val CHALLENGE_TTL_SECONDS = 300
 private const val PER_IP_RATE_PREFIX = "passkey_auth"
+
+/**
+ * Sign-in ceremonies one browser may have pending at once: the sign-in page open in more than
+ * one tab, or its passkey autofill alongside the button. Each start adds a challenge; finish
+ * uses the one the authenticator signed.
+ */
+private const val MAX_PENDING_CHALLENGES = 3
 
 internal fun Route.passkeyAuthRoutes(
     webAuthnService: WebAuthnService,
@@ -40,23 +55,8 @@ internal fun Route.passkeyAuthRoutes(
         when (val result = webAuthnService.startAuthentication(tenant)) {
             is WebAuthnResult.Success -> {
                 val optionsJson = result.value.publicKeyOptionsJson
-                val encoded =
-                    Base64
-                        .getUrlEncoder()
-                        .withoutPadding()
-                        .encodeToString(optionsJson.toByteArray(Charsets.UTF_8))
-                val signed = encryptionService.signCookie(encoded)
-                call.response.cookies.append(
-                    Cookie(
-                        name = AUTH_COOKIE,
-                        value = signed,
-                        maxAge = CHALLENGE_TTL_SECONDS,
-                        path = "/t/$slug",
-                        secure = secure,
-                        httpOnly = true,
-                        extensions = mapOf("SameSite" to "Strict"),
-                    ),
-                )
+                val pending = call.pendingAssertionRequests(encryptionService) + optionsJson
+                call.storePendingAssertionRequests(pending, slug, secure, encryptionService)
                 call.respondText(optionsJson, ContentType.Application.Json)
             }
             is WebAuthnResult.Failure ->
@@ -78,22 +78,19 @@ internal fun Route.passkeyAuthRoutes(
             return@post call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "RateLimited"))
         }
 
-        val signed =
-            call.request.cookies[AUTH_COOKIE]
-                ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "InvalidChallenge"))
-        val encoded =
-            encryptionService.verifyCookie(signed)
-                ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "InvalidChallenge"))
-        val assertionRequestJson =
-            String(
-                Base64.getUrlDecoder().decode(encoded),
-                Charsets.UTF_8,
-            )
+        val pending = call.pendingAssertionRequests(encryptionService)
+        if (pending.isEmpty()) {
+            return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "InvalidChallenge"))
+        }
 
         val body = call.receive<JsonObject>()
-        val credentialJson =
-            body["credential"]?.toString()
+        val credential =
+            body["credential"]
                 ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "MissingCredential"))
+        val credentialJson = credential.toString()
+        val signedChallenge = signedChallengeOf(credential)
+        // An unmatched challenge still goes to verification, which refuses it and records the failure.
+        val assertionRequestJson = pending.lastOrNull { challengeOf(it) == signedChallenge } ?: pending.last()
 
         when (
             val result =
@@ -104,14 +101,7 @@ internal fun Route.passkeyAuthRoutes(
                 )
         ) {
             is WebAuthnResult.Success -> {
-                call.response.cookies.append(
-                    name = AUTH_COOKIE,
-                    value = "",
-                    maxAge = 0L,
-                    path = "/t/$slug",
-                    httpOnly = true,
-                    secure = secure,
-                )
+                call.storePendingAssertionRequests(pending - assertionRequestJson, slug, secure, encryptionService)
                 val oauthParams = call.getAuthContext(encryptionService) ?: AuthView.OAuthParams()
                 if (oauthParams.isOAuthFlow) {
                     val redirectUrl =
@@ -156,3 +146,73 @@ internal fun Route.passkeyAuthRoutes(
         }
     }
 }
+
+/**
+ * The pending assertion requests carried by the signed challenge cookie, oldest first. A cookie
+ * written before several could be pending holds a single request rather than a list.
+ */
+private fun ApplicationCall.pendingAssertionRequests(encryptionService: EncryptionService): List<String> {
+    val encoded = request.cookies[AUTH_COOKIE]?.let { encryptionService.verifyCookie(it) } ?: return emptyList()
+    val text = runCatching { String(Base64.getUrlDecoder().decode(encoded), Charsets.UTF_8) }.getOrNull()
+    val parsed = text?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } ?: return emptyList()
+    return when (parsed) {
+        is JsonArray -> parsed.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        is JsonObject -> listOf(text)
+        else -> emptyList()
+    }
+}
+
+/** Writes the newest [MAX_PENDING_CHALLENGES] of [requests] back, or clears the cookie when none remain. */
+private fun ApplicationCall.storePendingAssertionRequests(
+    requests: List<String>,
+    slug: String,
+    secure: Boolean,
+    encryptionService: EncryptionService,
+) {
+    val kept = requests.takeLast(MAX_PENDING_CHALLENGES)
+    val value =
+        if (kept.isEmpty()) {
+            ""
+        } else {
+            val json = JsonArray(kept.map { JsonPrimitive(it) }).toString()
+            encryptionService.signCookie(
+                Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray(Charsets.UTF_8)),
+            )
+        }
+    response.cookies.append(
+        Cookie(
+            name = AUTH_COOKIE,
+            value = value,
+            maxAge = if (kept.isEmpty()) 0 else CHALLENGE_TTL_SECONDS,
+            path = "/t/$slug",
+            secure = secure,
+            httpOnly = true,
+            extensions = mapOf("SameSite" to "Strict"),
+        ),
+    )
+}
+
+private fun challengeOf(assertionRequestJson: String): String? =
+    runCatching {
+        val root = Json.parseToJsonElement(assertionRequestJson).jsonObject
+        val options = root["publicKey"]?.jsonObject ?: root
+        options["challenge"]?.jsonPrimitive?.contentOrNull?.trimEnd('=')
+    }.getOrNull()
+
+/** The challenge inside the credential's clientDataJSON, which is what the authenticator signed. */
+private fun signedChallengeOf(credential: JsonElement): String? =
+    runCatching {
+        val clientDataB64 =
+            credential.jsonObject["response"]
+                ?.jsonObject
+                ?.get("clientDataJSON")
+                ?.jsonPrimitive
+                ?.content ?: return null
+        val clientData = String(Base64.getUrlDecoder().decode(clientDataB64.trimEnd('=')), Charsets.UTF_8)
+        Json
+            .parseToJsonElement(clientData)
+            .jsonObject["challenge"]
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?.trimEnd('=')
+    }.getOrNull()

@@ -5,9 +5,11 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.EMAIL_OTP_LOCKOUT_THRESHOLD
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.MAGIC_LINK_TTL_MINUTES
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -76,7 +78,7 @@ internal fun workspaceDetailPageImpl(
                     ghostLinkExternal("/t/${workspace.slug}/account/login", "Open Portal")
                     primaryLink(
                         "/admin/workspaces/${workspace.slug}/applications/new",
-                        "New Application",
+                        "Create Application",
                         "plus",
                     )
                 }
@@ -185,7 +187,7 @@ internal fun workspaceDetailPageImpl(
 
             // ── Applications ────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Applications" }
+                h2("ov-card__section-label") { +"Applications" }
 
                 if (apps.isEmpty()) {
                     emptyState(
@@ -196,7 +198,7 @@ internal fun workspaceDetailPageImpl(
                         a(
                             href = "/admin/workspaces/${workspace.slug}/applications/new",
                             classes = "empty-state__cta",
-                        ) { +"+ New Application" }
+                        ) { +"+ Create Application" }
                     }
                 } else {
                     table("data-table") {
@@ -286,7 +288,7 @@ internal fun createWorkspacePageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "New Workspace",
+            pageTitle = "Create Workspace",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = "KotAuth",
@@ -324,7 +326,7 @@ internal fun createWorkspacePageImpl(
 
             // ── Identity card ──────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Identity" }
+                h2("ov-card__section-label") { +"Identity" }
                 form(
                     action = "/admin/workspaces",
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -333,7 +335,10 @@ internal fun createWorkspacePageImpl(
                     id = "create-workspace-form"
 
                     div("edit-row") {
-                        span("edit-row__label") { +"Slug" }
+                        label("edit-row__label") {
+                            htmlFor = "slug"
+                            +"Slug"
+                        }
                         div {
                             input(type = InputType.text, name = "slug") {
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
@@ -349,7 +354,10 @@ internal fun createWorkspacePageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Display Name" }
+                        label("edit-row__label") {
+                            htmlFor = "displayName"
+                            +"Display Name"
+                        }
                         input(type = InputType.text, name = "displayName") {
                             classes = setOf("edit-row__field")
                             this.id = "displayName"
@@ -359,7 +367,10 @@ internal fun createWorkspacePageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Issuer URL (optional)" }
+                        label("edit-row__label") {
+                            htmlFor = "issuerUrl"
+                            +"Issuer URL (optional)"
+                        }
                         div {
                             input(type = InputType.url, name = "issuerUrl") {
                                 classes = setOf("edit-row__field")
@@ -377,7 +388,7 @@ internal fun createWorkspacePageImpl(
 
             // ── Registration Policy card ───────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Registration Policy" }
+                h2("ov-card__section-label") { +"Registration Policy" }
                 label("check-row") {
                     input(type = InputType.checkBox, name = "registrationEnabled") {
                         attributes["form"] = "create-workspace-form"
@@ -455,7 +466,7 @@ internal fun workspaceSettingsPageImpl(
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
                         attributes["form"] = "general-form"
-                        +"Save Settings"
+                        +"Save Changes"
                     }
                 }
             }
@@ -472,19 +483,27 @@ internal fun workspaceSettingsPageImpl(
 
                 // ── Identity ───────────────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Identity" }
+                    h2("ov-card__section-label") { +"Identity" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Display Name" }
+                        label("edit-row__label") {
+                            htmlFor = "field-displayName"
+                            +"Display Name"
+                        }
                         input(type = InputType.text, name = "displayName") {
+                            this.id = "field-displayName"
                             classes = setOf("edit-row__field")
                             required = true
                             value = workspace.displayName
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Issuer URL" }
+                        label("edit-row__label") {
+                            htmlFor = "field-issuerUrl"
+                            +"Issuer URL"
+                        }
                         div {
                             input(type = InputType.url, name = "issuerUrl") {
+                                this.id = "field-issuerUrl"
                                 classes = setOf("edit-row__field")
                                 placeholder = "https://auth.example.com"
                                 value = workspace.issuerUrl ?: ""
@@ -502,11 +521,15 @@ internal fun workspaceSettingsPageImpl(
 
                 // ── Token Lifetimes ────────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Token Lifetimes" }
+                    h2("ov-card__section-label") { +"Token Lifetimes" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Access Token TTL" }
+                        label("edit-row__label") {
+                            htmlFor = "field-tokenExpirySeconds"
+                            +"Access Token TTL"
+                        }
                         div {
                             input(type = InputType.number, name = "tokenExpirySeconds") {
+                                this.id = "field-tokenExpirySeconds"
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
                                 required = true
                                 attributes["min"] = "60"
@@ -516,9 +539,13 @@ internal fun workspaceSettingsPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Refresh Token TTL" }
+                        label("edit-row__label") {
+                            htmlFor = "field-refreshTokenExpirySeconds"
+                            +"Refresh Token TTL"
+                        }
                         div {
                             input(type = InputType.number, name = "refreshTokenExpirySeconds") {
+                                this.id = "field-refreshTokenExpirySeconds"
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
                                 required = true
                                 attributes["min"] = "60"
@@ -531,7 +558,7 @@ internal fun workspaceSettingsPageImpl(
 
                 // ── Registration Policy ────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Registration Policy" }
+                    h2("ov-card__section-label") { +"Registration Policy" }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "registrationEnabled") {
                             attributes["value"] = "true"
@@ -550,11 +577,15 @@ internal fun workspaceSettingsPageImpl(
 
                 // ── Portal Layout ────────────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Self-Service Portal" }
+                    h2("ov-card__section-label") { +"Self-Service Portal" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Layout" }
+                        label("edit-row__label") {
+                            htmlFor = "field-portalLayout"
+                            +"Layout"
+                        }
                         div {
                             select {
+                                this.id = "field-portalLayout"
                                 name = "portalLayout"
                                 classes = setOf("edit-row__field")
                                 for (layout in PortalLayout.entries) {
@@ -605,6 +636,7 @@ internal fun securityPolicyPageImpl(
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
+                "Security" to "/admin/workspaces/$slug/settings/security",
                 "Security Policy" to null,
             )
 
@@ -621,7 +653,7 @@ internal fun securityPolicyPageImpl(
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
                         attributes["form"] = "security-form"
-                        +"Save Policy"
+                        +"Save Changes"
                     }
                 }
             }
@@ -639,11 +671,15 @@ internal fun securityPolicyPageImpl(
 
                 // ── Password Policy (numeric limits) ─────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_PASSWORD_POLICY_SECTION }
+                    h2("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_PASSWORD_POLICY_SECTION }
                     div("edit-row") {
-                        span("edit-row__label") { +"Minimum Length" }
+                        label("edit-row__label") {
+                            htmlFor = "field-passwordPolicyMinLength"
+                            +"Minimum Length"
+                        }
                         div {
                             input(type = InputType.number, name = "passwordPolicyMinLength") {
+                                this.id = "field-passwordPolicyMinLength"
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
                                 required = true
                                 attributes["min"] = "4"
@@ -654,9 +690,13 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Password History" }
+                        label("edit-row__label") {
+                            htmlFor = "field-passwordPolicyHistoryCount"
+                            +"Password History"
+                        }
                         div {
                             input(type = InputType.number, name = "passwordPolicyHistoryCount") {
+                                this.id = "field-passwordPolicyHistoryCount"
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
                                 attributes["min"] = "0"
                                 attributes["max"] = "24"
@@ -666,9 +706,13 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Password Expiry" }
+                        label("edit-row__label") {
+                            htmlFor = "field-passwordPolicyMaxAgeDays"
+                            +"Password Expiry"
+                        }
                         div {
                             input(type = InputType.number, name = "passwordPolicyMaxAgeDays") {
+                                this.id = "field-passwordPolicyMaxAgeDays"
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
                                 attributes["min"] = "0"
                                 attributes["max"] = "365"
@@ -682,7 +726,7 @@ internal fun securityPolicyPageImpl(
                 // ── Password requirements (character-class checkboxes) ──
                 div("ov-card") {
                     div("ov-card__section-label") {
-                        +EnglishStrings.ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION
+                        h2("ov-card__heading") { +EnglishStrings.ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION }
                     }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "passwordPolicyRequireSpecial") {
@@ -717,7 +761,7 @@ internal fun securityPolicyPageImpl(
 
                 // ── Multi-Factor Authentication ──────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Multi-Factor Authentication" }
+                    h2("ov-card__section-label") { +"Multi-Factor Authentication" }
                     div("radio-group") {
                         label("radio-row") {
                             input(type = InputType.radio, name = "mfaPolicy") {
@@ -760,7 +804,7 @@ internal fun securityPolicyPageImpl(
 
                 // ── Sign-In Identifier ───────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_SECTION }
+                    h2("ov-card__section-label") { +EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_SECTION }
                     div("radio-group") {
                         loginIdentifierRow(
                             workspace.securityConfig.loginIdentifierMode,
@@ -785,11 +829,15 @@ internal fun securityPolicyPageImpl(
 
                 // ── Account Lockout ──────────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Account Lockout" }
+                    h2("ov-card__section-label") { +"Account Lockout" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Max failed attempts" }
+                        label("edit-row__label") {
+                            htmlFor = "field-lockoutMaxAttempts"
+                            +"Max failed attempts"
+                        }
                         div {
                             input(type = InputType.number, name = "lockoutMaxAttempts") {
+                                this.id = "field-lockoutMaxAttempts"
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
                                 attributes["min"] = "0"
                                 attributes["max"] = "100"
@@ -801,9 +849,13 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Lockout duration" }
+                        label("edit-row__label") {
+                            htmlFor = "field-lockoutDurationMinutes"
+                            +"Lockout duration"
+                        }
                         div {
                             input(type = InputType.number, name = "lockoutDurationMinutes") {
+                                this.id = "field-lockoutDurationMinutes"
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
                                 attributes["min"] = "1"
                                 attributes["max"] = "1440"
@@ -817,9 +869,61 @@ internal fun securityPolicyPageImpl(
                     }
                 }
 
+                // ── Magic Links ──────────────────────────────────────
+                div("ov-card") {
+                    h2("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_MAGIC_LINK_SECTION }
+                    div("edit-row") {
+                        label("edit-row__label") {
+                            htmlFor = "field-magicLinkTokenTtlMinutes"
+                            +EnglishStrings.ADMIN_SECURITY_MAGIC_LINK_TTL_LABEL
+                        }
+                        div {
+                            input(type = InputType.number, name = "magicLinkTokenTtlMinutes") {
+                                this.id = "field-magicLinkTokenTtlMinutes"
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = MAGIC_LINK_TTL_MINUTES.first.toString()
+                                attributes["max"] = MAGIC_LINK_TTL_MINUTES.last.toString()
+                                value = workspace.securityConfig.magicLinkTtlMinutes.toString()
+                            }
+                            div("edit-row__hint") { +EnglishStrings.ADMIN_SECURITY_MAGIC_LINK_TTL_HINT }
+                        }
+                    }
+                }
+
+                // ── Email Codes ──────────────────────────────────────
+                div("ov-card") {
+                    h2("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_SECTION }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "emailOtpSignupEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.securityConfig.emailOtpSignupEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_SIGNUP_LABEL }
+                            span("check-row__desc") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_SIGNUP_DESC }
+                        }
+                    }
+                    div("edit-row") {
+                        label("edit-row__label") {
+                            htmlFor = "field-emailOtpLockoutThreshold"
+                            +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_LOCKOUT_LABEL
+                        }
+                        div {
+                            input(type = InputType.number, name = "emailOtpLockoutThreshold") {
+                                this.id = "field-emailOtpLockoutThreshold"
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = EMAIL_OTP_LOCKOUT_THRESHOLD.first.toString()
+                                attributes["max"] = EMAIL_OTP_LOCKOUT_THRESHOLD.last.toString()
+                                value = workspace.securityConfig.emailOtpLockoutThreshold.toString()
+                            }
+                            div("edit-row__hint") { +EnglishStrings.ADMIN_SECURITY_EMAIL_OTP_LOCKOUT_HINT }
+                        }
+                    }
+                }
+
                 // ── Cross-Origin (CORS) ──────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Cross-Origin (CORS)" }
+                    h2("ov-card__section-label") { +"Cross-Origin (CORS)" }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "corsAllowCredentials") {
                             attributes["value"] = "true"
@@ -838,7 +942,7 @@ internal fun securityPolicyPageImpl(
 
                 // ── Breach Detection (HIBP) ──────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Breach Detection" }
+                    h2("ov-card__section-label") { +"Breach Detection" }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "hibpCheckEnabled") {
                             attributes["value"] = "true"
@@ -906,7 +1010,7 @@ internal fun brandingPageImpl(
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
                         attributes["form"] = "branding-form"
-                        +"Save Branding"
+                        +"Save Changes"
                     }
                 }
             }
@@ -933,7 +1037,10 @@ internal fun brandingPageImpl(
                             attributes["open"] = ""
                             summary("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
                             div("edit-col") {
-                                span("edit-row__label") { +"Logo URL" }
+                                label("edit-row__label") {
+                                    htmlFor = "field-logo"
+                                    +"Logo URL"
+                                }
                                 div {
                                     input(type = InputType.url, name = "themeLogoUrl") {
                                         classes = setOf("edit-row__field")
@@ -948,7 +1055,10 @@ internal fun brandingPageImpl(
                                 }
                             }
                             div("edit-col") {
-                                span("edit-row__label") { +"Favicon URL" }
+                                label("edit-row__label") {
+                                    htmlFor = "field-favicon"
+                                    +"Favicon URL"
+                                }
                                 div {
                                     input(type = InputType.url, name = "themeFaviconUrl") {
                                         classes = setOf("edit-row__field")
@@ -969,9 +1079,13 @@ internal fun brandingPageImpl(
                             }
                             val eb = workspace.emailBranding
                             div("edit-col") {
-                                span("edit-row__label") { +"Support email" }
+                                label("edit-row__label") {
+                                    htmlFor = "field-emailSupportEmail"
+                                    +"Support email"
+                                }
                                 div {
                                     input(type = InputType.email, name = "emailSupportEmail") {
+                                        this.id = "field-emailSupportEmail"
                                         classes = setOf("edit-row__field")
                                         value = eb?.supportEmail ?: ""
                                         attributes["placeholder"] = "support@example.com"
@@ -1020,7 +1134,10 @@ internal fun brandingPageImpl(
                                 }
                             }
                             div("edit-col") {
-                                span("edit-row__label") { +"Font Family" }
+                                label("edit-row__label") {
+                                    htmlFor = "field-themeFontFamily"
+                                    +"Font Family"
+                                }
                                 val fontOptions = listOf(
                                     "Inter",
                                     "Montserrat",
@@ -1029,6 +1146,7 @@ internal fun brandingPageImpl(
                                     "Source Sans 3",
                                 )
                                 select {
+                                    this.id = "field-themeFontFamily"
                                     name = "themeFontFamily"
                                     classes = setOf("edit-row__field")
                                     for (f in fontOptions) {
@@ -1041,7 +1159,10 @@ internal fun brandingPageImpl(
                                 }
                             }
                             div("edit-col") {
-                                span("edit-row__label") { +"Border Radius" }
+                                label("edit-row__label") {
+                                    htmlFor = "field-radius"
+                                    +"Border Radius"
+                                }
                                 div {
                                     div("preset-group") {
                                         val radiusPresets = listOf("0px" to "Sharp", "8px" to "Rounded", "40px" to "Pill")
@@ -1067,9 +1188,13 @@ internal fun brandingPageImpl(
                                 }
                             }
                             div("edit-col") {
-                                span("edit-row__label") { +"Language" }
+                                label("edit-row__label") {
+                                    htmlFor = "field-themeDefaultLocale"
+                                    +"Language"
+                                }
                                 div {
                                     select {
+                                        this.id = "field-themeDefaultLocale"
                                         name = "themeDefaultLocale"
                                         classes = setOf("edit-row__field")
                                         option {
@@ -1098,7 +1223,10 @@ internal fun brandingPageImpl(
                             attributes["open"] = ""
                             summary("ov-card__section-label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_TITLE }
                             div("edit-col") {
-                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_FIELD }
+                                label("edit-row__label") {
+                                    htmlFor = "themeLoginLayout"
+                                    +EnglishStrings.BRANDING_LOGIN_LAYOUT_FIELD
+                                }
                                 div {
                                     select {
                                         id = "themeLoginLayout"
@@ -1116,7 +1244,10 @@ internal fun brandingPageImpl(
                                 }
                             }
                             div("edit-col") {
-                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_FIELD }
+                                label("edit-row__label") {
+                                    htmlFor = "field-login-tagline"
+                                    +EnglishStrings.BRANDING_LOGIN_TAGLINE_FIELD
+                                }
                                 div {
                                     input(type = InputType.text, name = "themeLoginTagline") {
                                         classes = setOf("edit-row__field")
@@ -1129,7 +1260,10 @@ internal fun brandingPageImpl(
                                 }
                             }
                             div("edit-col") {
-                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_BG_FIELD }
+                                label("edit-row__label") {
+                                    htmlFor = "field-login-bg"
+                                    +EnglishStrings.BRANDING_LOGIN_BG_FIELD
+                                }
                                 div {
                                     input(type = InputType.url, name = "themeLoginBackgroundUrl") {
                                         classes = setOf("edit-row__field")
@@ -1239,6 +1373,7 @@ private fun DIV.colorField(label: String, key: String, formName: String, current
                 input(type = InputType.color) {
                     classes = setOf("color-field__native")
                     id = "native-$key"
+                    attributes["aria-label"] = "$label ${EnglishStrings.BRANDING_COLOR_PICKER_SUFFIX}"
                     name = formName
                     value = currentValue
                     attributes["data-color-key"] = key
@@ -1247,6 +1382,7 @@ private fun DIV.colorField(label: String, key: String, formName: String, current
             input(type = InputType.text) {
                 classes = setOf("color-field__hex")
                 id = "hex-$key"
+                attributes["aria-label"] = "$label ${EnglishStrings.BRANDING_COLOR_HEX_SUFFIX}"
                 value = currentValue.uppercase()
                 maxLength = "7"
                 attributes["data-hex-key"] = key

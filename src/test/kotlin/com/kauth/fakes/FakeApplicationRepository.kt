@@ -100,6 +100,7 @@ class FakeApplicationRepository : ApplicationRepository {
         launcherVisible: Boolean,
         launcherDisplayOrder: Int,
         audience: String?,
+        tokenExpiryOverride: Int?,
     ): Application {
         val updated =
             store[appId.value]!!.copy(
@@ -113,6 +114,7 @@ class FakeApplicationRepository : ApplicationRepository {
                 launcherVisible = launcherVisible,
                 launcherDisplayOrder = launcherDisplayOrder,
                 audience = audience,
+                tokenExpiryOverride = tokenExpiryOverride,
             )
         store[appId.value] = updated
         return updated

@@ -118,6 +118,7 @@ internal fun Route.apiApplicationRoutes(
                         redirectUris = body.redirectUris,
                         grantTypes = grantTypes,
                         audience = body.audience,
+                        tokenExpiryOverride = body.tokenExpiryOverride,
                     )
             ) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.OK, result.value.toApiDto())

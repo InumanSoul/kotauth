@@ -8,7 +8,9 @@ import com.kauth.domain.port.TenantRepository
  * In-memory TenantRepository for unit tests.
  * Thread-safety is not a concern here — tests run single-threaded.
  */
-class FakeTenantRepository : TenantRepository {
+class FakeTenantRepository :
+    TenantRepository,
+    SnapshotableFake {
     private val store = mutableMapOf<Int, Tenant>()
     private var nextId = 1
 
@@ -21,6 +23,16 @@ class FakeTenantRepository : TenantRepository {
         // Like a database sequence, never hand out an id a seeded row already holds.
         nextId = maxOf(nextId, t.id.value + 1)
         return t
+    }
+
+    override fun snapshot(): FakeRestore {
+        val storeCopy = store.toMap()
+        val nextIdCopy = nextId
+        return FakeRestore {
+            store.clear()
+            store.putAll(storeCopy)
+            nextId = nextIdCopy
+        }
     }
 
     fun clear() {

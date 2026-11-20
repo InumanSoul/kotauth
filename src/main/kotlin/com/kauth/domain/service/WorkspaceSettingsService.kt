@@ -2,6 +2,8 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.EMAIL_OTP_LOCKOUT_THRESHOLD
+import com.kauth.domain.model.MAGIC_LINK_TTL_MINUTES
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
@@ -193,7 +195,7 @@ class WorkspaceSettingsService(
     private fun validateWorkspaceSettings(
         update: WorkspaceSettingsUpdate,
         tenant: Tenant,
-    ): AdminError.Validation? {
+    ): AdminError? {
         if (update.displayName.isBlank()) {
             return AdminError.Validation("Display name is required.")
         }
@@ -209,13 +211,42 @@ class WorkspaceSettingsService(
         if (update.mfaPolicy !in listOf("optional", "required", "required_admins")) {
             return AdminError.Validation("MFA policy must be 'optional', 'required', or 'required_admins'.")
         }
+        // Refused rather than coerced: a negative attempt count used to become 0, which turns lockout
+        // off. Checked only on a change, so a value stored before these bounds still saves.
+        val current = tenant.securityConfig
+        if (update.lockoutMaxAttempts != current.lockoutMaxAttempts && update.lockoutMaxAttempts !in 0..100) {
+            return AdminError.Validation("Max failed attempts must be between 0 (lockout off) and 100.")
+        }
+        if (update.lockoutDurationMinutes != current.lockoutDurationMinutes &&
+            update.lockoutDurationMinutes !in 1..1440
+        ) {
+            return AdminError.Validation("Lockout duration must be between 1 and 1440 minutes.")
+        }
         if (tenant.isMaster && !update.passwordLoginEnabled) {
             return AdminError.Validation("Password sign-in cannot be disabled on the master workspace.")
         }
-        if (!update.passwordLoginEnabled && !update.magicLinkEnabled) {
+        return validateSignInMethods(update, tenant)
+    }
+
+    // Same rules as the sign-in methods page (SecurityMethodsService), so a settings save can
+    // never reach a configuration that page would refuse.
+    private fun validateSignInMethods(
+        update: WorkspaceSettingsUpdate,
+        tenant: Tenant,
+    ): AdminError? {
+        val current = tenant.securityConfig
+        if (!update.passwordLoginEnabled) {
+            if (!update.magicLinkEnabled && !update.emailOtpLoginEnabled && !update.passkeysEnabled) {
+                return AdminError.NoMethodsEnabled
+            }
+            if (current.passwordLoginEnabled && !tenant.isSmtpReady) return AdminError.SmtpRequired
+        }
+        val turnsOnEmailMethod =
+            (update.magicLinkEnabled && !current.magicLinkEnabled) ||
+                (update.emailOtpLoginEnabled && !current.emailOtpLoginEnabled)
+        if (turnsOnEmailMethod && !tenant.isSmtpReady) {
             return AdminError.Validation(
-                "At least one email-based sign-in method must remain enabled. " +
-                    "Enable magic links before disabling password sign-in.",
+                "SMTP must be configured and enabled before turning on magic links or email codes.",
             )
         }
         return null
@@ -242,15 +273,15 @@ class WorkspaceSettingsService(
                     passwordMaxAgeDays = update.passwordPolicyMaxAgeDays.coerceIn(0, 365),
                     passwordBlacklistEnabled = update.passwordPolicyBlacklistEnabled,
                     mfaPolicy = update.mfaPolicy,
-                    lockoutMaxAttempts = update.lockoutMaxAttempts.coerceAtLeast(0),
-                    lockoutDurationMinutes = update.lockoutDurationMinutes.coerceAtLeast(1),
+                    lockoutMaxAttempts = update.lockoutMaxAttempts,
+                    lockoutDurationMinutes = update.lockoutDurationMinutes,
                     corsAllowCredentials = update.corsAllowCredentials,
                     hibpCheckEnabled = update.hibpCheckEnabled,
                     magicLinkEnabled = update.magicLinkEnabled,
-                    magicLinkTokenTtlMinutes = update.magicLinkTokenTtlMinutes.coerceIn(1, 1440),
+                    magicLinkTokenTtlMinutes = update.magicLinkTokenTtlMinutes.coerceIn(MAGIC_LINK_TTL_MINUTES),
                     passwordLoginEnabled = update.passwordLoginEnabled,
                     emailOtpSignupEnabled = update.emailOtpSignupEnabled,
-                    emailOtpLockoutThreshold = update.emailOtpLockoutThreshold.coerceIn(0, 50),
+                    emailOtpLockoutThreshold = update.emailOtpLockoutThreshold.coerceIn(EMAIL_OTP_LOCKOUT_THRESHOLD),
                     emailOtpLoginEnabled = update.emailOtpLoginEnabled,
                     loginIdentifierMode = update.loginIdentifierMode,
                 ),

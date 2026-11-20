@@ -76,12 +76,23 @@ class FakeRelyingPartyAdapter : RelyingPartyAdapter {
         return if (registrationQueue.isNotEmpty()) registrationQueue.removeFirst() else DEFAULT_REGISTERED_CREDENTIAL
     }
 
-    override fun startAssertion(): Pair<String, String> = CANNED_ASSERTION_REQUEST_JSON to CANNED_CHALLENGE
+    /** Challenges handed out by [startAssertion] before it falls back to [CANNED_CHALLENGE]. */
+    val nextAssertionChallenges = ArrayDeque<String>()
+
+    /** The assertion request each [finishAssertion] call verified against, in order. */
+    val verifiedAssertionRequests = mutableListOf<String>()
+
+    override fun startAssertion(): Pair<String, String> {
+        val challenge =
+            nextAssertionChallenges.removeFirstOrNull() ?: return CANNED_ASSERTION_REQUEST_JSON to CANNED_CHALLENGE
+        return """{"publicKey":{"challenge":"$challenge"}}""" to challenge
+    }
 
     override fun finishAssertion(
         assertionRequestJson: String,
         credentialResponseJson: String,
     ): AssertionResultData {
+        verifiedAssertionRequests += assertionRequestJson
         throwOnFinishAssertion?.let { throw IllegalStateException(it) }
         return if (assertionQueue.isNotEmpty()) assertionQueue.removeFirst() else DEFAULT_ASSERTION_RESULT
     }

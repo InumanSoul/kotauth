@@ -65,6 +65,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -470,6 +471,72 @@ class AdminSettingsTest {
 
             assertEquals(HttpStatusCode.Found, response.status)
             assertEquals("required", tenantRepo.findBySlug("acme")!!.securityConfig.mfaPolicy)
+        }
+
+    @Test
+    fun `the security page shows the magic-link expiry and saving it persists the new value`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters = Parameters.build { append("magicLinkTokenTtlMinutes", "45") },
+                )
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(45, tenantRepo.findBySlug("acme")!!.securityConfig.magicLinkTokenTtlMinutes)
+
+            val page = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+            val field = Regex("<input[^>]*name=\"magicLinkTokenTtlMinutes\"[^>]*>").find(page)?.value
+            assertNotNull(field, "the field must render")
+            assertTrue(field.contains("value=\"45\""), "the field must show the stored window, got $field")
+        }
+
+    @Test
+    fun `the security page saves and shows the email-code sign-up switch and lockout threshold`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("emailOtpSignupEnabled", "true")
+                        append("emailOtpLockoutThreshold", "7")
+                    },
+            )
+            val saved = tenantRepo.findBySlug("acme")!!.securityConfig
+            assertTrue(saved.emailOtpSignupEnabled)
+            assertEquals(7, saved.emailOtpLockoutThreshold)
+
+            val page = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+            val signup = Regex("<input[^>]*name=\"emailOtpSignupEnabled\"[^>]*>").find(page)?.value
+            val threshold = Regex("<input[^>]*name=\"emailOtpLockoutThreshold\"[^>]*>").find(page)?.value
+            assertNotNull(signup, "the sign-up switch must render")
+            assertTrue(signup.contains("checked"), "the switch must show the stored value, got $signup")
+            assertNotNull(threshold, "the threshold field must render")
+            assertTrue(threshold.contains("value=\"7\""), "the field must show the stored value, got $threshold")
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters = Parameters.build { append("emailOtpLockoutThreshold", "7") },
+            )
+            assertFalse(
+                tenantRepo.findBySlug("acme")!!.securityConfig.emailOtpSignupEnabled,
+                "an unticked box turns sign-up off",
+            )
         }
 
     // =========================================================================
