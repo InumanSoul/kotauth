@@ -487,6 +487,16 @@ object EnglishStrings {
         "Minutes a sign-in link stays valid after it is sent, from 1 to 1440. " +
             "The email and the confirmation page quote this time. " +
             "Applies while magic links are on in Sign-in Methods."
+    const val ADMIN_SECURITY_EMAIL_OTP_SECTION = "Email Codes"
+    const val ADMIN_SECURITY_EMAIL_OTP_SIGNUP_LABEL = "Create an account for a new address"
+    const val ADMIN_SECURITY_EMAIL_OTP_SIGNUP_DESC =
+        "When on, a code sent to an address with no account creates one at sign-in. " +
+            "When off, only existing users can sign in by code. " +
+            "Either way the response looks the same, so it never reveals which addresses have accounts."
+    const val ADMIN_SECURITY_EMAIL_OTP_LOCKOUT_LABEL = "Lock after failed codes"
+    const val ADMIN_SECURITY_EMAIL_OTP_LOCKOUT_HINT =
+        "Wrong codes, counted across separate requests, before the account locks for the " +
+            "Lockout duration above. 0 turns this off. Maximum 50."
 
     // Admin — sign-in identifier (workspace security policy)
     const val ADMIN_SIGNIN_IDENTIFIER_SECTION = "Sign-In Identifier"

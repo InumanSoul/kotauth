@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   email both said "15 minutes" whatever the setting; they now quote the configured window, in
   English and in the Spanish bundle. Closes #132.
 
+- **Email-code sign-up and lockout are now in the console.** The security policy page has an
+  Email Codes card. One switch decides whether a code sent to an unknown address creates an
+  account, and a field sets how many wrong codes, across separate requests, lock the account
+  (0 to 50, 0 turns it off). Both could only be set over `PATCH /workspace` before.
+
 ### Security
 
 - **Email-code sign-in no longer tells a known address from an unknown one by response time.**

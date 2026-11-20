@@ -47,3 +47,6 @@ data class SecurityConfig(
 }
 
 val MAGIC_LINK_TTL_MINUTES = 1..1440
+
+/** Failed email-code challenges before the account locks; 0 turns the lockout off. */
+val EMAIL_OTP_LOCKOUT_THRESHOLD = 0..50
