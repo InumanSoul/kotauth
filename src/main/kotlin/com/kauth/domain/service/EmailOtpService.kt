@@ -68,6 +68,9 @@ class EmailOtpService(
         const val OTP_TTL_MINUTES: Long = 10
         const val MAX_ATTEMPTS_PER_CHALLENGE: Int = 5
         const val AUTH_CODE_TTL_SECONDS: Long = 60
+
+        /** How long after the email code is verified the second factor may still complete. */
+        const val VERIFIED_CHALLENGE_TTL_SECONDS: Long = 300
         private val SECURE_RANDOM = SecureRandom()
     }
 
@@ -232,15 +235,13 @@ class EmailOtpService(
             roleRepository,
         )
 
-        val authCode =
-            issueAuthorizationCodeFor(tenant, user.id, challenge)
-                ?: return reject(tenant.id, user.id, null, OtpError.InvalidClient, ipAddress)
-
+        val originatingClient =
+            challenge.originatingClientId?.let { applicationRepository.findByClientId(tenant.id, it) }
         auditLog.record(
             AuditEvent(
                 tenantId = tenant.id,
                 userId = user.id,
-                clientId = authCode.clientId,
+                clientId = originatingClient?.id,
                 eventType = AuditEventType.EMAIL_OTP_VERIFIED,
                 ipAddress = ipAddress,
                 userAgent = null,
@@ -248,7 +249,34 @@ class EmailOtpService(
             ),
         )
 
-        return OtpVerifyResult.Success(user.id, authCode.code, authCode.expiresAt, authCode.redirectUri)
+        return OtpVerifyResult.Success(user.id, challenge.challengeId, challenge.originatingClientId)
+    }
+
+    /**
+     * Issues the authorization code for a challenge whose email code was already verified, once
+     * the caller has settled the second factor. Verifying the code and issuing the authorization
+     * code are separate steps so that nothing a client can redeem exists before MFA passes.
+     */
+    fun issueAuthorizationCode(
+        tenantSlug: String,
+        challengeId: String,
+        userId: UserId,
+    ): OtpCodeResult {
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return OtpCodeResult.Failure(OtpError.TenantNotFound)
+        val challenge = challengeRepository.findByChallengeId(challengeId)
+        if (challenge == null || challenge.tenantId != tenant.id || challenge.userId != userId) {
+            return OtpCodeResult.Failure(OtpError.InvalidOtp)
+        }
+        val verifiedAt = challenge.consumedAt ?: return OtpCodeResult.Failure(OtpError.InvalidOtp)
+        if (clock.instant().isAfter(verifiedAt.plusSeconds(VERIFIED_CHALLENGE_TTL_SECONDS))) {
+            return OtpCodeResult.Failure(OtpError.ChallengeExpired)
+        }
+        val authCode =
+            issueAuthorizationCodeFor(tenant, userId, challenge)
+                ?: return OtpCodeResult.Failure(OtpError.InvalidClient)
+        return OtpCodeResult.Success(authCode.code, authCode.expiresAt, authCode.redirectUri)
     }
 
     private fun trackCrossChallengeFailure(
@@ -413,14 +441,25 @@ sealed class OtpSendResult {
 sealed class OtpVerifyResult {
     data class Success(
         val userId: UserId,
-        val authorizationCode: String,
-        val codeExpiresAt: Instant,
-        val redirectUri: String,
+        val challengeId: String,
+        val originatingClientId: String?,
     ) : OtpVerifyResult()
 
     data class Failure(
         val error: OtpError,
     ) : OtpVerifyResult()
+}
+
+sealed class OtpCodeResult {
+    data class Success(
+        val authorizationCode: String,
+        val codeExpiresAt: Instant,
+        val redirectUri: String,
+    ) : OtpCodeResult()
+
+    data class Failure(
+        val error: OtpError,
+    ) : OtpCodeResult()
 }
 
 enum class OtpError(

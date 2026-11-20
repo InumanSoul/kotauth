@@ -10,6 +10,7 @@ import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.util.sha256Hex
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -345,18 +346,52 @@ class EmailOtpServiceTest {
     }
 
     @Test
-    fun `verifyOtp issues an auth code, stamps email_verified, and consumes the challenge`() {
+    fun `verifyOtp stamps email_verified and consumes the challenge, but issues no code`() {
         seedChallenge(clientId = clientApp.clientId)
         val result = newService().verifyOtp(tenant.slug, "handle-1", "123456")
 
         assertTrue(result is OtpVerifyResult.Success)
-        val stored = authCodes.findByCode(result.authorizationCode)!!
-        assertEquals(clientApp.id, stored.clientId)
-        assertEquals(clientApp.redirectUris.first(), stored.redirectUri)
+        assertTrue(authCodes.all().isEmpty(), "The code waits until the caller has settled the second factor")
         val consumed = challenges.findByChallengeId("handle-1")!!
         assertNotNull(consumed.consumedAt)
         assertTrue(users.findByEmail(tenant.id, "alice@acme.test")!!.emailVerified)
         assertEquals(AuditEventType.EMAIL_OTP_VERIFIED, audit.events.last().eventType)
+    }
+
+    @Test
+    fun `issueAuthorizationCode issues the code for a verified challenge`() {
+        val (user, _) = seedChallenge(clientId = clientApp.clientId)
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
+
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
+
+        assertTrue(result is OtpCodeResult.Success)
+        val stored = authCodes.findByCode(result.authorizationCode)!!
+        assertEquals(clientApp.id, stored.clientId)
+        assertEquals(clientApp.redirectUris.first(), stored.redirectUri)
+    }
+
+    @Test
+    fun `issueAuthorizationCode refuses a challenge whose email code was never verified`() {
+        val (user, _) = seedChallenge(clientId = clientApp.clientId)
+
+        val result = newService().issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
+
+        assertTrue(result is OtpCodeResult.Failure)
+        assertTrue(authCodes.all().isEmpty())
+    }
+
+    @Test
+    fun `issueAuthorizationCode refuses another user's challenge`() {
+        seedChallenge(clientId = clientApp.clientId)
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
+
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", UserId(9999))
+
+        assertTrue(result is OtpCodeResult.Failure)
+        assertTrue(authCodes.all().isEmpty())
     }
 
     @Test
@@ -372,22 +407,26 @@ class EmailOtpServiceTest {
                 ),
             )
         resources.setAuthorizedResources(clientApp.id, listOf(resource.id!!))
-        seedChallenge(clientId = clientApp.clientId, resources = listOf("orders-api"))
+        val (user, _) = seedChallenge(clientId = clientApp.clientId, resources = listOf("orders-api"))
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
 
-        val result = newService().verifyOtp(tenant.slug, "handle-1", "123456")
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
 
-        assertTrue(result is OtpVerifyResult.Success)
+        assertTrue(result is OtpCodeResult.Success)
         val stored = authCodes.findByCode(result.authorizationCode)!!
         assertEquals(listOf("orders-api"), stored.resources)
     }
 
     @Test
-    fun `verifyOtp rejects unauthorized OTP resources`() {
-        seedChallenge(clientId = clientApp.clientId, resources = listOf("orders-api"))
+    fun `issueAuthorizationCode rejects unauthorized OTP resources`() {
+        val (user, _) = seedChallenge(clientId = clientApp.clientId, resources = listOf("orders-api"))
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
 
-        val result = newService().verifyOtp(tenant.slug, "handle-1", "123456")
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
 
-        assertTrue(result is OtpVerifyResult.Failure)
+        assertTrue(result is OtpCodeResult.Failure)
         assertEquals(OtpError.InvalidClient, result.error)
         assertTrue(authCodes.all().isEmpty())
     }
@@ -451,7 +490,7 @@ class EmailOtpServiceTest {
     }
 
     @Test
-    fun `verifyOtp returns invalid_client when originating client has no redirect URI`() {
+    fun `issueAuthorizationCode returns invalid_client when originating client has no redirect URI`() {
         val app2 =
             apps.add(
                 Application(
@@ -465,10 +504,12 @@ class EmailOtpServiceTest {
                     redirectUris = emptyList(),
                 ),
             )
-        seedChallenge(clientId = app2.clientId)
+        val (user, _) = seedChallenge(clientId = app2.clientId)
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
 
-        val result = newService().verifyOtp(tenant.slug, "handle-1", "123456")
-        assertTrue(result is OtpVerifyResult.Failure)
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
+        assertTrue(result is OtpCodeResult.Failure)
         assertEquals(OtpError.InvalidClient, result.error)
     }
 

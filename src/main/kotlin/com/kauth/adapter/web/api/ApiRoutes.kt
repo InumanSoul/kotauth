@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.adapter.web.auth.MfaGate
 import com.kauth.adapter.web.plugin.TenantCorsPlugin
 import com.kauth.adapter.web.scim.ScimScopePlugin
 import com.kauth.adapter.web.scim.scimDiscoveryRoutes
@@ -78,6 +79,12 @@ fun Route.apiRoutes(
     // Absent only in tests that predate the identity-provider surface; when it is null the
     // routes are not mounted at all rather than answering with a runtime "not configured".
     identityProviderService: IdentityProviderService? = null,
+    encryptionService: com.kauth.infrastructure.EncryptionService? = null,
+    mfaRateLimiter: RateLimiterPort =
+        com.kauth.infrastructure.InMemoryRateLimiter(
+            maxRequests = 5,
+            windowSeconds = 300,
+        ),
     // Absent in tests that only read the workspace; PATCH /workspace is then not mounted.
     workspacePatchService: WorkspacePatchService? = null,
 ) {
@@ -202,7 +209,18 @@ fun Route.apiRoutes(
             apiUserAttributeRoutes(userAttributeService)
             apiClaimMapperRoutes(claimMapperService)
             identityProviderService?.let { apiIdentityProviderRoutes(it) }
-            apiOtpRoutes(emailOtpService, otpEmailRateLimiter, otpIpRateLimiter)
+            apiOtpRoutes(
+                emailOtpService,
+                otpEmailRateLimiter,
+                otpIpRateLimiter,
+                OtpApiMfa(
+                    gate = MfaGate(mfaService, roleRepository),
+                    mfaService = mfaService,
+                    tenantRepository = tenantRepository,
+                    encryptionService = encryptionService,
+                    limiter = mfaRateLimiter,
+                ),
+            )
             apiKeyManagementRoutes(apiKeyService)
             apiPasskeyRoutes(webAuthnService, webAuthnCredentialRepository)
         }
