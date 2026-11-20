@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Social sign-in no longer opens a session before the second factor.** Every successful
+  provider callback created a session and a full token set, even though the browser was sent on
+  with an authorization code and never received those tokens. The session appeared in the
+  user's session list, predated the TOTP challenge, and stayed behind if the challenge was never
+  finished. Social sign-in now issues nothing; the authorization code exchange opens the session,
+  as it does for every other sign-in method.
+
 ## [1.28.1] - 2026-11-20
 
 ### Security

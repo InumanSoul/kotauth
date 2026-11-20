@@ -142,8 +142,6 @@ class SocialLoginRoutesTest {
             socialAccountRepository = socialAccountRepo,
             userRepository = userRepo,
             tenantRepository = tenantRepo,
-            sessionRepository = sessionRepo,
-            tokenPort = tokenPort,
             passwordHasher = hasher,
             auditLog = auditLog,
             providerResolver =
@@ -386,6 +384,18 @@ class SocialLoginRoutesTest {
                 setCookies.any { it.startsWith("KOTAUTH_AUTH_CONTEXT=") },
                 "The OAuth request rode in the social state, so the challenge needs it written back",
             )
+        }
+
+    @Test
+    fun `no session exists while a social sign-in waits for the second factor`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes(mfa = enrollAliceInTotp())
+
+            val response = signInWithOriana()
+
+            assertEquals("/t/acme/mfa-challenge", response.headers["Location"])
+            assertTrue(sessionRepo.all().isEmpty(), "Nothing may be issued before the second factor passes")
         }
 
     @Test

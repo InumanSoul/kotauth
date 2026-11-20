@@ -4,11 +4,9 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.ProviderKey
-import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
-import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.model.socialCallbackUrl
 import com.kauth.domain.port.ApplicationRepository
@@ -17,16 +15,12 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.OidcRequestBinding
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.RoleRepository
-import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.SocialAccountRepository
 import com.kauth.domain.port.SocialProviderResolver
 import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.port.TenantRepository
-import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.util.SecureTokens
-import com.kauth.domain.util.sha256Hex
-import java.time.Instant
 
 /**
  * Domain service for social (OAuth2) login.
@@ -59,8 +53,6 @@ class SocialLoginService(
     private val socialAccountRepository: SocialAccountRepository,
     private val userRepository: UserRepository,
     private val tenantRepository: TenantRepository,
-    private val sessionRepository: SessionRepository,
-    private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val providerResolver: SocialProviderResolver,
@@ -169,7 +161,7 @@ class SocialLoginService(
         }
 
         when (val match = resolveExistingUser(tenant.id, idp, profile)) {
-            is ExistingUserMatch.Linked -> return issueTokens(match.user, tenant, provider, false, ipAddress, userAgent)
+            is ExistingUserMatch.Linked -> return signInAs(match.user, tenant, provider, false, ipAddress, userAgent)
             is ExistingUserMatch.EmailCollisionUnverified ->
                 return SocialLoginResult.Failure(SocialLoginError.LinkRequiresEmailVerification)
             ExistingUserMatch.None -> {
@@ -177,7 +169,7 @@ class SocialLoginService(
                 val jit =
                     jitProvisioning?.provision(tenant, idp, profile, originatingClientId, ipAddress, userAgent)
                 if (jit is JitOutcome.Provisioned) {
-                    return issueTokens(jit.user, tenant, provider, isNewUser = true, ipAddress, userAgent)
+                    return signInAs(jit.user, tenant, provider, isNewUser = true, ipAddress, userAgent)
                 }
                 val refused = jit as? JitOutcome.Refused
                 return SocialLoginResult.NeedsRegistration(
@@ -251,7 +243,7 @@ class SocialLoginService(
         val existingLink = socialAccountRepository.findByProviderIdentity(tenant.id, provider, providerUserId)
         if (existingLink != null) {
             userRepository.findById(existingLink.userId, tenant.id)?.let { user ->
-                return issueTokens(user, tenant, provider, isNewUser = false, ipAddress, userAgent)
+                return signInAs(user, tenant, provider, isNewUser = false, ipAddress, userAgent)
             }
         }
 
@@ -272,7 +264,7 @@ class SocialLoginService(
                     avatarUrl = avatarUrl,
                 ),
             )
-            return issueTokens(existingByEmail, tenant, provider, isNewUser = false, ipAddress, userAgent)
+            return signInAs(existingByEmail, tenant, provider, isNewUser = false, ipAddress, userAgent)
         }
 
         if (userRepository.existsByUsername(tenant.id, username)) {
@@ -313,7 +305,7 @@ class SocialLoginService(
 
         grantClientDefaultRoles(tenant.id, newUser.id, originatingClientId)
 
-        return issueTokens(newUser, tenant, provider, isNewUser = true, ipAddress, userAgent)
+        return signInAs(newUser, tenant, provider, isNewUser = true, ipAddress, userAgent)
     }
 
     private fun grantClientDefaultRoles(
@@ -385,10 +377,11 @@ class SocialLoginService(
     }
 
     /**
-     * Issues tokens for a resolved user and persists the session + audit log.
-     * Shared by both handleCallback() and completeSocialRegistration().
+     * Accepts a resolved user as signed in by the provider and records it. Issues no tokens and
+     * opens no session: the route sends the user through the second factor first, and the
+     * authorization code exchange creates the session.
      */
-    private fun issueTokens(
+    private fun signInAs(
         user: User,
         tenant: Tenant,
         provider: ProviderKey,
@@ -411,32 +404,6 @@ class SocialLoginService(
             return SocialLoginResult.Failure(SocialLoginError.UserDisabled)
         }
 
-        val tokens =
-            tokenPort.issueUserTokens(
-                user = user,
-                tenant = tenant,
-                client = null,
-                scopes = listOf("openid"),
-            )
-
-        sessionRepository.save(
-            Session(
-                tenantId = tenant.id,
-                userId = user.id!!,
-                clientId = null,
-                accessTokenHash = sha256Hex(tokens.access_token),
-                refreshTokenHash = tokens.refresh_token?.let { sha256Hex(it) },
-                scopes = "openid",
-                ipAddress = ipAddress,
-                userAgent = userAgent,
-                expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
-                refreshExpiresAt =
-                    tokens.refresh_token?.let {
-                        Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
-                    },
-            ),
-        )
-
         auditLog.record(
             AuditEvent(
                 tenantId = tenant.id,
@@ -451,7 +418,6 @@ class SocialLoginService(
 
         return SocialLoginResult.Success(
             SocialLoginSuccess(
-                tokens = tokens,
                 user = user,
                 isNewUser = isNewUser,
             ),
@@ -472,7 +438,6 @@ class SocialLoginService(
 // ---------------------------------------------------------------------------
 
 data class SocialLoginSuccess(
-    val tokens: TokenResponse,
     val user: User,
     val isNewUser: Boolean,
 )

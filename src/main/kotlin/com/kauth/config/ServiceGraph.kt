@@ -527,8 +527,6 @@ data class ServiceGraph(
                     socialAccountRepository = socialAccountRepository,
                     userRepository = userRepository,
                     tenantRepository = tenantRepository,
-                    sessionRepository = sessionRepository,
-                    tokenPort = tokenAdapter,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     providerResolver =
