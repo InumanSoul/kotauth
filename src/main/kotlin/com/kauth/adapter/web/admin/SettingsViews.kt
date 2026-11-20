@@ -63,7 +63,7 @@ internal fun smtpSettingsPageImpl(
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
                         attributes["form"] = "smtp-form"
-                        +"Save SMTP"
+                        +"Save Changes"
                     }
                 }
             }
@@ -100,19 +100,27 @@ internal fun smtpSettingsPageImpl(
 
                 // ── Server ───────────────────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Server" }
+                    h2("ov-card__section-label") { +"Server" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Host" }
+                        label("edit-row__label") {
+                            htmlFor = "field-smtpHost"
+                            +"Host"
+                        }
                         input(type = InputType.text, name = "smtpHost") {
+                            this.id = "field-smtpHost"
                             classes = setOf("edit-row__field")
                             placeholder = "smtp.example.com"
                             value = workspace.smtpHost ?: ""
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Port" }
+                        label("edit-row__label") {
+                            htmlFor = "field-smtpPort"
+                            +"Port"
+                        }
                         div {
                             input(type = InputType.number, name = "smtpPort") {
+                                this.id = "field-smtpPort"
                                 classes = setOf("edit-row__field", "edit-row__field--mono")
                                 placeholder = "587"
                                 attributes["min"] = "1"
@@ -138,10 +146,14 @@ internal fun smtpSettingsPageImpl(
 
                 // ── Authentication ───────────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Authentication" }
+                    h2("ov-card__section-label") { +"Authentication" }
                     div("edit-row") {
-                        span("edit-row__label") { +"Username" }
+                        label("edit-row__label") {
+                            htmlFor = "field-smtpUsername"
+                            +"Username"
+                        }
                         input(type = InputType.text, name = "smtpUsername") {
+                            this.id = "field-smtpUsername"
                             classes = setOf("edit-row__field")
                             placeholder = "user@example.com"
                             attributes["autocomplete"] = "off"
@@ -149,9 +161,13 @@ internal fun smtpSettingsPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Password" }
+                        label("edit-row__label") {
+                            htmlFor = "field-smtpPassword"
+                            +"Password"
+                        }
                         div {
                             input(type = InputType.password, name = "smtpPassword") {
+                                this.id = "field-smtpPassword"
                                 classes = setOf("edit-row__field")
                                 placeholder = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
                                 attributes["autocomplete"] = "new-password"
@@ -169,18 +185,26 @@ internal fun smtpSettingsPageImpl(
 
                 // ── Sender ───────────────────────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Sender" }
+                    h2("ov-card__section-label") { +"Sender" }
                     div("edit-row") {
-                        span("edit-row__label") { +"From Address" }
+                        label("edit-row__label") {
+                            htmlFor = "field-smtpFromAddress"
+                            +"From Address"
+                        }
                         input(type = InputType.email, name = "smtpFromAddress") {
+                            this.id = "field-smtpFromAddress"
                             classes = setOf("edit-row__field")
                             placeholder = "noreply@example.com"
                             value = workspace.smtpFromAddress ?: ""
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"From Name" }
+                        label("edit-row__label") {
+                            htmlFor = "field-smtpFromName"
+                            +"From Name"
+                        }
                         input(type = InputType.text, name = "smtpFromName") {
+                            this.id = "field-smtpFromName"
                             classes = setOf("edit-row__field")
                             placeholder = workspace.displayName
                             value = workspace.smtpFromName ?: ""

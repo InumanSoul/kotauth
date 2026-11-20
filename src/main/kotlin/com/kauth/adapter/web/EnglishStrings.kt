@@ -208,6 +208,21 @@ object EnglishStrings {
     const val IMPERSONATION_DISABLED_TOOLTIP = "Unavailable during impersonation"
 
     // Admin user-detail page — Impersonate action
+    const val ADMIN_RESET_EMAIL_NEEDS_SMTP = "Configure SMTP to enable password reset emails"
+    const val APP_DEFAULT_ROLE_SELECT_LABEL = "Default role"
+    const val APP_DEFAULT_ROLE_PLACEHOLDER = "Select a role…"
+    const val APP_SIGN_IN_LABEL = "Sign-in"
+    const val APP_NO_INTERACTIVE_SIGN_IN =
+        "None. This client has no interactive grant, so it never signs users in and needs no redirect URIs."
+    const val ADMIN_TOPBAR_SEARCH_LABEL = "Search users"
+    const val ADMIN_USERS_FILTER_LABEL = "Filter users"
+    const val ADMIN_AUDIT_EVENT_FILTER_LABEL = "Event type"
+    const val ADMIN_ROLE_CHILD_PICKER_LABEL = "Child role to add"
+    const val ADMIN_GROUP_ROLE_PICKER_LABEL = "Role to assign"
+
+    const val BRANDING_COLOR_PICKER_SUFFIX = "color"
+    const val BRANDING_COLOR_HEX_SUFFIX = "hex value"
+
     const val IMPERSONATE_BUTTON = "Impersonate user"
     const val IMPERSONATE_CONFIRM =
         "You will be signed into the portal as this user. " +
@@ -1165,7 +1180,7 @@ object EnglishStrings {
 
     const val IDP_ADD_TITLE = "Add an OIDC provider"
     const val IDP_ADD_BUTTON = "Add provider"
-    const val IDP_SAVE_BUTTON = "Save provider"
+    const val IDP_SAVE_BUTTON = "Save Changes"
     const val IDP_DELETE_BUTTON = "Delete provider"
     const val IDP_DELETE_DESCRIPTION =
         "Anyone who signs in through this provider loses that route immediately. Accounts already " +

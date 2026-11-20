@@ -108,7 +108,8 @@ object AdminView {
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
         userWithPasskey: List<Pair<com.kauth.domain.model.User, Boolean>> = emptyList(),
-    ): HTML.() -> Unit = { passkeysAdminPage(workspace, allWorkspaces, loggedInAs, userWithPasskey) }
+        baseUrl: String = "",
+    ): HTML.() -> Unit = { passkeysAdminPage(workspace, allWorkspaces, loggedInAs, userWithPasskey, baseUrl) }
 
     fun brandingPage(
         workspace: Tenant,
@@ -400,6 +401,7 @@ object AdminView {
         enrolledUsers: Int = 0,
         enrolledUserList: List<User> = emptyList(),
         notEnrolledUserList: List<User> = emptyList(),
+        baseUrl: String = "",
     ): HTML.() -> Unit =
         mfaSettingsPageImpl(
             workspace,
@@ -409,6 +411,7 @@ object AdminView {
             enrolledUsers,
             enrolledUserList,
             notEnrolledUserList,
+            baseUrl,
         )
 
     @Suppress("LongParameterList")

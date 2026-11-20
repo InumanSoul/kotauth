@@ -29,6 +29,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   account, and a field sets how many wrong codes, across separate requests, lock the account
   (0 to 50, 0 turns it off). Both could only be set over `PATCH /workspace` before.
 
+### Changed
+
+- **The admin console uses one set of words.** Every create flow says "Create" in its button,
+  tab title, breadcrumb, heading and submit button. Before, a claim mapper alone went through
+  "Add Mapper", "New Mapper", "Add Claim Mapper" and "Create Mapper". Every edit page saves with
+  "Save Changes". Breadcrumbs match their headings, and every Security page sits under Security in
+  the trail. Closes #134.
+
+- **The admin console works with a keyboard and a screen reader.** Every form label is tied to
+  its field, so clicking a label focuses the field and screen readers announce it. Search boxes,
+  pickers and color fields that had no visible label now have an accessible name. Pages have a
+  heading outline: the user page's name is its heading, and card titles are section headings. A
+  disabled button's reason ("Configure SMTP to enable password reset emails") now shows on
+  keyboard focus as well as hover, and is read out with the button.
+
+- **An application that never signs users in no longer shows sign-in settings.** An app without
+  the Authorization Code grant hides Redirect URIs, Launcher, Registration Defaults and the Open
+  Login button, and its Overview says it needs no redirect URIs.
+
+- **The audit log colors every event by what it means.** Failed passkey sign-ins, rejected
+  passkey replays, policy-rejected logins and TOTP lockouts are red; passkey and MFA resets,
+  forced password changes and impersonation are amber. Many of these were plain grey. Adding an
+  event type without choosing a color no longer compiles.
+
+- **Impersonate is no longer the page's primary button.** On the user page it is now amber, like
+  other actions that need care, rather than the blue reserved for the main action.
+
 ### Security
 
 - **Email-code sign-in no longer tells a known address from an unknown one by response time.**
@@ -59,6 +86,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused the sign-in as `DOMAIN_NOT_ALLOWED` for a domain that was allowed. Such an address now
   gets a generated username, as SCIM and the admin API already do when none is supplied. An address
   that is a valid username is still used as one. Closes #142.
+
+- **Registration Defaults no longer starts on the first role.** The role picker on an
+  application page preselected the first role, often `admin`, next to the Add Role button, so one
+  click granted it to everyone who signs up through that app. It now starts on "Select a role…"
+  and requires a choice.
+
+- **The MFA and passkey enrollment links can be shared as they are.** They showed and copied a
+  path such as `/t/acme/account/mfa/enroll`; they are now full URLs built from `KAUTH_BASE_URL`.
+
+- **The Authorized APIs breadcrumb no longer links to a missing page.** Its Applications crumb
+  pointed at a URL that answered 404.
 
 ## [1.27.0] - 2026-11-17
 

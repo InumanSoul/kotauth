@@ -149,8 +149,7 @@ internal fun clientAuthorizedApisPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
-                    "Applications" to "/admin/workspaces/$slug/applications",
-                    application.name to "/admin/workspaces/$slug/applications/${application.clientId}",
+                    application.clientId to "/admin/workspaces/$slug/applications/${application.clientId}",
                     EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING to null,
                 )
 
@@ -165,7 +164,7 @@ internal fun clientAuthorizedApisPageImpl(
                         if (allResources.isNotEmpty()) {
                             button(type = ButtonType.submit, classes = "btn btn--primary") {
                                 attributes["form"] = formId
-                                +"Save"
+                                +"Save Changes"
                             }
                         }
                     },
@@ -315,7 +314,7 @@ internal fun resourceServerFormPageImpl(
                 )
 
                 val formId = "api-form"
-                val submitLabel = if (isEdit) "Save changes" else "Register API"
+                val submitLabel = if (isEdit) "Save Changes" else "Register API"
 
                 pageHeader(
                     title = title,
@@ -339,9 +338,13 @@ internal fun resourceServerFormPageImpl(
                     id = formId
                     div("ov-card") {
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.API_FIELD_IDENTIFIER }
+                            label("edit-row__label") {
+                                htmlFor = "field-identifier"
+                                +EnglishStrings.API_FIELD_IDENTIFIER
+                            }
                             div {
                                 input(type = InputType.text, name = "identifier") {
+                                    this.id = "field-identifier"
                                     classes = setOf("edit-row__field", "edit-row__field--mono")
                                     value = prefill?.identifier.orEmpty()
                                     attributes["required"] = "required"
@@ -361,9 +364,13 @@ internal fun resourceServerFormPageImpl(
                             }
                         }
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.API_FIELD_NAME }
+                            label("edit-row__label") {
+                                htmlFor = "field-name"
+                                +EnglishStrings.API_FIELD_NAME
+                            }
                             div {
                                 input(type = InputType.text, name = "name") {
+                                    this.id = "field-name"
                                     classes = setOf("edit-row__field")
                                     value = prefill?.name.orEmpty()
                                     attributes["required"] = "required"
@@ -373,9 +380,13 @@ internal fun resourceServerFormPageImpl(
                             }
                         }
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.API_FIELD_DESCRIPTION }
+                            label("edit-row__label") {
+                                htmlFor = "field-description"
+                                +EnglishStrings.API_FIELD_DESCRIPTION
+                            }
                             div {
                                 textArea {
+                                    this.id = "field-description"
                                     classes = setOf("edit-row__field")
                                     attributes["name"] = "description"
                                     attributes["rows"] = "3"
@@ -385,7 +396,10 @@ internal fun resourceServerFormPageImpl(
                             }
                         }
                         div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.RESOURCE_SERVER_SCOPES_LABEL }
+                            label("edit-row__label") {
+                                htmlFor = "scopes"
+                                +EnglishStrings.RESOURCE_SERVER_SCOPES_LABEL
+                            }
                             div {
                                 textArea {
                                     classes = setOf("edit-row__field")
@@ -403,7 +417,7 @@ internal fun resourceServerFormPageImpl(
 
                 if (prefill != null && existingId != null) {
                     div("ov-card") {
-                        div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
+                        h2("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                         div("danger-zone") {
                             dangerZoneCard(
                                 title = if (prefill.enabled) "Disable API" else "Enable API",

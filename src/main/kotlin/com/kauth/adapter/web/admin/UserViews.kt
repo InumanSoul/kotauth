@@ -104,7 +104,7 @@ internal fun userDetailPageImpl(
                         +userInitials(user.fullName, user.username)
                     }
                     div {
-                        div("user-header__name") { +user.fullName.ifBlank { user.username } }
+                        h1("user-header__name") { +user.fullName.ifBlank { user.username } }
                         div("user-header__meta") {
                             span("badge badge--id-muted") { +user.username }
                             if (user.enabled) {
@@ -159,13 +159,11 @@ internal fun userDetailPageImpl(
                             btnClass = "btn btn--ghost",
                         )
                     } else {
-                        span("tooltip-wrap") {
-                            attributes["data-tooltip"] = "Configure SMTP to enable password reset emails"
-                            button(classes = "btn btn--ghost") {
-                                disabled = true
-                                +"Send Reset Email"
-                            }
-                        }
+                        disabledButtonWithReason(
+                            label = "Send Reset Email",
+                            reason = EnglishStrings.ADMIN_RESET_EMAIL_NEEDS_SMTP,
+                            reasonId = "reset-email-reason",
+                        )
                     }
                     button(classes = "btn btn--ghost") {
                         attributes["hx-get"] =
@@ -189,7 +187,7 @@ internal fun userDetailPageImpl(
                                 action =
                                     "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/impersonate",
                                 label = EnglishStrings.IMPERSONATE_BUTTON,
-                                btnClass = "btn btn--primary",
+                                btnClass = "btn btn--warning",
                                 confirmMessage =
                                     when {
                                         activeImpersonation == null || isThisUser ->
@@ -201,13 +199,11 @@ internal fun userDetailPageImpl(
                                     },
                             )
                         } else {
-                            span("tooltip-wrap") {
-                                attributes["data-tooltip"] = impersonateBlockedReason
-                                button(classes = "btn btn--primary") {
-                                    disabled = true
-                                    +EnglishStrings.IMPERSONATE_BUTTON
-                                }
-                            }
+                            disabledButtonWithReason(
+                                label = EnglishStrings.IMPERSONATE_BUTTON,
+                                reason = impersonateBlockedReason,
+                                reasonId = "impersonate-reason",
+                            )
                         }
                     }
                 }
@@ -267,7 +263,7 @@ internal fun userDetailPageImpl(
             // ── Active Sessions ──────────────────────────────────────
             div("ov-card") {
                 div("ov-card__section-label") {
-                    span { +"Active Sessions" }
+                    h2("ov-card__heading") { +"Active Sessions" }
                     div {
                         style = "display:flex;align-items:center;gap:10px;"
                         span {
@@ -337,7 +333,7 @@ internal fun userDetailPageImpl(
             // ── Recent impersonations ────────────────────────────────
             if (recentImpersonations.isNotEmpty()) {
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Recent Impersonations" }
+                    h2("ov-card__section-label") { +"Recent Impersonations" }
                     table("data-table") {
                         thead {
                             tr {
@@ -359,7 +355,7 @@ internal fun userDetailPageImpl(
 
             if (recentOtpActivity.isNotEmpty()) {
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Recent OTP Activity" }
+                    h2("ov-card__section-label") { +"Recent OTP Activity" }
                     table("data-table") {
                         thead {
                             tr {
@@ -390,7 +386,7 @@ internal fun userDetailPageImpl(
             // ── Passkeys ─────────────────────────────────────────────
             div("ov-card") {
                 div("ov-card__section-label") {
-                    span { +EnglishStrings.ADMIN_PASSKEYS_HEADING }
+                    h2("ov-card__heading") { +EnglishStrings.ADMIN_PASSKEYS_HEADING }
                 }
                 if (passkeys.isEmpty()) {
                     emptyState(
@@ -444,7 +440,7 @@ internal fun userDetailPageImpl(
 
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
+                h2("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                 div("danger-zone") {
                     if (user.isLocked) {
                         dangerZoneCard(
@@ -518,7 +514,7 @@ internal fun DIV.userProfileReadFragment(
             }
         }
         div("ov-card") {
-            div("ov-card__section-label") { +"Profile" }
+            h2("ov-card__section-label") { +"Profile" }
             div("ov-card__row") {
                 span("ov-card__label") { +EnglishStrings.USERNAME_LABEL }
                 span("ov-card__value") {
@@ -584,7 +580,7 @@ internal fun DIV.userProfileEditFragment(
             errorNotice(editError)
         }
         div("ov-card") {
-            div("ov-card__section-label") { +"Edit Profile" }
+            h2("ov-card__section-label") { +"Edit Profile" }
             form(
                 action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/edit",
                 encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -594,9 +590,13 @@ internal fun DIV.userProfileEditFragment(
                 attributes["hx-target"] = "#profile-section"
                 attributes["hx-swap"] = "outerHTML"
                 div("edit-row") {
-                    span("edit-row__label") { +EnglishStrings.USERNAME_LABEL }
+                    label("edit-row__label") {
+                        htmlFor = "field-username"
+                        +EnglishStrings.USERNAME_LABEL
+                    }
                     div {
                         input(classes = "edit-row__field edit-row__field--mono") {
+                            this.id = "field-username"
                             type = InputType.text
                             name = "username"
                             value = user.username
@@ -609,16 +609,24 @@ internal fun DIV.userProfileEditFragment(
                     }
                 }
                 div("edit-row") {
-                    span("edit-row__label") { +"Email" }
+                    label("edit-row__label") {
+                        htmlFor = "field-email"
+                        +"Email"
+                    }
                     input(classes = "edit-row__field") {
+                        this.id = "field-email"
                         type = InputType.email
                         name = "email"
                         value = user.email
                     }
                 }
                 div("edit-row") {
-                    span("edit-row__label") { +"Full Name" }
+                    label("edit-row__label") {
+                        htmlFor = "field-fullName"
+                        +"Full Name"
+                    }
                     input(classes = "edit-row__field") {
+                        this.id = "field-fullName"
                         type = InputType.text
                         name = "fullName"
                         value = user.fullName
@@ -637,7 +645,7 @@ internal fun DIV.userProfileEditFragment(
                 )
                 div("edit-actions") {
                     button(type = ButtonType.submit, classes = "btn btn--primary btn--sm") {
-                        +"Save changes"
+                        +"Save Changes"
                     }
                     button(classes = "btn btn--ghost btn--sm") {
                         type = ButtonType.button
@@ -664,9 +672,13 @@ private fun FlowContent.namePartRows(
     familyName: String,
 ) {
     div("edit-row") {
-        span("edit-row__label") { +EnglishStrings.USER_GIVEN_NAME_LABEL }
+        label("edit-row__label") {
+            htmlFor = "field-givenName"
+            +EnglishStrings.USER_GIVEN_NAME_LABEL
+        }
         div {
             input(classes = "edit-row__field") {
+                this.id = "field-givenName"
                 type = InputType.text
                 name = "givenName"
                 value = givenName
@@ -676,8 +688,12 @@ private fun FlowContent.namePartRows(
         }
     }
     div("edit-row") {
-        span("edit-row__label") { +EnglishStrings.USER_FAMILY_NAME_LABEL }
+        label("edit-row__label") {
+            htmlFor = "field-familyName"
+            +EnglishStrings.USER_FAMILY_NAME_LABEL
+        }
         input(classes = "edit-row__field") {
+            this.id = "field-familyName"
             type = InputType.text
             name = "familyName"
             value = familyName
@@ -777,7 +793,7 @@ internal fun userListPageImpl(
                 div("page-header__actions") {
                     primaryLink(
                         "/admin/workspaces/${workspace.slug}/users/new",
-                        "New User",
+                        "Create User",
                         "plus",
                     )
                 }
@@ -792,6 +808,7 @@ internal fun userListPageImpl(
                     inlineSvgIcon("search", "search", cssClass = "filter-bar__icon")
                     input(type = InputType.search, name = "q", classes = "filter-bar__input") {
                         placeholder = "Filter by username, email, or name…"
+                        attributes["aria-label"] = EnglishStrings.ADMIN_USERS_FILTER_LABEL
                         value = search ?: ""
                         attributes["hx-get"] = "/admin/workspaces/${workspace.slug}/users"
                         attributes["hx-target"] = "#user-list-content"
@@ -930,7 +947,7 @@ internal fun createUserPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "New User · ${workspace.displayName}",
+            pageTitle = "Create User · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -973,9 +990,13 @@ internal fun createUserPageImpl(
                     method = FormMethod.post,
                 ) {
                     div("edit-row") {
-                        span("edit-row__label") { +EnglishStrings.USERNAME_LABEL }
+                        label("edit-row__label") {
+                            htmlFor = "field-username"
+                            +EnglishStrings.USERNAME_LABEL
+                        }
                         div {
                             input(classes = "edit-row__field edit-row__field--mono") {
+                                this.id = "field-username"
                                 type = InputType.text
                                 name = "username"
                                 value = prefill.username
@@ -990,8 +1011,12 @@ internal fun createUserPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Email" }
+                        label("edit-row__label") {
+                            htmlFor = "field-email"
+                            +"Email"
+                        }
                         input(classes = "edit-row__field") {
+                            this.id = "field-email"
                             type = InputType.email
                             name = "email"
                             required = true
@@ -1001,8 +1026,12 @@ internal fun createUserPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Full Name" }
+                        label("edit-row__label") {
+                            htmlFor = "field-fullName"
+                            +"Full Name"
+                        }
                         input(classes = "edit-row__field") {
+                            this.id = "field-fullName"
                             type = InputType.text
                             name = "fullName"
                             value = prefill.fullName
@@ -1058,9 +1087,13 @@ internal fun createUserPageImpl(
                         if (workspace.isSmtpReady) {
                             style = "display:none;"
                         }
-                        span("edit-row__label") { +EnglishStrings.PASSWORD }
+                        label("edit-row__label") {
+                            htmlFor = "field-password"
+                            +EnglishStrings.PASSWORD
+                        }
                         div {
                             input(classes = "edit-row__field") {
+                                this.id = "field-password"
                                 type = InputType.password
                                 name = "password"
                                 placeholder =
@@ -1108,9 +1141,9 @@ private fun FlowContent.userAttributesSection(
 
     div("ov-card") {
         div("ov-card__section-label") {
-            span { +"Custom Attributes" }
+            h2("ov-card__heading") { +"Custom Attributes" }
             a(href = "$base/new", classes = "btn btn--ghost btn--sm") {
-                +"Add attribute"
+                +"Create Attribute"
             }
         }
 
@@ -1204,7 +1237,7 @@ internal fun userAttributeFormPageImpl(
         val isEdit = existingKey != null
 
         adminShell(
-            pageTitle = "${if (isEdit) "Edit Attribute" else "Add Attribute"} · ${user.username}",
+            pageTitle = "${if (isEdit) "Edit Attribute" else "Create Attribute"} · ${user.username}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -1219,14 +1252,14 @@ internal fun userAttributeFormPageImpl(
                     slug to "/admin/workspaces/$slug",
                     "Users" to "/admin/workspaces/$slug/users",
                     user.username to "/admin/workspaces/$slug/users/$userIdValue",
-                    (if (isEdit) "Edit Attribute" else "Add Attribute") to null,
+                    (if (isEdit) "Edit Attribute" else "Create Attribute") to null,
                 )
 
                 div("page-header") {
                     div("page-header__left") {
                         div("page-header__identity") {
                             h1("page-header__title") {
-                                +(if (isEdit) "Edit Attribute" else "Add Attribute")
+                                +(if (isEdit) "Edit Attribute" else "Create Attribute")
                             }
                             p("page-header__sub") {
                                 +"Attribute values are stored as strings. They appear in JWTs only when a "
@@ -1237,7 +1270,7 @@ internal fun userAttributeFormPageImpl(
                     div("page-header__actions") {
                         button(type = ButtonType.submit, classes = "btn btn--primary") {
                             attributes["form"] = "attribute-form"
-                            +(if (isEdit) "Save" else "Add Attribute")
+                            +(if (isEdit) "Save Changes" else "Create Attribute")
                         }
                     }
                 }
@@ -1247,7 +1280,7 @@ internal fun userAttributeFormPageImpl(
                 }
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Attribute Details" }
+                    h2("ov-card__section-label") { +"Attribute Details" }
                     form(
                         action =
                             if (isEdit) {
@@ -1262,9 +1295,13 @@ internal fun userAttributeFormPageImpl(
                         id = "attribute-form"
 
                         div("edit-row") {
-                            span("edit-row__label") { +"Key" }
+                            label("edit-row__label") {
+                                htmlFor = "field-key"
+                                +"Key"
+                            }
                             div {
                                 input(type = InputType.text, name = "key") {
+                                    this.id = "field-key"
                                     classes = setOf("edit-row__field")
                                     required = true
                                     maxLength = "64"
@@ -1280,9 +1317,13 @@ internal fun userAttributeFormPageImpl(
                         }
 
                         div("edit-row") {
-                            span("edit-row__label") { +"Value" }
+                            label("edit-row__label") {
+                                htmlFor = "field-value"
+                                +"Value"
+                            }
                             div {
                                 textArea {
+                                    this.id = "field-value"
                                     classes = setOf("edit-row__field")
                                     name = "value"
                                     rows = "3"
@@ -1313,7 +1354,7 @@ private fun encodeUriComponent(input: String): String =
  */
 private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
     div("ov-card") {
-        div("ov-card__section-label") { +EnglishStrings.LINKED_IDENTITIES_HEADING }
+        h2("ov-card__section-label") { +EnglishStrings.LINKED_IDENTITIES_HEADING }
         if (accounts.isEmpty()) {
             div("ov-card__row--stacked") {
                 span("ov-card__value--muted") { +EnglishStrings.LINKED_IDENTITIES_EMPTY }
@@ -1361,7 +1402,7 @@ private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
  */
 private fun FlowContent.activeImpersonationCard(active: ActiveImpersonation) {
     div("ov-card") {
-        div("ov-card__section-label") { +EnglishStrings.IMPERSONATION_ACTIVE_HEADING }
+        h2("ov-card__section-label") { +EnglishStrings.IMPERSONATION_ACTIVE_HEADING }
         div("ov-card__row") {
             span("ov-card__label") { +EnglishStrings.IMPERSONATION_ACTIVE_USER }
             span("ov-card__value ov-card__value--mono") {

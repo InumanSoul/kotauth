@@ -140,7 +140,7 @@ internal fun HTML.adminShell(
                         a(
                             href = "/admin/workspaces/new",
                             classes = "ws-dropdown-item ws-dropdown-action",
-                        ) { +"Add workspace" }
+                        ) { +"Create workspace" }
                         a(
                             href = "/admin/workspaces",
                             classes = "ws-dropdown-item ws-dropdown-action",
@@ -157,6 +157,7 @@ internal fun HTML.adminShell(
                         ) {
                             input(type = InputType.search, name = "q", classes = "topbar-search") {
                                 placeholder = "Search users…"
+                                attributes["aria-label"] = EnglishStrings.ADMIN_TOPBAR_SEARCH_LABEL
                                 attributes["autocomplete"] = "off"
                             }
                         }

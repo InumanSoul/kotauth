@@ -650,7 +650,7 @@ fun Route.adminSettingsRoutes(
         val userWithPasskey = users.map { u -> u to (u.id in enrolledUserIds) }
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.passkeysPage(workspace, wsPairs, session.username, userWithPasskey),
+            AdminView.passkeysPage(workspace, wsPairs, session.username, userWithPasskey, baseUrl),
         )
     }
 
@@ -679,6 +679,7 @@ fun Route.adminSettingsRoutes(
                 enrolledUsers = enrolled.size,
                 enrolledUserList = enrolled,
                 notEnrolledUserList = notEnrolled,
+                baseUrl = baseUrl,
             ),
         )
     }

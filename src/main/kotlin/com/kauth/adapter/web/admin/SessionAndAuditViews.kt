@@ -179,6 +179,7 @@ internal fun auditLogPageImpl(
                         attributes["hx-indicator"] = ".htmx-loader"
                         select("filter-bar__select") {
                             name = "event"
+                            attributes["aria-label"] = EnglishStrings.ADMIN_AUDIT_EVENT_FILTER_LABEL
                             attributes["hx-get"] = "/admin/workspaces/${workspace.slug}/logs"
                             attributes["hx-target"] = "#audit-content"
                             attributes["hx-select"] = "#audit-content"
@@ -332,6 +333,11 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.ADMIN_USER_PASSWORD_RESET,
         AuditEventType.ACCOUNT_UNLOCKED,
         AuditEventType.EMAIL_OTP_VERIFIED,
+        AuditEventType.JIT_USER_PROVISIONED,
+        AuditEventType.MAGIC_LINK_CONSUMED,
+        AuditEventType.USER_INVITE_ACCEPTED,
+        AuditEventType.PASSKEY_ENROLLED,
+        AuditEventType.PASSKEY_AUTH_SUCCESS,
         -> "badge--active"
 
         AuditEventType.LOGIN_FAILED,
@@ -344,6 +350,10 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.EMAIL_OTP_REJECTED,
         AuditEventType.EMAIL_OTP_LOCKOUT,
         AuditEventType.SOCIAL_LOGIN_FAILED,
+        AuditEventType.LOGIN_REJECTED_POLICY,
+        AuditEventType.MFA_TOTP_LOCKOUT,
+        AuditEventType.PASSKEY_AUTH_FAILED,
+        AuditEventType.PASSKEY_REPLAY_REJECTED,
         -> "badge--danger"
 
         AuditEventType.LOGIN_RATE_LIMITED,
@@ -356,6 +366,13 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.MFA_DISABLED,
         AuditEventType.MFA_RECOVERY_CODE_USED,
         AuditEventType.ADMIN_CLIENT_SECRET_REGENERATED,
+        AuditEventType.PASSKEY_REVOKED,
+        AuditEventType.PASSKEY_ADMIN_REVOKED,
+        AuditEventType.PASSKEY_ADMIN_RESET_ALL,
+        AuditEventType.MFA_ADMIN_RESET,
+        AuditEventType.ADMIN_FORCED_PASSWORD_CHANGE,
+        AuditEventType.ADMIN_IMPERSONATION_STARTED,
+        AuditEventType.ADMIN_KEY_RETIRED,
         -> "badge--warn"
 
         AuditEventType.EMAIL_VERIFICATION_SENT,
@@ -364,7 +381,34 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.TOKEN_INTROSPECTED,
         AuditEventType.ADMIN_SMTP_TEST,
         AuditEventType.ADMIN_SMTP_UPDATED,
+        AuditEventType.MAGIC_LINK_REQUESTED,
+        AuditEventType.EMAIL_OTP_SENT,
+        AuditEventType.USER_INVITE_SENT,
         -> "badge--info"
 
-        else -> "badge--inactive"
+        AuditEventType.ADMIN_TENANT_CREATED,
+        AuditEventType.ADMIN_TENANT_UPDATED,
+        AuditEventType.ADMIN_CLIENT_CREATED,
+        AuditEventType.ADMIN_CLIENT_UPDATED,
+        AuditEventType.ADMIN_CLIENT_DELETED,
+        AuditEventType.ADMIN_USER_CREATED,
+        AuditEventType.ADMIN_USER_UPDATED,
+        AuditEventType.ADMIN_ROLE_CREATED,
+        AuditEventType.ADMIN_ROLE_UPDATED,
+        AuditEventType.ADMIN_ROLE_DELETED,
+        AuditEventType.ADMIN_ROLE_ASSIGNED,
+        AuditEventType.ADMIN_ROLE_UNASSIGNED,
+        AuditEventType.ADMIN_GROUP_CREATED,
+        AuditEventType.ADMIN_GROUP_UPDATED,
+        AuditEventType.ADMIN_GROUP_DELETED,
+        AuditEventType.ADMIN_GROUP_ROLE_ASSIGNED,
+        AuditEventType.ADMIN_GROUP_ROLE_UNASSIGNED,
+        AuditEventType.ADMIN_GROUP_MEMBER_ADDED,
+        AuditEventType.ADMIN_GROUP_MEMBER_REMOVED,
+        AuditEventType.ADMIN_KEY_ROTATED,
+        AuditEventType.ADMIN_TENANT_EXPORTED,
+        AuditEventType.ADMIN_TENANT_IMPORTED,
+        AuditEventType.ADMIN_SECURITY_CONFIG_UPDATED,
+        AuditEventType.ADMIN_IMPERSONATION_ENDED,
+        -> "badge--inactive"
     }
