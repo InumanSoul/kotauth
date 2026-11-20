@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-11-20
+
 ### Added
 
 - **Set an application's own access-token lifetime.** The application edit page has an Access
@@ -105,6 +107,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The Authorized APIs breadcrumb no longer links to a missing page.** Its Applications crumb
   pointed at a URL that answered 404.
+
+### Chore
+
+- Dependency bumps: Ktor 3.6.1, Exposed 1.6.1, Logback 1.6.7, Gradle 9.9.1.
 
 ## [1.27.0] - 2026-11-17
 
