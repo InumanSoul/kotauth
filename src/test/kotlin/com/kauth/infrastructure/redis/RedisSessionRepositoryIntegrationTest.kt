@@ -92,6 +92,29 @@ class RedisSessionRepositoryIntegrationTest {
     }
 
     @Test
+    fun `revokeAllForUser revokes a session that can still refresh after its access token expired`() {
+        val now = Instant.now()
+        repo.save(
+            newSession(
+                userId = 9,
+                createdAt = now.minusSeconds(7200),
+                expiresAt = now.minusSeconds(3600),
+                refreshTokenHash = "still-refreshable",
+                refreshExpiresAt = now.plusSeconds(86_400),
+            ),
+        )
+        // Any read of the user's sessions runs the index pruning.
+        repo.findActiveByUser(TenantId(1), UserId(9))
+
+        repo.revokeAllForUser(TenantId(1), UserId(9), Instant.now())
+
+        assertNull(
+            repo.findActiveByRefreshTokenHash("still-refreshable"),
+            "Signing a user out everywhere must also end sessions that can still refresh",
+        )
+    }
+
+    @Test
     fun `findActiveByUser returns only active sessions, newest first`() {
         val now = Instant.now()
         val older = repo.save(newSession(userId = 7, createdAt = now.minusSeconds(10), accessTokenHash = "old"))

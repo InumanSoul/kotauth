@@ -39,6 +39,12 @@ data class Session(
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isRevoked: Boolean get() = revokedAt != null
     val isActive: Boolean get() = !isExpired && !isRevoked
+
+    /** True while any credential of this session still works: the access token or the refresh token. */
+    val isUsable: Boolean
+        get() =
+            !isRevoked &&
+                (!isExpired || (refreshTokenHash != null && refreshExpiresAt?.isAfter(Instant.now()) == true))
     val isImpersonation: Boolean get() = impersonatorSessionId != null
 
     companion object {
