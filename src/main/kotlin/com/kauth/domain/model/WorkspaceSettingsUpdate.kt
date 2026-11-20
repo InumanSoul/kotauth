@@ -27,6 +27,8 @@ data class WorkspaceSettingsUpdate(
     val emailOtpLoginEnabled: Boolean,
     val passkeysEnabled: Boolean,
     val loginIdentifierMode: LoginIdentifierMode,
+    /** Active sessions a user may hold in one application; null means no limit. */
+    val maxConcurrentSessions: Int? = null,
 ) {
     companion object {
         fun from(tenant: Tenant): WorkspaceSettingsUpdate {
@@ -58,6 +60,7 @@ data class WorkspaceSettingsUpdate(
                 emailOtpLoginEnabled = s.emailOtpLoginEnabled,
                 passkeysEnabled = tenant.passkeysEnabled,
                 loginIdentifierMode = s.loginIdentifierMode,
+                maxConcurrentSessions = tenant.maxConcurrentSessions,
             )
         }
     }

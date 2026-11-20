@@ -411,7 +411,10 @@ components:
         registrationEnabled: { type: boolean }
         emailVerificationRequired: { type: boolean }
         passkeysEnabled: { type: boolean }
-        maxConcurrentSessions: { type: integer, nullable: true }
+        maxConcurrentSessions:
+          type: integer
+          nullable: true
+          description: Active sessions a user may hold in one application. Null means no limit.
         signInMethods: { $ref: "#/components/schemas/WorkspaceSignInMethodsDto" }
         passwordPolicy: { $ref: "#/components/schemas/WorkspacePasswordPolicyDto" }
         mfaPolicy: { type: string, enum: [optional, required, required_admins] }
@@ -489,6 +492,14 @@ components:
           type: string
           description: One of the locales the server ships or has mounted, e.g. `es`.
         smtp: { $ref: "#/components/schemas/UpdateSmtpRequest" }
+        maxConcurrentSessions:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: |
+            Active sessions a user may hold in one application, e.g. one per device. A sign-in
+            past the limit ends that user's oldest session in the same application; other
+            applications are not counted. 0 removes the limit.
 
     UpdateSmtpRequest:
       type: object

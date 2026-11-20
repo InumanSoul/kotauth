@@ -4,6 +4,7 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.EMAIL_OTP_LOCKOUT_THRESHOLD
 import com.kauth.domain.model.MAGIC_LINK_TTL_MINUTES
+import com.kauth.domain.model.MAX_SESSIONS_PER_APP
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
@@ -222,6 +223,14 @@ class WorkspaceSettingsService(
         ) {
             return AdminError.Validation("Lockout duration must be between 1 and 1440 minutes.")
         }
+        if (update.maxConcurrentSessions != tenant.maxConcurrentSessions &&
+            update.maxConcurrentSessions != null &&
+            update.maxConcurrentSessions !in MAX_SESSIONS_PER_APP
+        ) {
+            return AdminError.Validation(
+                "Sessions per application must be between 1 and 100, or empty for no limit.",
+            )
+        }
         if (tenant.isMaster && !update.passwordLoginEnabled) {
             return AdminError.Validation("Password sign-in cannot be disabled on the master workspace.")
         }
@@ -286,6 +295,7 @@ class WorkspaceSettingsService(
                     loginIdentifierMode = update.loginIdentifierMode,
                 ),
             passkeysEnabled = update.passkeysEnabled,
+            maxConcurrentSessions = update.maxConcurrentSessions,
         )
 
     private fun recordWorkspaceSettingsAudit(

@@ -457,6 +457,15 @@ fun Route.adminSettingsRoutes(
                 emailOtpLockoutThreshold =
                     params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
                 loginIdentifierMode = parsedLoginIdentifierMode ?: s.loginIdentifierMode,
+                maxConcurrentSessions =
+                    params["maxConcurrentSessions"]?.trim().let { raw ->
+                        when {
+                            raw == null -> workspace.maxConcurrentSessions
+                            raw.isEmpty() -> null
+                            // An unparseable value is passed on as out of range so the save is refused.
+                            else -> raw.toIntOrNull() ?: -1
+                        }
+                    },
             )
 
         when (val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {

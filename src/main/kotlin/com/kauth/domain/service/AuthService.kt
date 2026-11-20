@@ -3,9 +3,7 @@ package com.kauth.domain.service
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.RequiredAction
-import com.kauth.domain.model.Session
 import com.kauth.domain.model.TenantId
-import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
@@ -17,7 +15,6 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
-import com.kauth.domain.util.sha256Hex
 import java.time.Duration
 import java.time.Instant
 
@@ -283,61 +280,6 @@ class AuthService(
     }
 
     /**
-     * Authenticates a user, issues a token set, and persists a server-side session.
-     * Used for direct (non-OAuth) browser login and REST token issuance.
-     *
-     * Delegates credential verification to [authenticate] so that validation logic,
-     * audit logging, and password expiry checks live in exactly one place.
-     *
-     * For OAuth2 Authorization Code Flow, prefer [authenticate] + OAuthService
-     * which handles client validation, PKCE, and proper redirect handling.
-     */
-    fun login(
-        tenantSlug: String,
-        username: String,
-        rawPassword: String,
-        ipAddress: String? = null,
-        userAgent: String? = null,
-    ): AuthResult<TokenResponse> {
-        val authResult = authenticate(tenantSlug, username, rawPassword, ipAddress, userAgent)
-        if (authResult is AuthResult.Failure) return AuthResult.Failure(authResult.error)
-
-        val user = (authResult as AuthResult.Success).value
-        // Safe: authenticate() succeeded, so the tenant exists.
-        val tenant = tenantRepository.findBySlug(tenantSlug)!!
-
-        val tokens =
-            tokenPort.issueUserTokens(
-                user = user,
-                tenant = tenant,
-                client = null,
-                scopes = listOf("openid"),
-            )
-
-        sessionRepository.save(
-            Session(
-                tenantId = tenant.id,
-                userId = user.id,
-                clientId = null,
-                accessTokenHash = sha256Hex(tokens.access_token),
-                refreshTokenHash = tokens.refresh_token?.let { sha256Hex(it) },
-                scopes = "openid",
-                ipAddress = ipAddress,
-                userAgent = userAgent,
-                expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
-                refreshExpiresAt =
-                    tokens.refresh_token?.let {
-                        Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
-                    },
-            ),
-        )
-
-        enforceConcurrentSessionLimit(tenant.id, user.id!!, tenant.maxConcurrentSessions)
-
-        return AuthResult.Success(tokens)
-    }
-
-    /**
      * Registers a new user within the given tenant.
      * Respects the tenant's registration policy and password requirements.
      * [baseUrl] is used to construct the verification email link.
@@ -497,18 +439,6 @@ class AuthService(
         val a = java.util.UUID.randomUUID()
         val b = java.util.UUID.randomUUID()
         return "$a$b"
-    }
-
-    private fun enforceConcurrentSessionLimit(
-        tenantId: TenantId,
-        userId: UserId,
-        maxSessions: Int?,
-    ) {
-        if (maxSessions == null || maxSessions <= 0) return
-        val active = sessionRepository.countActiveByUser(tenantId, userId)
-        if (active > maxSessions) {
-            sessionRepository.revokeOldestForUser(tenantId, userId, keepNewest = maxSessions)
-        }
     }
 }
 

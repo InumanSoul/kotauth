@@ -81,23 +81,14 @@ interface SessionRepository {
     ): Int
 
     /**
-     * Counts active (non-revoked, non-expired) sessions for a user within a tenant.
-     * Used to enforce [Tenant.maxConcurrentSessions].
+     * Returns a user's sessions in one application that can still be used — access token
+     * unexpired, or a refresh token that is — oldest first. Enforces [Tenant.maxConcurrentSessions].
      */
-    fun countActiveByUser(
+    fun findUsableByUserAndClient(
         tenantId: TenantId,
         userId: UserId,
-    ): Int
-
-    /**
-     * Revokes the oldest sessions for a user, keeping only [keepNewest] active.
-     * Called after login when the session count exceeds the tenant limit.
-     */
-    fun revokeOldestForUser(
-        tenantId: TenantId,
-        userId: UserId,
-        keepNewest: Int,
-    )
+        clientId: ApplicationId,
+    ): List<Session>
 
     /**
      * Deletes sessions that are both expired and revoked (or expired for over [retentionDays]).

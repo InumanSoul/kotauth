@@ -444,6 +444,44 @@ class AdminSettingsTest {
         }
 
     @Test
+    fun `security policy page shows the sessions-per-application field`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+
+            assertTrue("""for="field-maxConcurrentSessions"""" in body)
+            assertTrue("""name="maxConcurrentSessions"""" in body)
+        }
+
+    @Test
+    fun `POST security settings sets, keeps and clears the sessions-per-application limit`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val url = "/admin/workspaces/acme/settings/security"
+
+            authed.submitForm(url, Parameters.build { append("maxConcurrentSessions", "3") })
+            assertEquals(3, tenantRepo.findBySlug("acme")!!.maxConcurrentSessions)
+
+            authed.submitForm(url, Parameters.build { append("mfaPolicy", "optional") })
+            assertEquals(3, tenantRepo.findBySlug("acme")!!.maxConcurrentSessions, "An absent field keeps it")
+
+            authed.submitForm(url, Parameters.build { append("maxConcurrentSessions", "") })
+            assertEquals(null, tenantRepo.findBySlug("acme")!!.maxConcurrentSessions)
+
+            val refused = authed.submitForm(url, Parameters.build { append("maxConcurrentSessions", "abc") })
+            assertEquals(HttpStatusCode.UnprocessableEntity, refused.status)
+        }
+
+    @Test
     fun `POST security settings omitting mfaPolicy preserves a required tenant`() =
         testApplication {
             // mfaPolicy is absent from a partial/programmatic POST here. It must fall back to

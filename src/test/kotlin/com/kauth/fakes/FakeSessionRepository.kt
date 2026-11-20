@@ -111,22 +111,13 @@ class FakeSessionRepository : SessionRepository {
         .filter { applicationId == null || it.clientId == applicationId }
         .size
 
-    override fun countActiveByUser(
+    override fun findUsableByUserAndClient(
         tenantId: TenantId,
         userId: UserId,
-    ) = store.values.count { it.tenantId == tenantId && it.userId == userId && it.isActive }
-
-    override fun revokeOldestForUser(
-        tenantId: TenantId,
-        userId: UserId,
-        keepNewest: Int,
-    ) {
-        val active =
-            store.values
-                .filter { it.tenantId == tenantId && it.userId == userId && it.isActive }
-                .sortedBy { it.createdAt }
-        active.dropLast(keepNewest).forEach { revoke(it.id!!, Instant.now()) }
-    }
+        clientId: ApplicationId,
+    ) = store.values
+        .filter { it.tenantId == tenantId && it.userId == userId && it.clientId == clientId && it.isUsable }
+        .sortedBy { it.createdAt }
 
     override fun deleteExpired(retentionDays: Int): Int {
         val cutoff = Instant.now().minusSeconds(retentionDays * 86400L)

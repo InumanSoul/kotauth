@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The "max concurrent sessions" workspace setting now works, per application.** It was only
+  checked by a sign-in function nothing called, and neither the console nor the API could set
+  it. It now limits how many active sessions a user may hold in one application, for example one
+  per device: a sign-in past the limit ends that user's oldest session in the same application,
+  and sessions in other applications are not counted. Sessions whose access token expired but
+  can still refresh count toward the limit. Set it under Security Policy → Sessions or with
+  `maxConcurrentSessions` on `PATCH /workspace` (0 removes it). Each ended session is audited
+  as `SESSION_REVOKED` with reason `session_limit`.
 - **Hosted email-code sign-in no longer creates an unused authorization code.** Verifying the
   code issued one that was never sent anywhere, before the sign-in issued the real one.
 

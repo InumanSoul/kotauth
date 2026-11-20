@@ -181,9 +181,12 @@ contain orphans before the next read.
 
 ### Concurrent-session enforcement
 
-`countActiveByUser` and `revokeOldestForUser` use the per-user ZSET to
-enforce `Tenant.maxConcurrentSessions`. The ZSET is scored by
-`createdAt` epoch-millis so "oldest first" is a single `ZRANGE`.
+`findUsableByUserAndClient` reads the per-user ZSET to enforce
+`Tenant.maxConcurrentSessions` (a per-application limit). It returns the user's
+sessions in one application that can still be used — access token unexpired, or a
+refresh token that is — oldest first, since the ZSET is scored by `createdAt`
+epoch-millis. A member leaves the ZSET only once neither token works, so the same
+set also lets revoking all of a user's sessions reach ones that can only refresh.
 
 ### Pagination
 

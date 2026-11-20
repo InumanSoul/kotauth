@@ -33,6 +33,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AdminServicesTest {
@@ -1755,6 +1756,30 @@ class AdminServicesTest {
         assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutMaxAttempts = 101)))
         assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutDurationMinutes = 0)))
         assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(lockoutDurationMinutes = 1441)))
+    }
+
+    @Test
+    fun `updateWorkspaceSettings refuses a session limit outside 1 to 100`() {
+        val base = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!)
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(maxConcurrentSessions = 0)))
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(maxConcurrentSessions = 101)))
+        assertIs<AdminResult.Failure>(wsSvc.updateWorkspaceSettings("acme", base.copy(maxConcurrentSessions = -1)))
+    }
+
+    @Test
+    fun `updateWorkspaceSettings saves and clears the session limit`() {
+        val base = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!)
+        val set = wsSvc.updateWorkspaceSettings("acme", base.copy(maxConcurrentSessions = 2))
+        assertIs<AdminResult.Success<Tenant>>(set)
+        assertEquals(2, set.value.maxConcurrentSessions)
+
+        val cleared =
+            wsSvc.updateWorkspaceSettings(
+                "acme",
+                WorkspaceSettingsUpdate.from(set.value).copy(maxConcurrentSessions = null),
+            )
+        assertIs<AdminResult.Success<Tenant>>(cleared)
+        assertNull(cleared.value.maxConcurrentSessions)
     }
 
     @Test

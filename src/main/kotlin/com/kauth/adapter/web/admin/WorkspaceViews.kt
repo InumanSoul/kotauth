@@ -10,6 +10,7 @@ import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.MAGIC_LINK_TTL_MINUTES
+import com.kauth.domain.model.MAX_SESSIONS_PER_APP
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -865,6 +866,28 @@ internal fun securityPolicyPageImpl(
                                 +"Minutes before the account automatically unlocks. "
                                 +"Only applies when Max failed attempts is greater than 0."
                             }
+                        }
+                    }
+                }
+
+                // ── Sessions ─────────────────────────────────────────
+                div("ov-card") {
+                    h2("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_SESSIONS_SECTION }
+                    div("edit-row") {
+                        label("edit-row__label") {
+                            htmlFor = "field-maxConcurrentSessions"
+                            +EnglishStrings.ADMIN_SECURITY_SESSIONS_PER_APP_LABEL
+                        }
+                        div {
+                            input(type = InputType.number, name = "maxConcurrentSessions") {
+                                this.id = "field-maxConcurrentSessions"
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = MAX_SESSIONS_PER_APP.first.toString()
+                                attributes["max"] = MAX_SESSIONS_PER_APP.last.toString()
+                                placeholder = EnglishStrings.ADMIN_SECURITY_SESSIONS_NO_LIMIT
+                                value = workspace.maxConcurrentSessions?.toString().orEmpty()
+                            }
+                            div("edit-row__hint") { +EnglishStrings.ADMIN_SECURITY_SESSIONS_PER_APP_HINT }
                         }
                     }
                 }

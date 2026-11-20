@@ -130,6 +130,18 @@ class WorkspacePatchServiceTest {
     }
 
     @Test
+    fun `maxConcurrentSessions sets a per-app limit and 0 removes it`() {
+        success(WorkspacePatch(maxConcurrentSessions = 3))
+        assertEquals(3, stored().maxConcurrentSessions)
+
+        success(WorkspacePatch(displayName = "Shop 2"))
+        assertEquals(3, stored().maxConcurrentSessions, "An absent field keeps the limit")
+
+        success(WorkspacePatch(maxConcurrentSessions = 0))
+        assertNull(stored().maxConcurrentSessions)
+    }
+
+    @Test
     fun `one patch can configure SMTP, turn on email codes and turn off password sign-in`() {
         success(
             WorkspacePatch(

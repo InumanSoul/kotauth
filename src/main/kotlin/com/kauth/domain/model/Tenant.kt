@@ -33,7 +33,8 @@ data class Tenant(
     val smtpTlsEnabled: Boolean = true,
     val smtpEnabled: Boolean = false,
     // Session policy
-    val maxConcurrentSessions: Int? = null, // null = unlimited
+    // Active sessions a user may hold in one application; null = unlimited.
+    val maxConcurrentSessions: Int? = null,
     // Portal UI configuration (loaded from workspace_portal_config via LEFT JOIN)
     val portalConfig: PortalConfig = PortalConfig(),
     // Per-tenant transactional email branding; null means inherit defaults.
@@ -61,3 +62,6 @@ data class Tenant(
         const val MASTER_SLUG = "master"
     }
 }
+
+/** Bounds for [Tenant.maxConcurrentSessions] when set. */
+val MAX_SESSIONS_PER_APP = 1..100

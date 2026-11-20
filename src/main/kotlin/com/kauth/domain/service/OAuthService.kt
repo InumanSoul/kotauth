@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
@@ -436,6 +437,8 @@ class OAuthService(
             ),
         )
 
+        enforceSessionLimit(tenant, user.id, client.id, ipAddress, userAgent)
+
         // Mark code as consumed
         authCodeRepository.markUsed(code)
 
@@ -454,6 +457,35 @@ class OAuthService(
         return OAuthResult.Success(tokenResponse)
     }
 
+    /**
+     * Ends a user's oldest sessions in [clientId] once a new sign-in takes them past the
+     * workspace's per-application limit. Sessions in other applications are not counted.
+     */
+    private fun enforceSessionLimit(
+        tenant: Tenant,
+        userId: UserId,
+        clientId: ApplicationId,
+        ipAddress: String?,
+        userAgent: String?,
+    ) {
+        val limit = tenant.maxConcurrentSessions?.takeIf { it > 0 } ?: return
+        val usable = sessionRepository.findUsableByUserAndClient(tenant.id, userId, clientId)
+        usable.dropLast(limit).forEach { oldest ->
+            sessionRepository.revoke(oldest.id!!, reason = Session.REVOCATION_REASON_SESSION_LIMIT)
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = userId,
+                    clientId = clientId,
+                    eventType = AuditEventType.SESSION_REVOKED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to Session.REVOCATION_REASON_SESSION_LIMIT, "limit" to limit.toString()),
+                ),
+            )
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Client Credentials Flow (M2M)
     // -------------------------------------------------------------------------
@@ -462,6 +494,7 @@ class OAuthService(
      * Authenticates a client directly (no user involved) and issues an access token.
      * Refresh tokens are NOT issued for M2M flows.
      */
+
     fun clientCredentials(
         tenantSlug: String,
         clientId: String,

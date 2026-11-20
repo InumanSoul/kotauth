@@ -490,42 +490,6 @@ class AuthServiceTest {
     }
 
     // =========================================================================
-    // login()
-    // =========================================================================
-
-    @Test
-    fun `login returns InvalidCredentials for wrong password`() {
-        val result = svc.login("acme", "alice", "wrong-pass")
-        assertIs<AuthResult.Failure>(result)
-        assertIs<AuthError.InvalidCredentials>(result.error)
-    }
-
-    @Test
-    fun `login returns token set and persists session on success`() {
-        val result = svc.login("acme", "alice", "correct-pass")
-
-        assertIs<AuthResult.Success<*>>(result)
-        // A session must have been persisted
-        val activeSessions = sessions.findActiveByUser(TenantId(1), UserId(10))
-        assertEquals(1, activeSessions.size)
-    }
-
-    @Test
-    fun `login evicts oldest session when concurrent session limit is exceeded`() {
-        val limitedTenant = testTenant.copy(maxConcurrentSessions = 2)
-        tenants.clear()
-        tenants.add(limitedTenant)
-
-        // Log in 3 times — the first session should be evicted after the third
-        svc.login("acme", "alice", "correct-pass")
-        svc.login("acme", "alice", "correct-pass")
-        svc.login("acme", "alice", "correct-pass")
-
-        val active = sessions.findActiveByUser(TenantId(1), UserId(10))
-        assertEquals(2, active.size, "Only 2 sessions should remain active after the limit enforcement")
-    }
-
-    // =========================================================================
     // authenticate() — PendingSetup guard (invite flow)
     // =========================================================================
 

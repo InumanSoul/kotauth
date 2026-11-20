@@ -128,30 +128,30 @@ class RedisSessionRepositoryIntegrationTest {
     }
 
     @Test
-    fun `countActiveByUser excludes revoked and expired sessions`() {
-        val tenant = TenantId(1)
-        val user = UserId(8)
-        repo.save(newSession(userId = 8, accessTokenHash = "a"))
-        repo.save(newSession(userId = 8, accessTokenHash = "b"))
-        val revoked = repo.save(newSession(userId = 8, accessTokenHash = "c"))
-        repo.revoke(revoked.id!!, Instant.now())
-
-        assertEquals(2, repo.countActiveByUser(tenant, user))
-    }
-
-    @Test
-    fun `revokeOldestForUser keeps the N most recent and revokes older ones`() {
+    fun `findUsableByUserAndClient counts refreshable sessions in that app only, oldest first`() {
         val now = Instant.now()
-        repo.save(newSession(userId = 9, createdAt = now.minusSeconds(30), accessTokenHash = "1"))
-        repo.save(newSession(userId = 9, createdAt = now.minusSeconds(20), accessTokenHash = "2"))
-        repo.save(newSession(userId = 9, createdAt = now.minusSeconds(10), accessTokenHash = "3"))
-        repo.save(newSession(userId = 9, createdAt = now, accessTokenHash = "4"))
+        val old = repo.save(newSession(userId = 8, clientId = 1, createdAt = now.minusSeconds(30)))
+        val refreshable =
+            repo.save(
+                newSession(
+                    userId = 8,
+                    clientId = 1,
+                    createdAt = now.minusSeconds(20),
+                    expiresAt = now.minusSeconds(5),
+                    refreshTokenHash = "r-8",
+                    refreshExpiresAt = now.plusSeconds(3600),
+                ),
+            )
+        repo.save(newSession(userId = 8, clientId = 2, createdAt = now.minusSeconds(10)))
+        val revoked = repo.save(newSession(userId = 8, clientId = 1, createdAt = now))
+        repo.revoke(revoked.id!!, Instant.now())
+        repo.save(
+            newSession(userId = 8, clientId = 1, createdAt = now.minusSeconds(40), expiresAt = now.minusSeconds(1)),
+        )
 
-        repo.revokeOldestForUser(TenantId(1), UserId(9), keepNewest = 2)
+        val usable = repo.findUsableByUserAndClient(TenantId(1), UserId(8), ApplicationId(1))
 
-        val active = repo.findActiveByUser(TenantId(1), UserId(9))
-        assertEquals(2, active.size)
-        assertEquals(setOf("3", "4"), active.map { it.accessTokenHash }.toSet())
+        assertEquals(listOf(old.id, refreshable.id), usable.map { it.id })
     }
 
     @Test
@@ -162,8 +162,8 @@ class RedisSessionRepositoryIntegrationTest {
 
         repo.revokeAllForUser(TenantId(1), UserId(1), Instant.now())
 
-        assertEquals(0, repo.countActiveByUser(TenantId(1), UserId(1)))
-        assertEquals(1, repo.countActiveByUser(TenantId(1), UserId(2)))
+        assertEquals(0, repo.findActiveByUser(TenantId(1), UserId(1)).size)
+        assertEquals(1, repo.findActiveByUser(TenantId(1), UserId(2)).size)
     }
 
     @Test
