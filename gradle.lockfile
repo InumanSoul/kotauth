@@ -5,9 +5,9 @@
 at.favre.lib:bcrypt:0.10.2=compileClasspath,e2eTestCompileClasspath,e2eTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 at.favre.lib:bytes:1.5.0=compileClasspath,e2eTestCompileClasspath,e2eTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 ch.qos.logback:logback-classic:1.3.14=ktlint
-ch.qos.logback:logback-classic:1.5.32=compileClasspath,e2eTestCompileClasspath,e2eTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+ch.qos.logback:logback-classic:1.6.7=compileClasspath,e2eTestCompileClasspath,e2eTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 ch.qos.logback:logback-core:1.3.14=ktlint
-ch.qos.logback:logback-core:1.5.32=compileClasspath,e2eTestCompileClasspath,e2eTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+ch.qos.logback:logback-core:1.6.7=compileClasspath,e2eTestCompileClasspath,e2eTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 com.auth0:java-jwt:4.6.0=compileClasspath,e2eTestCompileClasspath,e2eTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 com.charleskorn.kaml:kaml-jvm:0.79.0=e2eTestRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
 com.charleskorn.kaml:kaml:0.79.0=e2eTestRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
