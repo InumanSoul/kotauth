@@ -87,6 +87,8 @@ internal data class UpdateWorkspaceRequest(
     val loginIdentifierMode: String? = null,
     val defaultLocale: String? = null,
     val smtp: UpdateSmtpRequest? = null,
+    /** Active sessions a user may hold in one application; 0 removes the limit. */
+    val maxConcurrentSessions: Int? = null,
 ) {
     /** Null when [loginIdentifierMode] names no known mode. */
     fun toDomain(): WorkspacePatch? {
@@ -121,6 +123,7 @@ internal data class UpdateWorkspaceRequest(
             loginIdentifierMode = mode,
             defaultLocale = defaultLocale,
             smtp = smtp?.toDomain(),
+            maxConcurrentSessions = maxConcurrentSessions,
         )
     }
 }

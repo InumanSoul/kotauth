@@ -54,5 +54,8 @@ data class Session(
          * theft (OAuth 2.0 Security BCP) — unlike logout/admin revocation.
          */
         const val REVOCATION_REASON_ROTATED = "rotated"
+
+        /** Revocation reason set when a newer sign-in pushes the session past the workspace limit. */
+        const val REVOCATION_REASON_SESSION_LIMIT = "session_limit"
     }
 }

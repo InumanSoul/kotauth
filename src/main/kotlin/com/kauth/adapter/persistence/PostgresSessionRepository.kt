@@ -204,10 +204,11 @@ class PostgresSessionRepository : SessionRepository {
             query.count().toInt()
         }
 
-    override fun countActiveByUser(
+    override fun findUsableByUserAndClient(
         tenantId: TenantId,
         userId: UserId,
-    ): Int =
+        clientId: ApplicationId,
+    ): List<Session> =
         transaction {
             val now = OffsetDateTime.now()
             SessionsTable
@@ -215,43 +216,18 @@ class PostgresSessionRepository : SessionRepository {
                 .where {
                     (SessionsTable.tenantId eq tenantId.value) and
                         (SessionsTable.userId eq userId.value) and
+                        (SessionsTable.clientId eq clientId.value) and
                         (SessionsTable.revokedAt.isNull()) and
-                        (SessionsTable.expiresAt greater now)
-                }.count()
-                .toInt()
-        }
-
-    override fun revokeOldestForUser(
-        tenantId: TenantId,
-        userId: UserId,
-        keepNewest: Int,
-    ) = transaction {
-        val now = OffsetDateTime.now()
-        val ts = now
-
-        // Find all active session IDs ordered oldest-first, skip the N newest
-        val allActive =
-            SessionsTable
-                .select(SessionsTable.id)
-                .where {
-                    (SessionsTable.tenantId eq tenantId.value) and
-                        (SessionsTable.userId eq userId.value) and
-                        (SessionsTable.revokedAt.isNull()) and
-                        (SessionsTable.expiresAt greater now)
+                        (
+                            (SessionsTable.expiresAt greater now) or
+                                (
+                                    SessionsTable.refreshTokenHash.isNotNull() and
+                                        (SessionsTable.refreshExpiresAt greater now)
+                                )
+                        )
                 }.orderBy(SessionsTable.createdAt, SortOrder.ASC)
-                .map { it[SessionsTable.id] }
-
-        val toRevoke = allActive.dropLast(keepNewest)
-        if (toRevoke.isNotEmpty()) {
-            SessionsTable.update({
-                (SessionsTable.id inList toRevoke) and
-                    (SessionsTable.revokedAt.isNull())
-            }) {
-                it[SessionsTable.revokedAt] = ts
-            }
+                .map { it.toSession() }
         }
-        Unit
-    }
 
     override fun findActiveByImpersonator(parentSessionId: SessionId): List<Session> =
         transaction {

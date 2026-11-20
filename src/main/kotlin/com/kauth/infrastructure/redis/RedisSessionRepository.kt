@@ -179,23 +179,13 @@ class RedisSessionRepository(
             liveSessions(RedisKeys.activeTenantSet(tenantId), newestFirst)
         }
 
-    override fun countActiveByUser(
+    override fun findUsableByUserAndClient(
         tenantId: TenantId,
         userId: UserId,
-    ): Int = liveSessions(RedisKeys.activeUserSet(tenantId, userId), newestFirst = false).size
-
-    override fun revokeOldestForUser(
-        tenantId: TenantId,
-        userId: UserId,
-        keepNewest: Int,
-    ) {
-        // ZRANGE returns ascending score order — oldest first.
-        val key = RedisKeys.activeUserSet(tenantId, userId)
-        val members = commands.zrange(key, 0, -1)
-        val toRevoke = members.dropLast(keepNewest)
-        val now = Instant.now()
-        toRevoke.forEach { it.toIntOrNull()?.let { id -> revoke(SessionId(id), now) } }
-    }
+        clientId: ApplicationId,
+    ): List<Session> =
+        indexedSessions(RedisKeys.activeUserSet(tenantId, userId), newestFirst = false)
+            .filter { it.clientId == clientId }
 
     /**
      * Redis TTL handles physical expiry; this is a no-op kept on the interface
@@ -224,6 +214,12 @@ class RedisSessionRepository(
      * Round trips: 1 ZRANGE + 1 MGET (+ 1 ZREM only if orphans were found).
      */
     private fun liveSessions(
+        setKey: String,
+        newestFirst: Boolean,
+    ): List<Session> = indexedSessions(setKey, newestFirst).filter { it.isActive }
+
+    /** The sessions in an index that can still be used, pruning the ones that can't. */
+    private fun indexedSessions(
         setKey: String,
         newestFirst: Boolean,
     ): List<Session> {
@@ -258,7 +254,7 @@ class RedisSessionRepository(
             when {
                 session == null -> toPrune += member
                 !session.isUsable -> toPrune += member
-                session.isActive -> live += session
+                else -> live += session
             }
         }
         if (toPrune.isNotEmpty()) {

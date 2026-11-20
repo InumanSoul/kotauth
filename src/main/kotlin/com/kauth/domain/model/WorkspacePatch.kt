@@ -2,7 +2,8 @@ package com.kauth.domain.model
 
 /**
  * A partial change to a workspace's settings. A null field leaves the current value untouched.
- * For [issuerUrl] and [defaultLocale] an empty string clears the value.
+ * For [issuerUrl] and [defaultLocale] an empty string clears the value; for
+ * [maxConcurrentSessions] 0 removes the limit.
  */
 data class WorkspacePatch(
     val displayName: String? = null,
@@ -33,6 +34,7 @@ data class WorkspacePatch(
     val loginIdentifierMode: LoginIdentifierMode? = null,
     val defaultLocale: String? = null,
     val smtp: SmtpPatch? = null,
+    val maxConcurrentSessions: Int? = null,
 ) {
     /** True when any field handled by [WorkspaceSettingsUpdate] is set. */
     val touchesSettings: Boolean
@@ -68,6 +70,12 @@ data class WorkspacePatch(
             emailOtpLockoutThreshold = emailOtpLockoutThreshold ?: base.emailOtpLockoutThreshold,
             corsAllowCredentials = corsAllowCredentials ?: base.corsAllowCredentials,
             loginIdentifierMode = loginIdentifierMode ?: base.loginIdentifierMode,
+            maxConcurrentSessions =
+                when (maxConcurrentSessions) {
+                    null -> base.maxConcurrentSessions
+                    0 -> null
+                    else -> maxConcurrentSessions
+                },
         )
 }
 

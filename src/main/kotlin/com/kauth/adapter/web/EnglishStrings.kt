@@ -218,6 +218,13 @@ object EnglishStrings {
     const val APP_TOKEN_LIFETIME_OVERRIDE_SUFFIX = "seconds, set on this application"
     const val APP_INHERITED_ALL = "Token TTL, security and branding"
     const val APP_INHERITED_WITHOUT_TTL = "Security and branding"
+    const val ADMIN_SECURITY_SESSIONS_SECTION = "Sessions"
+    const val ADMIN_SECURITY_SESSIONS_PER_APP_LABEL = "Sessions per application"
+    const val ADMIN_SECURITY_SESSIONS_NO_LIMIT = "No limit"
+    const val ADMIN_SECURITY_SESSIONS_PER_APP_HINT =
+        "How many active sessions a user may hold in one application, for example one per device. " +
+            "A new sign-in past the limit ends that user's oldest session in the app; other apps " +
+            "are not affected. Leave empty for no limit."
     const val ADMIN_TOPBAR_SEARCH_LABEL = "Search users"
     const val ADMIN_USERS_FILTER_LABEL = "Filter users"
     const val ADMIN_AUDIT_EVENT_FILTER_LABEL = "Event type"

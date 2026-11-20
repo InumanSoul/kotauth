@@ -498,6 +498,82 @@ class OAuthServiceTest {
         assertIs<OAuthError.InvalidGrant>(replayResult.error)
     }
 
+    private fun signInToSpa(): OAuthResult<*> {
+        val code =
+            (
+                svc.issueAuthorizationCode(
+                    tenantSlug = "acme",
+                    userId = UserId(10),
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scopes = "openid",
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                    nonce = null,
+                    state = null,
+                ) as OAuthResult.Success<AuthorizationCode>
+            ).value.code
+        return svc.exchangeAuthorizationCode(
+            tenantSlug = "acme",
+            code = code,
+            clientId = "spa-app",
+            redirectUri = "https://app.example.com/callback",
+            codeVerifier = pkceVerifier,
+            clientSecret = null,
+        )
+    }
+
+    @Test
+    fun `a sign-in past the per-app session limit ends the oldest session in that app`() {
+        tenants.update(tenants.findBySlug("acme")!!.copy(maxConcurrentSessions = 2))
+
+        repeat(3) { assertIs<OAuthResult.Success<*>>(signInToSpa()) }
+
+        val usable = sessions.all().filter { it.userId == UserId(10) && it.isUsable }
+        assertEquals(2, usable.size, "Only the two newest sessions stay")
+        val ended = sessions.all().single { it.revokedAt != null }
+        assertEquals(com.kauth.domain.model.Session.REVOCATION_REASON_SESSION_LIMIT, ended.revocationReason)
+        assertEquals(usable.minOf { it.createdAt }.isAfter(ended.createdAt), true, "The oldest one is ended")
+        assertTrue(auditLog.events.any { it.eventType == AuditEventType.SESSION_REVOKED })
+    }
+
+    @Test
+    fun `without a limit every sign-in keeps its session`() {
+        repeat(3) { signInToSpa() }
+
+        assertEquals(3, sessions.all().count { it.userId == UserId(10) && it.isUsable })
+    }
+
+    @Test
+    fun `the limit does not count sessions in other applications`() {
+        tenants.update(tenants.findBySlug("acme")!!.copy(maxConcurrentSessions = 1))
+        val otherApp =
+            sessions.save(
+                com.kauth.domain.model.Session(
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId =
+                        com.kauth.domain.model
+                            .ApplicationId(9_999),
+                    accessTokenHash = "other-app",
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    ipAddress = null,
+                    userAgent = null,
+                    expiresAt =
+                        java.time.Instant
+                            .now()
+                            .plusSeconds(3600),
+                ),
+            )
+
+        signInToSpa()
+        signInToSpa()
+
+        assertEquals(null, sessions.findById(otherApp.id!!)?.revokedAt, "Another app's session is untouched")
+        assertEquals(1, sessions.all().count { it.clientId != otherApp.clientId && it.isUsable })
+    }
+
     @Test
     fun `exchangeAuthorizationCode omits refresh token for client not registered for refresh_token grant`() {
         val codeOnlyClient =
