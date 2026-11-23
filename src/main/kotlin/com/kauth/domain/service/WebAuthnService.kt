@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.FactorChange
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
@@ -24,6 +25,7 @@ class WebAuthnService(
     private val userRepository: UserRepository,
     private val tenantRepository: TenantRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
+    private val factorChangeNotifier: FactorChangeNotifier? = null,
 ) {
     /**
      * Derives a stable 32-byte user handle for WebAuthn from the tenant + user + secret key.
@@ -97,6 +99,7 @@ class WebAuthnService(
                 details = mapOf("credentialId" to saved.id.toString()),
             ),
         )
+        factorChangeNotifier?.notify(userId, tenant.id, FactorChange.PASSKEY_ADDED)
         return WebAuthnResult.Success(saved)
     }
 
@@ -205,10 +208,12 @@ class WebAuthnService(
         }
     }
 
+    /** Removes one passkey; [byAdmin] marks a removal by an administrator in the email to the user. */
     fun revoke(
         userId: UserId,
         credentialPk: Long,
         tenantId: TenantId,
+        byAdmin: Boolean = false,
     ): WebAuthnResult<Unit> {
         val tenant = tenantRepository?.findById(tenantId)
         if (tenant != null && !tenant.securityConfig.passwordLoginEnabled) {
@@ -229,6 +234,8 @@ class WebAuthnService(
                     details = mapOf("credentialId" to credentialPk.toString()),
                 ),
             )
+            val change = if (byAdmin) FactorChange.PASSKEY_REMOVED_BY_ADMIN else FactorChange.PASSKEY_REMOVED
+            factorChangeNotifier?.notify(userId, tenantId, change)
             WebAuthnResult.Success(Unit)
         } else {
             WebAuthnResult.Failure(WebAuthnError.CredentialNotFound)
@@ -256,6 +263,7 @@ class WebAuthnService(
                     ),
             ),
         )
+        if (count > 0) factorChangeNotifier?.notify(userId, tenantId, FactorChange.PASSKEYS_RESET_BY_ADMIN)
         return WebAuthnResult.Success(count)
     }
 }

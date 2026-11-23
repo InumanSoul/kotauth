@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.FactorChange
 import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.MfaMethod
 import com.kauth.domain.model.MfaRecoveryCode
@@ -39,6 +40,7 @@ class MfaService(
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val clock: Clock = Clock.systemUTC(),
+    private val factorChangeNotifier: FactorChangeNotifier? = null,
 ) {
     companion object {
         /** Number of one-time recovery codes generated per enrollment. */
@@ -192,6 +194,7 @@ class MfaService(
                 userAgent = userAgent,
             ),
         )
+        factorChangeNotifier?.notify(userId, enrollment.tenantId, FactorChange.TOTP_ADDED)
 
         return MfaResult.Success(verified)
     }
@@ -382,6 +385,12 @@ class MfaService(
                         details = mapOf("remaining" to (unusedCodes.size - 1).toString()),
                     ),
                 )
+                factorChangeNotifier?.notify(
+                    userId,
+                    stored.tenantId,
+                    FactorChange.RECOVERY_CODE_USED,
+                    remainingRecoveryCodes = unusedCodes.size - 1,
+                )
 
                 return MfaResult.Success(true)
             }
@@ -406,18 +415,20 @@ class MfaService(
     // -----------------------------------------------------------------------
 
     /**
-     * Disables MFA for a user — removes all enrollments and recovery codes.
-     * Typically invoked by an admin or during account recovery.
+     * Disables MFA for a user — removes all enrollments and recovery codes. [byAdmin] marks a
+     * reset by an administrator, which the user is told about as such.
      */
     fun disableMfa(
         userId: UserId,
         tenantId: TenantId,
         ipAddress: String? = null,
         userAgent: String? = null,
+        byAdmin: Boolean = false,
     ): MfaResult<Unit> {
         val user =
             userRepository.findById(userId, tenantId)
                 ?: return MfaResult.Success(Unit) // cross-tenant / missing user — no-op, no audit
+        val hadActiveFactor = shouldChallengeMfa(userId)
 
         mfaRepository.deleteEnrollmentsByUser(userId)
         mfaRepository.deleteRecoveryCodesByUser(userId)
@@ -433,6 +444,10 @@ class MfaService(
                 userAgent = userAgent,
             ),
         )
+        if (hadActiveFactor) {
+            val change = if (byAdmin) FactorChange.TOTP_RESET_BY_ADMIN else FactorChange.TOTP_REMOVED
+            factorChangeNotifier?.notify(userId, tenantId, change)
+        }
 
         return MfaResult.Success(Unit)
     }

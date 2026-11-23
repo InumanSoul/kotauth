@@ -909,6 +909,51 @@ object EnglishStrings {
     const val EMAIL_FOOTER_PASSWORD_RESET = "If you did not request a password reset, you can safely ignore this email."
     const val EMAIL_FOOTER_PASSWORD_CHANGED =
         "For security, all active sessions were signed out when your password was changed."
+
+    // Factor-change emails. {0} = workspace name; RECOVERY_CODE_USED body {1} = codes left;
+    // EMAIL_FOOTER_FACTOR_CHANGED {0} = time of the change.
+    const val EMAIL_SUBJECT_FACTOR_TOTP_ADDED = "Two-factor authentication was turned on ({0})"
+    const val EMAIL_HEADING_FACTOR_TOTP_ADDED = "Two-factor authentication is on"
+    const val EMAIL_BODY_FACTOR_TOTP_ADDED =
+        "An authenticator app was set up for two-factor authentication on your {0} account."
+    const val EMAIL_SUBJECT_FACTOR_TOTP_REMOVED = "Your authenticator app was removed ({0})"
+    const val EMAIL_HEADING_FACTOR_TOTP_REMOVED = "Your authenticator app was removed"
+    const val EMAIL_BODY_FACTOR_TOTP_REMOVED =
+        "The authenticator app was removed from your {0} account, so sign-in no longer asks for its " +
+            "codes."
+    const val EMAIL_SUBJECT_FACTOR_TOTP_RESET_BY_ADMIN = "An administrator removed your authenticator app ({0})"
+    const val EMAIL_HEADING_FACTOR_TOTP_RESET_BY_ADMIN = "Your authenticator app was removed"
+    const val EMAIL_BODY_FACTOR_TOTP_RESET_BY_ADMIN =
+        "An administrator removed the authenticator app from your {0} account. If the workspace " +
+            "requires two-factor authentication, you'll set up a new one the next time you sign in."
+    const val EMAIL_SUBJECT_FACTOR_RECOVERY_CODE_USED = "A recovery code was used to sign in ({0})"
+    const val EMAIL_HEADING_FACTOR_RECOVERY_CODE_USED = "A recovery code was used"
+    const val EMAIL_BODY_FACTOR_RECOVERY_CODE_USED =
+        "One of your recovery codes was used to sign in to your {0} account. You have {1} recovery " +
+            "codes left."
+    const val EMAIL_SUBJECT_FACTOR_PASSKEY_ADDED = "A passkey was added to your account ({0})"
+    const val EMAIL_HEADING_FACTOR_PASSKEY_ADDED = "A passkey was added"
+    const val EMAIL_BODY_FACTOR_PASSKEY_ADDED =
+        "A new passkey was added to your {0} account and can now be used to sign in."
+    const val EMAIL_SUBJECT_FACTOR_PASSKEY_REMOVED = "A passkey was removed from your account ({0})"
+    const val EMAIL_HEADING_FACTOR_PASSKEY_REMOVED = "A passkey was removed"
+    const val EMAIL_BODY_FACTOR_PASSKEY_REMOVED =
+        "A passkey was removed from your {0} account and can no longer be used to sign in."
+    const val EMAIL_SUBJECT_FACTOR_PASSKEY_REMOVED_BY_ADMIN = "An administrator removed one of your passkeys ({0})"
+    const val EMAIL_HEADING_FACTOR_PASSKEY_REMOVED_BY_ADMIN = "A passkey was removed"
+    const val EMAIL_BODY_FACTOR_PASSKEY_REMOVED_BY_ADMIN =
+        "An administrator removed a passkey from your {0} account. It can no longer be used to sign " +
+            "in."
+    const val EMAIL_SUBJECT_FACTOR_PASSKEYS_RESET_BY_ADMIN = "An administrator removed your passkeys ({0})"
+    const val EMAIL_HEADING_FACTOR_PASSKEYS_RESET_BY_ADMIN = "Your passkeys were removed"
+    const val EMAIL_BODY_FACTOR_PASSKEYS_RESET_BY_ADMIN =
+        "An administrator removed all passkeys from your {0} account. None of them can be used to " +
+            "sign in any more."
+    const val EMAIL_BODY_FACTOR_NOT_YOU =
+        "If you didn't make this change, reset your password and contact your {0} administrator " +
+            "right away."
+    const val EMAIL_FOOTER_FACTOR_CHANGED = "This change was made on {0}."
+
     const val EMAIL_FOOTER_ACCOUNT_LOCKED =
         "If you made these sign-in attempts, you can safely ignore this email. Your account will unlock automatically."
     const val EMAIL_FOOTER_TEST = "Sent by KotAuth to verify SMTP configuration."

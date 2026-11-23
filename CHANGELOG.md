@@ -31,6 +31,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Comes with migration V68. Tokens from sessions that existed before the upgrade omit the new
   claims until the user signs in again. See ADR-24.
 
+- **Users are emailed when their sign-in factors change.** With SMTP set up, Kotauth now emails
+  the user when:
+  - an authenticator app is added or removed
+  - an admin resets their MFA
+  - a recovery code is used, with the count left
+  - a passkey is added or removed, or an admin removes one or all of them
+
+  The email names the change and when it happened, says whether an administrator made it, and
+  tells the user what to do if it wasn't them. It carries no links, the same as the
+  password-changed email. Auth0 and Clerk don't send these; Okta sends similar notices for
+  authenticator enrollment and reset. They matter more now that a user can set up their first
+  factor during sign-in with only a password: if someone else does it, the owner hears about it.
+  Sending never blocks or fails the change, and nothing is sent when nothing changed (for
+  example, resetting MFA for a user who never finished enrolling).
+
 ### Fixed
 
 - **With Redis as the session store, refreshed tokens kept their resource audiences.** The Redis

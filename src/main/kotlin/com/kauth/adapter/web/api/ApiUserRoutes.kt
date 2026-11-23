@@ -221,7 +221,7 @@ internal fun Route.apiUserRoutes(
                         return@delete
                     }
                     is AdminResult.Success -> {
-                        mfaService.disableMfa(userId, tenantId)
+                        mfaService.disableMfa(userId, tenantId, byAdmin = true)
                         call.respond(HttpStatusCode.NoContent, "")
                     }
                 }
