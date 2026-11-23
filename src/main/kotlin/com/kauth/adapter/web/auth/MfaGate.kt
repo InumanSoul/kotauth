@@ -7,7 +7,6 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.EncryptionService
-import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respondRedirect
 import java.time.Instant
@@ -33,8 +32,6 @@ internal class MfaGate(
     ): MfaStep {
         val service = mfaService ?: return MfaStep.PROCEED
         if (service.shouldChallengeMfa(userId)) return MfaStep.CHALLENGE
-        // The portal is where an unenrolled user goes to enroll, so it can't be refused here.
-        if (clientId == PortalClientProvisioning.PORTAL_CLIENT_ID) return MfaStep.PROCEED
         val policy = tenant.mfaPolicy
         if (policy == "optional") return MfaStep.PROCEED
         val roles =
@@ -49,9 +46,9 @@ internal class MfaGate(
 
 /**
  * Finishes a sign-in whose first factor has passed: challenges the second factor when the user
- * has one, refuses when the workspace requires one the user lacks, and otherwise issues the
- * authorization code. Returns the URL to send the browser to, or null once [renderError] or
- * [renderMfaRequired] has responded.
+ * has one, sends them to set one up when the workspace requires one they lack, and otherwise
+ * issues the authorization code. Returns the URL to send the browser to, or null once
+ * [renderError] has responded.
  *
  * [secondFactorDone] is for a first factor that already proves two factors, such as a passkey
  * with user verification.
@@ -68,7 +65,6 @@ internal suspend fun ApplicationCall.signInRedirectUrl(
     oauthService: OAuthService,
     encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
-    renderMfaRequired: suspend (message: String) -> Unit = renderError,
     secondFactorDone: Boolean = false,
 ): String? {
     // Refuse a user of another workspace before anything else, so not even the challenge starts.
@@ -78,10 +74,8 @@ internal suspend fun ApplicationCall.signInRedirectUrl(
     }
     if (!secondFactorDone) {
         when (gate.stepFor(userId, tenant, oauthParams.clientId)) {
-            MfaStep.ENROLLMENT_REQUIRED -> {
-                renderMfaRequired(EnglishStrings.MFA_ENROLLMENT_REQUIRED)
-                return null
-            }
+            MfaStep.ENROLLMENT_REQUIRED ->
+                return startMfaEnrollment(slug, userId, oauthParams, encryptionService, secure)
             MfaStep.CHALLENGE -> return startMfaChallenge(slug, userId, oauthParams, encryptionService, secure)
             MfaStep.PROCEED -> Unit
         }
@@ -115,7 +109,6 @@ internal suspend fun ApplicationCall.finishSignIn(
     oauthService: OAuthService,
     encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
-    renderMfaRequired: suspend (message: String) -> Unit = renderError,
 ) {
     val url =
         signInRedirectUrl(
@@ -130,7 +123,6 @@ internal suspend fun ApplicationCall.finishSignIn(
             oauthService = oauthService,
             encryptionService = encryptionService,
             renderError = renderError,
-            renderMfaRequired = renderMfaRequired,
         ) ?: return
     respondRedirect(url)
 }

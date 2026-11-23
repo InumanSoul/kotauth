@@ -31,6 +31,7 @@
 @import "./auth/alert.css";
 @import "./auth/social.css";
 @import "./auth/misc.css";
+@import "./auth/mfa-setup.css";
 
 /* ── Password validation checklist ────────────────────────────────────────── */
 @import "./components/password-validation.css";

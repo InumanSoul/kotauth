@@ -68,6 +68,9 @@ class MfaService(
      *
      * If the user already has an unverified enrollment, it is replaced.
      * If the user already has a verified enrollment, this fails.
+     *
+     * With [withRecoveryCodes] false no codes are made yet; [issueRecoveryCodes] makes them once
+     * the enrollment is verified, for a flow that shows them at the end.
      */
     fun beginEnrollment(
         userId: UserId,
@@ -75,6 +78,7 @@ class MfaService(
         issuer: String,
         ipAddress: String? = null,
         userAgent: String? = null,
+        withRecoveryCodes: Boolean = true,
     ): MfaResult<EnrollmentResponse> {
         val user =
             userRepository.findById(userId, tenantId)
@@ -115,17 +119,7 @@ class MfaService(
                 ),
             )
 
-        // Generate recovery codes
-        val plaintextCodes = generateRecoveryCodes()
-        val hashedCodes =
-            plaintextCodes.map { code ->
-                MfaRecoveryCode(
-                    userId = userId,
-                    tenantId = tenantId,
-                    codeHash = passwordHasher.hash(code),
-                )
-            }
-        mfaRepository.saveRecoveryCodes(hashedCodes)
+        val plaintextCodes = if (withRecoveryCodes) saveNewRecoveryCodes(userId, tenantId) else emptyList()
 
         auditLog.record(
             AuditEvent(
@@ -156,9 +150,12 @@ class MfaService(
         code: String,
         ipAddress: String? = null,
         userAgent: String? = null,
+        enrollmentId: Int? = null,
     ): MfaResult<MfaEnrollment> {
         val enrollment =
-            mfaRepository.findEnrollmentByUserId(userId)
+            mfaRepository
+                .findEnrollmentByUserId(userId)
+                ?.takeIf { enrollmentId == null || it.id == enrollmentId }
                 ?: return MfaResult.Failure(MfaError.NotEnrolled)
 
         if (enrollment.verified) {
@@ -197,6 +194,38 @@ class MfaService(
         )
 
         return MfaResult.Success(verified)
+    }
+
+    /**
+     * The otpauth:// URI of the user's enrollment [enrollmentId] while it is still unverified, so
+     * a setup page can show it again. Null once verified, replaced, or not this user's.
+     */
+    fun pendingEnrollmentUri(
+        userId: UserId,
+        tenantId: TenantId,
+        enrollmentId: Int,
+        issuer: String,
+    ): String? {
+        val enrollment =
+            mfaRepository
+                .findEnrollmentByUserId(userId)
+                ?.takeIf { it.id == enrollmentId && it.tenantId == tenantId && !it.verified }
+                ?: return null
+        val user = userRepository.findById(userId, tenantId) ?: return null
+        return TotpUtil.generateUri(secret = enrollment.secret, accountName = user.email, issuer = issuer)
+    }
+
+    /** Replaces the recovery codes of a verified enrollment and returns the new plaintext codes. */
+    fun issueRecoveryCodes(
+        userId: UserId,
+        tenantId: TenantId,
+    ): MfaResult<List<String>> {
+        val enrollment = mfaRepository.findEnrollmentByUserId(userId)
+        if (enrollment == null || !enrollment.verified || enrollment.tenantId != tenantId) {
+            return MfaResult.Failure(MfaError.NotEnrolled)
+        }
+        mfaRepository.deleteRecoveryCodesByUser(userId)
+        return MfaResult.Success(saveNewRecoveryCodes(userId, tenantId))
     }
 
     // -----------------------------------------------------------------------
@@ -449,8 +478,22 @@ class MfaService(
     // Helpers
     // -----------------------------------------------------------------------
 
-    private fun generateRecoveryCodes(): List<String> =
-        (1..RECOVERY_CODE_COUNT).map { SecureTokens.randomHex(RECOVERY_CODE_BYTES) }
+    private fun saveNewRecoveryCodes(
+        userId: UserId,
+        tenantId: TenantId,
+    ): List<String> {
+        val plaintextCodes = (1..RECOVERY_CODE_COUNT).map { SecureTokens.randomHex(RECOVERY_CODE_BYTES) }
+        mfaRepository.saveRecoveryCodes(
+            plaintextCodes.map {
+                MfaRecoveryCode(
+                    userId = userId,
+                    tenantId = tenantId,
+                    codeHash = passwordHasher.hash(it),
+                )
+            },
+        )
+        return plaintextCodes
+    }
 }
 
 // ---------------------------------------------------------------------------

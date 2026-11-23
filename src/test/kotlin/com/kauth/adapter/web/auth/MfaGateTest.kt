@@ -97,9 +97,9 @@ class MfaGateTest {
     }
 
     @Test
-    fun `an unenrolled user may still reach the portal to enroll`() {
+    fun `the portal asks for enrollment like any other application`() {
         assertEquals(
-            MfaStep.PROCEED,
+            MfaStep.ENROLLMENT_REQUIRED,
             gate.stepFor(alice, workspace("required"), PortalClientProvisioning.PORTAL_CLIENT_ID),
         )
     }

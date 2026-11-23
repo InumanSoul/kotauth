@@ -62,7 +62,8 @@ The success response is the same as `/auth/verify-otp`'s. The token expires five
 minutes after issue and only works in the workspace that issued it; wrong codes
 count toward the user's TOTP lockout. If the workspace requires MFA and the user
 has not enrolled, `/auth/verify-otp` answers `403` with
-`mfa_enrollment_required`; the user must enroll in the account portal first.
+`mfa_enrollment_required`; the user enrolls by signing in once through the hosted
+pages (or the account portal), which walk them through setting up an authenticator app.
 
 This mirrors Auth0's `mfa_required` / `mfa_token` exchange, so the second factor
 can never be skipped by signing in through the API instead of the hosted pages.

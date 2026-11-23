@@ -345,7 +345,7 @@ class MagicLinkRoutesTest {
         }
 
     @Test
-    fun `a magic link is refused when the workspace requires MFA the user lacks`() =
+    fun `a magic link sends a user without the required second factor to set one up`() =
         testApplication {
             mfaRepository.clear()
             tenants.clear()
@@ -354,8 +354,14 @@ class MagicLinkRoutesTest {
 
             val response = consumeAsAlice()
 
-            assertEquals(HttpStatusCode.BadRequest, response.status)
-            assertTrue(response.bodyAsText().contains("Multi-factor authentication is required"))
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/mfa-enroll", response.headers["Location"])
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .any { it.startsWith("$MFA_ENROLL_COOKIE=") },
+            )
             assertTrue(authCodes.all().isEmpty(), "No code may be issued without the required second factor")
         }
 

@@ -370,8 +370,8 @@ These are not environment variables — they are configured per workspace throug
 
 ### MFA Policy
 - `optional` — Users can enroll but are not required to
-- `required` — All users must complete MFA before accessing the portal
-- `required_for_admins` — Only users with the `admin` role are required to enroll
+- `required` — Every user needs a second factor; anyone without one sets up an authenticator app during their next sign-in
+- `required_admins` — Only users with the `admin` role need one, set up the same way
 
 ### SMTP Configuration
 - Host, port, username, password (AES-256-GCM encrypted at rest)
