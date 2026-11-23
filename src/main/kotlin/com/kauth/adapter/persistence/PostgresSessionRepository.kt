@@ -39,6 +39,8 @@ class PostgresSessionRepository : SessionRepository {
                     it[revocationReason] = session.revocationReason
                     it[impersonatorSessionId] = session.impersonatorSessionId?.value
                     it[resources] = Json.encodeToString(session.resources)
+                    it[authTime] = session.authTime?.toOffsetDateTime()
+                    it[amr] = Json.encodeToString(session.amr)
                 } get SessionsTable.id
 
             session.copy(id = SessionId(insertedId))
@@ -294,6 +296,8 @@ class PostgresSessionRepository : SessionRepository {
             revocationReason = this[SessionsTable.revocationReason],
             impersonatorSessionId = this[SessionsTable.impersonatorSessionId]?.let { SessionId(it) },
             resources = Json.decodeFromString(this[SessionsTable.resources].ifBlank { "[]" }),
+            authTime = this[SessionsTable.authTime]?.toInstant(),
+            amr = Json.decodeFromString(this[SessionsTable.amr].ifBlank { "[]" }),
         )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)

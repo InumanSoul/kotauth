@@ -37,6 +37,7 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import io.mockk.every
 import io.mockk.mockk
 import java.time.Instant
 import kotlin.test.BeforeTest
@@ -356,6 +357,7 @@ class SilentAuthTest {
         testApplication {
             tenantRepo.clear()
             tenantRepo.add(tenant.copy(securityConfig = tenant.securityConfig.copy(mfaPolicy = "required")))
+            every { mfaService.isMfaRequired("required", any()) } returns true
             application(appBlock())
             val noFollow = createClient { followRedirects = false }
             val response =

@@ -229,9 +229,11 @@ class SsoCookieTest {
         val userId: Int,
         val tenantId: Int,
         val authTimeEpochSec: Long,
-        val mfaCompleted: Boolean,
+        val amr: List<String>,
         val expiresAtEpochSec: Long,
-    )
+    ) {
+        val mfaCompleted: Boolean get() = "mfa" in amr
+    }
 
     private fun parseSsoCookie(value: String): SsoPayload {
         val verified = encryptionService.verifyCookie(value)
@@ -243,7 +245,7 @@ class SsoCookieTest {
             userId = parts[1].toInt(),
             tenantId = parts[2].toInt(),
             authTimeEpochSec = parts[3].toLong(),
-            mfaCompleted = parts[4] == "1",
+            amr = parts[4].split(",").filter { it.isNotBlank() },
             expiresAtEpochSec = parts[5].toLong(),
         )
     }
@@ -274,7 +276,8 @@ class SsoCookieTest {
                     ?: error("KOTAUTH_SSO must be set on successful password login. Set-Cookie: $setCookie")
 
             val payload = parseSsoCookie(ssoValue)
-            assertEquals("v1", payload.version)
+            assertEquals("v2", payload.version)
+            assertEquals(listOf("pwd"), payload.amr)
             assertEquals(alice.id!!.value, payload.userId)
             assertEquals(tenant.id.value, payload.tenantId)
             assertEquals(false, payload.mfaCompleted, "Password-only login must record mfaCompleted=false")
@@ -330,6 +333,7 @@ class SsoCookieTest {
             assertEquals(alice.id!!.value, payload.userId)
             assertEquals(tenant.id.value, payload.tenantId)
             assertEquals(false, payload.mfaCompleted, "Magic-link sign-in must record mfaCompleted=false")
+            assertEquals(listOf("otp"), payload.amr)
         }
 
     @Test
@@ -342,7 +346,7 @@ class SsoCookieTest {
                 com.kauth.domain.service.MfaResult
                     .Success(true)
 
-            val mfaPending = "${alice.id!!.value}|acme|${System.currentTimeMillis()}"
+            val mfaPending = "${alice.id!!.value}|acme|${System.currentTimeMillis()}|pwd"
             val mfaCookie = encryptionService.signCookie(mfaPending)
 
             val noFollow = createClient { followRedirects = false }
@@ -372,6 +376,7 @@ class SsoCookieTest {
             val payload = parseSsoCookie(ssoValue)
             assertEquals(alice.id.value, payload.userId)
             assertEquals(true, payload.mfaCompleted, "MFA-completed login must record mfaCompleted=true")
+            assertEquals(listOf("pwd", "otp", "mfa"), payload.amr)
         }
 
     @Test
@@ -385,7 +390,10 @@ class SsoCookieTest {
 
             // Signed by us, unexpired, and answered with a code the holder really owns — only the
             // slug says it was minted somewhere else, and nothing compared it until now.
-            val mfaCookie = encryptionService.signCookie("${alice.id!!.value}|otherco|${System.currentTimeMillis()}")
+            val mfaCookie =
+                encryptionService.signCookie(
+                    "${alice.id!!.value}|otherco|${System.currentTimeMillis()}|pwd",
+                )
 
             val noFollow = createClient { followRedirects = false }
             val response =

@@ -43,6 +43,8 @@ internal object SessionCodec {
         val impersonatorSessionId: Int? = null,
         // Defaulted so a session written before this field existed still decodes.
         val resources: List<String> = emptyList(),
+        val authTime: String? = null,
+        val amr: List<String> = emptyList(),
     )
 
     private fun Session.toDto() =
@@ -64,6 +66,8 @@ internal object SessionCodec {
             revocationReason = revocationReason,
             impersonatorSessionId = impersonatorSessionId?.value,
             resources = resources,
+            authTime = authTime?.toString(),
+            amr = amr,
         )
 
     private fun SessionDto.toSession() =
@@ -85,5 +89,7 @@ internal object SessionCodec {
             revocationReason = revocationReason,
             impersonatorSessionId = impersonatorSessionId?.let { SessionId(it) },
             resources = resources,
+            authTime = authTime?.let(Instant::parse),
+            amr = amr,
         )
 }

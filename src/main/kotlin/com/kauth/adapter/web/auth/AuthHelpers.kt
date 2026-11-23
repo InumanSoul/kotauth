@@ -2,6 +2,7 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.ViewContext
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -81,6 +82,7 @@ internal fun Parameters.toOAuthParams() =
         codeChallenge = this["code_challenge"],
         codeChallengeMethod = this["code_challenge_method"],
         nonce = this["nonce"],
+        acrValues = this["acr_values"]?.takeIf { it.isNotBlank() },
     )
 
 // -- Server-side OAuth context cookie ------------------------------------------
@@ -100,6 +102,7 @@ private const val AUTH_CTX_TIMESTAMP = 8
 private const val AUTH_CTX_OTP_CHALLENGE_ID = 9
 private const val AUTH_CTX_OTP_EMAIL = 10
 private const val AUTH_CTX_RESOURCES = 11
+private const val AUTH_CTX_ACR_VALUES = 12
 
 private const val AUTH_CTX_MIN_FIELDS = AUTH_CTX_TIMESTAMP + 1 // base OAuth params
 private const val AUTH_CTX_MIN_OTP_FIELDS = AUTH_CTX_OTP_EMAIL + 1 // OTP context required
@@ -130,6 +133,7 @@ internal fun ApplicationCall.setAuthContextCookie(
             otpChallengeId ?: "",
             otpEmail ?: "",
             params.resources.joinToString(","),
+            params.acrValues.orEmpty(),
         ).joinToString("|")
     response.cookies.append(
         name = AUTH_CONTEXT_COOKIE,
@@ -166,6 +170,7 @@ internal fun ApplicationCall.getAuthContext(encryptionService: EncryptionService
             codeChallengeMethod = parts[AUTH_CTX_CODE_CHALLENGE_METHOD].ifBlank { null },
             nonce = parts[AUTH_CTX_NONCE].ifBlank { null },
             resources = resources,
+            acrValues = parts.getOrNull(AUTH_CTX_ACR_VALUES)?.ifBlank { null },
         )
     return if (params.isOAuthFlow) params else null
 }
@@ -202,7 +207,10 @@ internal fun ApplicationCall.clearAuthContextCookie(slug: String) {
 // -- SSO session cookie (OIDC silent auth) -------------------------------------
 
 private const val SSO_COOKIE = "KOTAUTH_SSO"
-private const val SSO_COOKIE_VERSION = "v1"
+
+// v2 replaced v1's MFA flag (`1`/`0`) with the sign-in's `amr`, comma-separated. v1 cookies still parse.
+private const val SSO_COOKIE_VERSION = "v2"
+private const val SSO_COOKIE_VERSION_1 = "v1"
 
 /**
  * Witness of a successful interactive authentication, scoped to `/t/{slug}`.
@@ -218,9 +226,11 @@ internal data class SsoCookieData(
     val userId: Int,
     val tenantId: Int,
     val authTime: Instant,
-    val mfaCompleted: Boolean,
+    val amr: List<String>,
     val expiresAt: Instant,
-)
+) {
+    val mfaCompleted: Boolean get() = AuthMethods.isMultiFactor(amr)
+}
 
 internal fun ApplicationCall.setSsoCookie(
     data: SsoCookieData,
@@ -234,7 +244,7 @@ internal fun ApplicationCall.setSsoCookie(
             data.userId.toString(),
             data.tenantId.toString(),
             data.authTime.epochSecond.toString(),
-            if (data.mfaCompleted) "1" else "0",
+            data.amr.joinToString(","),
             data.expiresAt.epochSecond.toString(),
         ).joinToString("|")
     val maxAge = (data.expiresAt.epochSecond - Instant.now().epochSecond).coerceAtLeast(0L)
@@ -252,19 +262,25 @@ internal fun ApplicationCall.getSsoCookie(encryptionService: EncryptionService):
     val raw = request.cookies[SSO_COOKIE] ?: return null
     val payload = encryptionService.verifyCookie(raw) ?: return null
     val parts = payload.split("|")
-    if (parts.size != 6 || parts[0] != SSO_COOKIE_VERSION) return null
+    if (parts.size != 6) return null
     val userId = parts[1].toIntOrNull() ?: return null
     val tenantId = parts[2].toIntOrNull() ?: return null
     val authTime = parts[3].toLongOrNull()?.let(Instant::ofEpochSecond) ?: return null
-    val mfaCompleted =
-        when (parts[4]) {
-            "0" -> false
-            "1" -> true
+    val amr =
+        when (parts[0]) {
+            SSO_COOKIE_VERSION -> parts[4].split(",").filter { it.isNotBlank() }
+            // A v1 cookie knew only whether MFA was done, not which methods.
+            SSO_COOKIE_VERSION_1 ->
+                when (parts[4]) {
+                    "0" -> emptyList()
+                    "1" -> listOf(AuthMethods.MULTI_FACTOR)
+                    else -> return null
+                }
             else -> return null
         }
     val expiresAt = parts[5].toLongOrNull()?.let(Instant::ofEpochSecond) ?: return null
     if (Instant.now().isAfter(expiresAt)) return null
-    return SsoCookieData(userId, tenantId, authTime, mfaCompleted, expiresAt)
+    return SsoCookieData(userId, tenantId, authTime, amr, expiresAt)
 }
 
 internal fun ApplicationCall.clearSsoCookie(slug: String) {
@@ -303,6 +319,7 @@ internal fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
         codeChallenge = map["code_challenge"],
         codeChallengeMethod = map["code_challenge_method"],
         nonce = map["nonce"],
+        acrValues = map["acr_values"]?.takeIf { it.isNotBlank() },
     )
 }
 
@@ -484,7 +501,7 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
     oauthParams: AuthView.OAuthParams,
     ipAddress: String?,
     authTime: Instant,
-    mfaCompleted: Boolean,
+    amr: List<String>,
     ssoTtlSeconds: Long,
     secure: Boolean,
     oauthService: OAuthService,
@@ -527,6 +544,7 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
                 ipAddress = ipAddress,
                 authTime = authTime,
                 resources = oauthParams.resources,
+                amr = amr,
             )
     ) {
         is OAuthResult.Success -> {
@@ -537,7 +555,7 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
                     userId = userId.value,
                     tenantId = tenantId.value,
                     authTime = authTime,
-                    mfaCompleted = mfaCompleted,
+                    amr = amr,
                     expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
                 ),
                 slug = slug,
@@ -572,7 +590,7 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
     oauthParams: AuthView.OAuthParams,
     ipAddress: String?,
     authTime: Instant,
-    mfaCompleted: Boolean,
+    amr: List<String>,
     ssoTtlSeconds: Long,
     secure: Boolean,
     oauthService: OAuthService,
@@ -587,7 +605,7 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
             oauthParams = oauthParams,
             ipAddress = ipAddress,
             authTime = authTime,
-            mfaCompleted = mfaCompleted,
+            amr = amr,
             ssoTtlSeconds = ssoTtlSeconds,
             secure = secure,
             oauthService = oauthService,

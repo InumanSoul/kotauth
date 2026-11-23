@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.BrokeredSignInFailure
 import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.ProviderKey
@@ -678,6 +679,7 @@ internal fun Route.socialLoginRoutes(
                                 ),
                             )
                         },
+                        firstFactor = listOf(AuthMethods.FEDERATED),
                     )
                 } else {
                     // Without an OAuth request there is no client to return to, and handing the
@@ -825,6 +827,7 @@ internal fun Route.socialLoginRoutes(
                                 ),
                             )
                         },
+                        firstFactor = listOf(AuthMethods.FEDERATED),
                     )
                 } else {
                     call.respondRedirect("/t/$slug/account/login")

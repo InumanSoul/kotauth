@@ -759,6 +759,7 @@ private class JwtFakeTokenPort(
         authTime: java.time.Instant?,
         actingSubject: UserId?,
         audiences: List<String>,
+        amr: List<String>,
     ): TokenResponse {
         val header = Base64.getUrlEncoder().withoutPadding().encodeToString("""{"alg":"none"}""".toByteArray())
         val payload =

@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RoleRepository
@@ -25,13 +26,16 @@ internal class MfaGate(
     private val mfaService: MfaService?,
     private val roleRepository: RoleRepository?,
 ) {
+    /** [multiFactorRequested] is a client asking for a multi-factor sign-in through `acr_values`. */
     fun stepFor(
         userId: UserId,
         tenant: Tenant,
         clientId: String?,
+        multiFactorRequested: Boolean = false,
     ): MfaStep {
         val service = mfaService ?: return MfaStep.PROCEED
         if (service.shouldChallengeMfa(userId)) return MfaStep.CHALLENGE
+        if (multiFactorRequested) return MfaStep.ENROLLMENT_REQUIRED
         val policy = tenant.mfaPolicy
         if (policy == "optional") return MfaStep.PROCEED
         val roles =
@@ -50,8 +54,8 @@ internal class MfaGate(
  * issues the authorization code. Returns the URL to send the browser to, or null once
  * [renderError] has responded.
  *
- * [secondFactorDone] is for a first factor that already proves two factors, such as a passkey
- * with user verification.
+ * [firstFactor] is the `amr` of what the user just proved. One that is already multi-factor, such
+ * as a passkey with user verification, owes nothing more.
  */
 internal suspend fun ApplicationCall.signInRedirectUrl(
     gate: MfaGate,
@@ -65,18 +69,19 @@ internal suspend fun ApplicationCall.signInRedirectUrl(
     oauthService: OAuthService,
     encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
-    secondFactorDone: Boolean = false,
+    firstFactor: List<String>,
 ): String? {
     // Refuse a user of another workspace before anything else, so not even the challenge starts.
     if (!oauthService.userBelongsToTenant(userId, tenant.id)) {
         renderError(EnglishStrings.SIGN_IN_WRONG_WORKSPACE)
         return null
     }
-    if (!secondFactorDone) {
-        when (gate.stepFor(userId, tenant, oauthParams.clientId)) {
+    if (!AuthMethods.isMultiFactor(firstFactor)) {
+        when (gate.stepFor(userId, tenant, oauthParams.clientId, oauthParams.requiresMultiFactor)) {
             MfaStep.ENROLLMENT_REQUIRED ->
-                return startMfaEnrollment(slug, userId, oauthParams, encryptionService, secure)
-            MfaStep.CHALLENGE -> return startMfaChallenge(slug, userId, oauthParams, encryptionService, secure)
+                return startMfaEnrollment(slug, userId, firstFactor, oauthParams, encryptionService, secure)
+            MfaStep.CHALLENGE ->
+                return startMfaChallenge(slug, userId, firstFactor, oauthParams, encryptionService, secure)
             MfaStep.PROCEED -> Unit
         }
     }
@@ -87,7 +92,7 @@ internal suspend fun ApplicationCall.signInRedirectUrl(
         oauthParams = oauthParams,
         ipAddress = ipAddress,
         authTime = Instant.now(),
-        mfaCompleted = secondFactorDone,
+        amr = firstFactor,
         ssoTtlSeconds = ssoTtlSeconds,
         secure = secure,
         oauthService = oauthService,
@@ -109,6 +114,7 @@ internal suspend fun ApplicationCall.finishSignIn(
     oauthService: OAuthService,
     encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
+    firstFactor: List<String>,
 ) {
     val url =
         signInRedirectUrl(
@@ -123,6 +129,7 @@ internal suspend fun ApplicationCall.finishSignIn(
             oauthService = oauthService,
             encryptionService = encryptionService,
             renderError = renderError,
+            firstFactor = firstFactor,
         ) ?: return
     respondRedirect(url)
 }
@@ -130,13 +137,17 @@ internal suspend fun ApplicationCall.finishSignIn(
 private fun ApplicationCall.startMfaChallenge(
     slug: String,
     userId: UserId,
+    firstFactor: List<String>,
     oauthParams: AuthView.OAuthParams,
     encryptionService: EncryptionService,
     secure: Boolean,
 ): String {
     response.cookies.append(
         name = MFA_PENDING_COOKIE,
-        value = encryptionService.signCookie("${userId.value}|$slug|${System.currentTimeMillis()}"),
+        value =
+            encryptionService.signCookie(
+                "${userId.value}|$slug|${System.currentTimeMillis()}|${firstFactor.joinToString(",")}",
+            ),
         maxAge = MFA_PENDING_TTL_SECONDS,
         httpOnly = true,
         secure = secure,

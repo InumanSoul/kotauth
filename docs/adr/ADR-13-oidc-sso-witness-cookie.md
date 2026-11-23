@@ -323,3 +323,14 @@ the operator tightened the policy.
 - **Open redirect via `prompt=none` failure path.** Mitigated by
   `validateRedirectUri` before any redirect involving query-supplied
   URIs.
+
+## Addendum — `amr` in the cookie and the MFA gate (ADR-24)
+
+The payload is now `v2|userId|tenantId|authTime|amr|expiresAt`, with the sign-in's RFC 8176
+methods comma-separated in place of the `mfaCompleted` bit. `v1` cookies still parse (`1` means
+`mfa`). Silent auth no longer applies the `policy == "optional" || mfaCompleted` check above. It
+asks the MFA gate what the session still owes: nothing, and a code is issued; or a second factor,
+which is asked for without the password page. A `required_admins` non-admin therefore signs in
+silently now, instead of being re-prompted for a password. See
+[ADR-24](ADR-24-sign-in-methods-amr-acr-step-up.md).
+

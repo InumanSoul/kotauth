@@ -98,8 +98,12 @@ object AuthView {
         val codeChallengeMethod: String? = null,
         val nonce: String? = null,
         val resources: List<String> = emptyList(),
+        val acrValues: String? = null,
     ) {
         val isOAuthFlow: Boolean get() = !responseType.isNullOrBlank()
+
+        /** Whether the client asked for a multi-factor sign-in through `acr_values`. */
+        val requiresMultiFactor: Boolean get() = com.kauth.domain.model.AuthMethods.requestsMultiFactor(acrValues)
 
         /** Serializes non-null OAuth params to a query string (with leading '?'). */
         fun toQueryString(): String {
@@ -112,6 +116,7 @@ object AuthView {
             codeChallenge?.let { parts += "code_challenge=$it" }
             codeChallengeMethod?.let { parts += "code_challenge_method=$it" }
             nonce?.let { parts += "nonce=$it" }
+            acrValues?.let { parts += "acr_values=" + java.net.URLEncoder.encode(it, "UTF-8") }
             return if (parts.isEmpty()) "" else "?" + parts.joinToString("&")
         }
     }

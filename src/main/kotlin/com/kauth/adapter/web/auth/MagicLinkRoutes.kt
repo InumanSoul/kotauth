@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.admin.resolvedBaseUrl
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.OAuthService
@@ -166,6 +167,7 @@ internal fun Route.magicLinkRoutes(
                             ),
                         )
                     },
+                    firstFactor = listOf(AuthMethods.ONE_TIME_CODE),
                 )
             }
         }

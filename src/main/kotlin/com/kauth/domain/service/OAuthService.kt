@@ -192,6 +192,7 @@ class OAuthService(
         ipAddress: String? = null,
         authTime: Instant = Instant.now(),
         resources: List<String> = emptyList(),
+        amr: List<String> = emptyList(),
     ): OAuthResult<AuthorizationCode> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -247,6 +248,7 @@ class OAuthService(
                 expiresAt = Instant.now().plusSeconds(CODE_EXPIRY_SECONDS),
                 authTime = authTime,
                 resources = resources,
+                amr = amr,
             )
 
         val saved = authCodeRepository.save(code)
@@ -407,6 +409,7 @@ class OAuthService(
                 customAccessClaims = customAccessClaims,
                 customIdClaims = customIdClaims,
                 authTime = authCode.authTime,
+                amr = authCode.amr,
                 audiences = resolvedResources,
             )
 
@@ -434,6 +437,8 @@ class OAuthService(
                         Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
                     },
                 resources = resolvedResources,
+                authTime = authCode.authTime,
+                amr = authCode.amr,
             ),
         )
 
@@ -864,6 +869,9 @@ class OAuthService(
                 customAccessClaims = customAccessClaims,
                 customIdClaims = customIdClaims,
                 audiences = resolvedResources,
+                // OIDC Core §12.2: a refreshed ID token reports the original sign-in.
+                authTime = session.authTime,
+                amr = session.amr,
             )
 
         sessionRepository.revoke(session.id!!, reason = Session.REVOCATION_REASON_ROTATED)
@@ -883,6 +891,8 @@ class OAuthService(
                         Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
                     },
                 resources = resolvedResources,
+                authTime = session.authTime,
+                amr = session.amr,
             ),
         )
 
