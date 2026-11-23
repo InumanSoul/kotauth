@@ -950,9 +950,8 @@ object EnglishStrings {
         "An administrator removed all passkeys from your {0} account. None of them can be used to " +
             "sign in any more."
     const val EMAIL_BODY_FACTOR_NOT_YOU =
-        "If you didn't make this change, reset your password and contact your {0} administrator " +
-            "right away."
-    const val EMAIL_FOOTER_FACTOR_CHANGED = "This change was made on {0}."
+        "If this wasn't you, reset your password and contact your {0} administrator right away."
+    const val EMAIL_FOOTER_FACTOR_CHANGED = "This happened on {0}."
 
     const val EMAIL_FOOTER_ACCOUNT_LOCKED =
         "If you made these sign-in attempts, you can safely ignore this email. Your account will unlock automatically."
