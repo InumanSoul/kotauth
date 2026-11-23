@@ -1038,6 +1038,49 @@ class OAuthServiceTest {
     }
 
     @Test
+    fun `the sign-in's methods and time survive the exchange and every refresh`() {
+        val authTime = Instant.parse("2026-11-24T10:00:00Z")
+        val amr = listOf("pwd", "otp", "mfa")
+        val code =
+            (
+                svc.issueAuthorizationCode(
+                    tenantSlug = "acme",
+                    userId = UserId(10),
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scopes = "openid",
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                    nonce = null,
+                    state = null,
+                    authTime = authTime,
+                    amr = amr,
+                ) as OAuthResult.Success<AuthorizationCode>
+            ).value.code
+        val exchanged =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            ) as OAuthResult.Success<com.kauth.domain.model.TokenResponse>
+        assertEquals(amr, tokens.lastAmr)
+
+        var refreshToken = exchanged.value.refresh_token!!
+        repeat(2) {
+            tokens.reset()
+            val refreshed =
+                svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+                    as OAuthResult.Success<com.kauth.domain.model.TokenResponse>
+            assertEquals(amr, tokens.lastAmr, "refresh ${it + 1}")
+            assertEquals(authTime, tokens.lastAuthTime, "refresh ${it + 1}")
+            refreshToken = refreshed.value.refresh_token!!
+        }
+    }
+
+    @Test
     fun `refreshTokens rotates token — old session is revoked, new session is created`() {
         // First, establish a session via code exchange
         val issueResult =

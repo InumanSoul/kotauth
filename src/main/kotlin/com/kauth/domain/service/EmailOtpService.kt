@@ -3,6 +3,7 @@ package com.kauth.domain.service
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.EmailOtpChallenge
 import com.kauth.domain.model.RequiredAction
@@ -256,11 +257,13 @@ class EmailOtpService(
      * Issues the authorization code for a challenge whose email code was already verified, once
      * the caller has settled the second factor. Verifying the code and issuing the authorization
      * code are separate steps so that nothing a client can redeem exists before MFA passes.
+     * [secondFactorDone] records that the caller verified a second factor, for the `amr` claim.
      */
     fun issueAuthorizationCode(
         tenantSlug: String,
         challengeId: String,
         userId: UserId,
+        secondFactorDone: Boolean = false,
     ): OtpCodeResult {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -274,7 +277,7 @@ class EmailOtpService(
             return OtpCodeResult.Failure(OtpError.ChallengeExpired)
         }
         val authCode =
-            issueAuthorizationCodeFor(tenant, userId, challenge)
+            issueAuthorizationCodeFor(tenant, userId, challenge, secondFactorDone)
                 ?: return OtpCodeResult.Failure(OtpError.InvalidClient)
         return OtpCodeResult.Success(authCode.code, authCode.expiresAt, authCode.redirectUri)
     }
@@ -334,6 +337,7 @@ class EmailOtpService(
         tenant: Tenant,
         userId: UserId,
         challenge: EmailOtpChallenge,
+        secondFactorDone: Boolean,
     ): AuthorizationCode? {
         val clientIdString = challenge.originatingClientId
         if (clientIdString.isNullOrBlank()) return null
@@ -355,6 +359,10 @@ class EmailOtpService(
                 createdAt = now,
                 authTime = now,
                 resources = resources,
+                amr =
+                    listOf(AuthMethods.ONE_TIME_CODE).let {
+                        if (secondFactorDone) AuthMethods.withSecondFactor(it) else it
+                    },
             ),
         )
     }

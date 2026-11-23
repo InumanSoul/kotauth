@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tokens say how the user signed in, and clients can ask for multi-factor per request.**
+  - **ID tokens carry `amr`** (RFC 8176): `pwd` for a password, `otp` for an authenticator,
+    recovery or email code or a magic link, `fed` for a social or OIDC provider, `hwk`/`swk` for
+    a device-bound or synced passkey, and `mfa` once two factors were used. A passkey with user
+    verification counts as two factors.
+  - **A multi-factor sign-in also carries `acr`**: the OpenID PAPE multi-factor URI, in the ID
+    token and, with `auth_time`, in the access token, so an API can enforce step-up (RFC 9470).
+  - **`acr_values` can require a second factor.** A client that sends
+    `acr_values=http://schemas.openid.net/pape/policies/2007/06/multi-factor` gets a sign-in with
+    a second factor whatever the workspace policy. A user already signed in with one factor is
+    asked only for the second, not for their password again. Discovery lists `amr`, `acr` and
+    `acr_values_supported`.
+  - **Refreshed ID tokens keep the original `auth_time`, `amr` and `acr`** (OIDC Core §12.2).
+    Before, a refresh dropped `auth_time`.
+  - **Silent sign-in asks the MFA gate what's owed**, the same as a fresh sign-in, so an enrolled
+    user whose session started before they enrolled is now challenged.
+
+  Comes with migration V68. Tokens from sessions that existed before the upgrade omit the new
+  claims until the user signs in again. See ADR-24.
+
 ### Fixed
 
 - **With Redis as the session store, refreshed tokens kept their resource audiences.** The Redis

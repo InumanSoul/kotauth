@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.admin.resolvedBaseUrl
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.Tenant
@@ -149,8 +150,11 @@ internal fun Route.oauthProtocolRoutes(
                         add("name")
                         add("preferred_username")
                         add("auth_time")
+                        add("amr")
+                        add("acr")
                     },
                 )
+                put("acr_values_supported", buildJsonArray { add(AuthMethods.ACR_MULTI_FACTOR) })
                 put("code_challenge_methods_supported", buildJsonArray { add("S256") })
                 put("resource_indicators_supported", true)
                 put(
@@ -193,6 +197,7 @@ internal fun Route.oauthProtocolRoutes(
         val scope = q["scope"] ?: "openid"
         val state = q["state"]
         val nonce = q["nonce"]
+        val acrValues = q["acr_values"]?.takeIf { it.isNotBlank() }
         val codeChallenge = q["code_challenge"]
         val codeChallengeMethod = q["code_challenge_method"]
 
@@ -364,13 +369,15 @@ internal fun Route.oauthProtocolRoutes(
                 codeChallengeMethod = codeChallengeMethod,
                 nonce = nonce,
                 resources = resolvedResources,
+                acrValues = acrValues,
             )
 
         // ---- Silent auth attempt -------------------------------------------
-        // Skip when the RP explicitly asked for a fresh login. Otherwise read
-        // the SSO witness cookie and, if it still matches all the RP's hints
-        // (max_age, id_token_hint, current MFA policy), issue an authorization
-        // code and bounce back to the redirect_uri without showing UI.
+        // Skip when the RP explicitly asked for a fresh login. Otherwise read the SSO witness
+        // cookie and, if it still matches the RP's hints (max_age, id_token_hint), let the MFA
+        // gate decide what the session still owes: nothing, and a code is issued without UI; or a
+        // second factor (workspace policy, `acr_values`, or a factor enrolled since), and only
+        // that is asked for, since the session already proves the first.
         if (!forceReauth) {
             val sso = call.getSsoCookie(encryptionService)
             if (sso != null && sso.tenantId == tenant.id.value) {
@@ -385,19 +392,21 @@ internal fun Route.oauthProtocolRoutes(
                     }
                 val hintSub = q["id_token_hint"]?.let { decodeIdTokenSub(it) }
                 val hintMatches = hintSub == null || hintSub == sso.userId.toString()
-                // If the tenant currently requires MFA but the cookie was minted
-                // before that requirement was satisfied, silent auth is not safe
-                // — fall back to interactive so the policy can re-trigger.
-                val mfaPolicy = tenant.mfaPolicy
-                val mfaSatisfied = sso.mfaCompleted || mfaPolicy == "optional"
+                val ssoUser =
+                    com.kauth.domain.model
+                        .UserId(sso.userId)
+                val step =
+                    if (sso.mfaCompleted) {
+                        MfaStep.PROCEED
+                    } else {
+                        mfaGate.stepFor(ssoUser, tenant, clientId, oauthParams.requiresMultiFactor)
+                    }
 
-                if (withinMaxAge && hintMatches && mfaSatisfied) {
+                if (withinMaxAge && hintMatches && step == MfaStep.PROCEED) {
                     val codeResult =
                         oauthService.issueAuthorizationCode(
                             tenantSlug = slug,
-                            userId =
-                                com.kauth.domain.model
-                                    .UserId(sso.userId),
+                            userId = ssoUser,
                             clientId = clientId,
                             redirectUri = redirectUri,
                             scopes = scope,
@@ -408,6 +417,7 @@ internal fun Route.oauthProtocolRoutes(
                             ipAddress = call.request.origin.remoteAddress,
                             authTime = sso.authTime,
                             resources = resolvedResources,
+                            amr = sso.amr,
                         )
                     if (codeResult is OAuthResult.Success) {
                         val redirect =
@@ -421,6 +431,27 @@ internal fun Route.oauthProtocolRoutes(
                     }
                     // OAuth failure (e.g., PKCE required + missing challenge): fall through
                     // to the interactive flow; never leak a silent-auth failure to the client.
+                } else if (withinMaxAge && hintMatches && !isSilentOnly) {
+                    val stepUpUrl =
+                        call.signInRedirectUrl(
+                            gate = mfaGate,
+                            slug = slug,
+                            userId = ssoUser,
+                            tenant = tenant,
+                            oauthParams = oauthParams,
+                            ipAddress = call.request.origin.remoteAddress,
+                            ssoTtlSeconds = ssoTtlSeconds,
+                            secure = baseUrl.startsWith("https://", ignoreCase = true),
+                            oauthService = oauthService,
+                            encryptionService = encryptionService,
+                            // Nothing is shown on failure; the sign-in page below takes over.
+                            renderError = {},
+                            firstFactor = sso.amr,
+                        )
+                    if (stepUpUrl != null) {
+                        call.respondRedirect(stepUpUrl)
+                        return@get
+                    }
                 }
             }
         }
@@ -575,6 +606,7 @@ internal fun Route.oauthProtocolRoutes(
                     oauthService = oauthService,
                     encryptionService = encryptionService,
                     renderError = { renderLoginError(HttpStatusCode.BadRequest, it) },
+                    firstFactor = listOf(AuthMethods.PASSWORD),
                 )
             }
         }

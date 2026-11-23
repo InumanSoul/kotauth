@@ -35,6 +35,9 @@ data class Session(
     val revocationReason: String? = null,
     val impersonatorSessionId: SessionId? = null,
     val resources: List<String> = emptyList(),
+    // The sign-in behind the session, so a refreshed ID token keeps its `auth_time`, `amr` and `acr`.
+    val authTime: Instant? = null,
+    val amr: List<String> = emptyList(),
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isRevoked: Boolean get() = revokedAt != null

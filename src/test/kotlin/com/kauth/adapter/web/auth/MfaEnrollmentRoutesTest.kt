@@ -199,7 +199,7 @@ class MfaEnrollmentRoutesTest {
         verified: Boolean = false,
         slug: String = "acme",
         startedAt: Long = System.currentTimeMillis(),
-    ): String = encryptionService.signCookie("10|$slug|$startedAt|$enrollmentId|${if (verified) 1 else 0}")
+    ): String = encryptionService.signCookie("10|$slug|$startedAt|$enrollmentId|${if (verified) 1 else 0}|pwd")
 
     /** A browser's cookie jar, enough for this flow: the response's cookies replace the request's. */
     private class Browser(
