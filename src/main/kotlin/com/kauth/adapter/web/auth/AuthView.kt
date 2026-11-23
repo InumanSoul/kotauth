@@ -1617,6 +1617,158 @@ object AuthView {
             }
         }
 
+    // -------------------------------------------------------------------------
+    // Second-factor setup inside the sign-in (workspace requires MFA, user has none)
+    // -------------------------------------------------------------------------
+
+    private fun HTML.mfaEnrollShell(
+        ctx: ViewContext,
+        withSetupScript: Boolean = false,
+        content: DIV.() -> Unit,
+    ) {
+        head { authHead(ctx.t("AUTH_PAGE_TITLE_MFA_ENROLL", ctx.workspaceName), ctx.theme) }
+        body {
+            demoBanner()
+            authShell(
+                ctx.workspaceName,
+                ctx.theme,
+                brandExtra = { div("brand-tagline") { +ctx.t("MFA_TAGLINE") } },
+            ) {
+                div("card") { content() }
+                p("copyright") {
+                    +ctx.t("AUTH_COPYRIGHT_TEMPLATE", java.time.Year.now().toString(), ctx.workspaceName)
+                    a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
+                }
+            }
+            if (withSetupScript) {
+                script(src = "/static/js/kotauth-mfa-setup.min.js?v=${AppInfo.assetVersion}") {
+                    attributes["defer"] = "true"
+                    JsIntegrity.mfaSetup?.let { attributes["integrity"] = it }
+                    attributes["crossorigin"] = "anonymous"
+                }
+            }
+        }
+    }
+
+    private fun FlowContent.backToSignIn(
+        tenantSlug: String,
+        ctx: ViewContext,
+    ) {
+        div("footer-link") { a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") } }
+    }
+
+    fun mfaEnrollIntroPage(
+        tenantSlug: String,
+        ctx: ViewContext,
+    ): HTML.() -> Unit =
+        {
+            mfaEnrollShell(ctx) {
+                h1("card-title") { +ctx.t("MFA_ENROLL_TITLE") }
+                p("card-subtitle") { +ctx.t("MFA_ENROLL_INTRO", ctx.workspaceName) }
+                p("mfa-enroll-apps") { +ctx.t("MFA_ENROLL_APPS") }
+                form(action = "/t/$tenantSlug/mfa-enroll/start", method = FormMethod.post) {
+                    button(type = ButtonType.submit, classes = "btn") { +ctx.t("MFA_ENROLL_START_BUTTON") }
+                }
+                backToSignIn(tenantSlug, ctx)
+            }
+        }
+
+    fun mfaEnrollSetupPage(
+        tenantSlug: String,
+        ctx: ViewContext,
+        totpUri: String,
+        error: String? = null,
+    ): HTML.() -> Unit =
+        {
+            val secret = Regex("[?&]secret=([A-Z2-7]+)", RegexOption.IGNORE_CASE).find(totpUri)?.groupValues?.get(1)
+            mfaEnrollShell(ctx, withSetupScript = true) {
+                h1("card-title") { +ctx.t("MFA_ENROLL_SCAN_TITLE") }
+                p("card-subtitle") { +ctx.t("MFA_ENROLL_SCAN_SUBTITLE") }
+                if (error != null) {
+                    div("alert alert-error") { +error }
+                }
+                div("mfa-qr") {
+                    id = "mfa-qr"
+                    attributes["data-totp-uri"] = totpUri
+                    attributes["role"] = "img"
+                    attributes["aria-label"] = ctx.t("MFA_ENROLL_QR_LABEL")
+                }
+                if (secret != null) {
+                    p("mfa-manual-key") {
+                        +ctx.t("MFA_ENROLL_MANUAL_KEY")
+                        +" "
+                        code { +secret }
+                    }
+                }
+                form(action = "/t/$tenantSlug/mfa-enroll/verify", method = FormMethod.post) {
+                    div("field") {
+                        label {
+                            htmlFor = "code"
+                            +ctx.t("MFA_ENROLL_CODE_LABEL")
+                        }
+                        input(type = InputType.text, name = "code") {
+                            id = "code"
+                            placeholder = "000000"
+                            autoComplete = "one-time-code"
+                            autoFocus = true
+                            required = true
+                            maxLength = "6"
+                            attributes["inputmode"] = "numeric"
+                            attributes["pattern"] = "[0-9]{6}"
+                        }
+                    }
+                    button(type = ButtonType.submit, classes = "btn") { +ctx.t("MFA_ENROLL_VERIFY_BUTTON") }
+                }
+                backToSignIn(tenantSlug, ctx)
+            }
+        }
+
+    /**
+     * Shown once the new factor is verified. [recoveryCodes] are shown only here, once; a reload
+     * lands on this page without them. With [error] the sign-in could not be finished.
+     */
+    fun mfaEnrollDonePage(
+        tenantSlug: String,
+        ctx: ViewContext,
+        recoveryCodes: List<String> = emptyList(),
+        error: String? = null,
+    ): HTML.() -> Unit =
+        {
+            mfaEnrollShell(ctx, withSetupScript = recoveryCodes.isNotEmpty()) {
+                h1("card-title") { +ctx.t("MFA_ENROLL_DONE_TITLE") }
+                if (error != null) {
+                    div("alert alert-error") { +error }
+                    backToSignIn(tenantSlug, ctx)
+                    return@mfaEnrollShell
+                }
+                if (recoveryCodes.isEmpty()) {
+                    p("card-subtitle") { +ctx.t("MFA_ENROLL_DONE_NO_CODES") }
+                } else {
+                    p("card-subtitle") { +ctx.t("MFA_ENROLL_RECOVERY_INTRO") }
+                    ul("mfa-recovery-codes") {
+                        id = "mfa-recovery-codes"
+                        recoveryCodes.forEach { li { code { +it } } }
+                    }
+                    button(type = ButtonType.button, classes = "btn btn--ghost mfa-copy-codes") {
+                        attributes["data-action"] = "copy-recovery-codes"
+                        attributes["data-copied-label"] = ctx.t("MFA_ENROLL_COPIED")
+                        hidden = true
+                        +ctx.t("MFA_ENROLL_COPY_CODES")
+                    }
+                }
+                form(action = "/t/$tenantSlug/mfa-enroll/complete", method = FormMethod.post) {
+                    if (recoveryCodes.isNotEmpty()) {
+                        label("mfa-codes-saved") {
+                            input(type = InputType.checkBox, name = "saved") { required = true }
+                            +" "
+                            +ctx.t("MFA_ENROLL_CODES_SAVED")
+                        }
+                    }
+                    button(type = ButtonType.submit, classes = "btn") { +ctx.t("MFA_ENROLL_CONTINUE") }
+                }
+            }
+        }
+
     /**
      * The contents of one social sign-in button. A provider key is an open string, so the
      * compiler cannot check this for exhaustiveness.

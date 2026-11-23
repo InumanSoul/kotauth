@@ -85,6 +85,52 @@ class MfaServiceTest {
     // =========================================================================
 
     @Test
+    fun `beginEnrollment can leave the recovery codes for after verification`() {
+        val result = svc.beginEnrollment(UserId(10), TenantId(1), "Acme", withRecoveryCodes = false)
+
+        assertTrue((result as MfaResult.Success<EnrollmentResponse>).value.recoveryCodes.isEmpty())
+        assertTrue(mfaRepo.findUnusedRecoveryCodes(UserId(10)).isEmpty())
+    }
+
+    @Test
+    fun `issueRecoveryCodes needs a verified enrollment and replaces any earlier codes`() {
+        val begun = svc.beginEnrollment(UserId(10), TenantId(1), "Acme") as MfaResult.Success<EnrollmentResponse>
+        assertIs<MfaResult.Failure>(svc.issueRecoveryCodes(UserId(10), TenantId(1)), "Not before verification")
+
+        val secret = begun.value.enrollment.secret
+        svc.verifyEnrollment(UserId(10), TotpUtil.generateCode(secret))
+        assertIs<MfaResult.Failure>(svc.issueRecoveryCodes(UserId(10), TenantId(2)), "Not in another workspace")
+        val issued = svc.issueRecoveryCodes(UserId(10), TenantId(1)) as MfaResult.Success<List<String>>
+
+        val stored = mfaRepo.findUnusedRecoveryCodes(UserId(10))
+        assertEquals(MfaService.RECOVERY_CODE_COUNT, stored.size)
+        assertTrue(issued.value.all { code -> stored.any { hasher.verify(code, it.codeHash) } })
+        assertTrue(begun.value.recoveryCodes.none { code -> stored.any { hasher.verify(code, it.codeHash) } })
+    }
+
+    @Test
+    fun `verifyEnrollment refuses an enrollment other than the one asked for`() {
+        val begun = svc.beginEnrollment(UserId(10), TenantId(1), "Acme") as MfaResult.Success<EnrollmentResponse>
+        val enrollment = begun.value.enrollment
+        val code = TotpUtil.generateCode(enrollment.secret)
+
+        assertIs<MfaResult.Failure>(svc.verifyEnrollment(UserId(10), code, enrollmentId = enrollment.id!! + 1))
+        assertIs<MfaResult.Success<*>>(svc.verifyEnrollment(UserId(10), code, enrollmentId = enrollment.id))
+    }
+
+    @Test
+    fun `pendingEnrollmentUri is only for the unverified enrollment asked for`() {
+        val begun = svc.beginEnrollment(UserId(10), TenantId(1), "Acme") as MfaResult.Success<EnrollmentResponse>
+        val id = begun.value.enrollment.id!!
+
+        assertEquals(begun.value.totpUri, svc.pendingEnrollmentUri(UserId(10), TenantId(1), id, "Acme"))
+        assertEquals(null, svc.pendingEnrollmentUri(UserId(10), TenantId(1), id + 1, "Acme"))
+        assertEquals(null, svc.pendingEnrollmentUri(UserId(10), TenantId(2), id, "Acme"))
+        svc.verifyEnrollment(UserId(10), TotpUtil.generateCode(begun.value.enrollment.secret))
+        assertEquals(null, svc.pendingEnrollmentUri(UserId(10), TenantId(1), id, "Acme"), "Never once verified")
+    }
+
+    @Test
     fun `beginEnrollment returns a TOTP URI and 8 recovery codes on success`() {
         val result = svc.beginEnrollment(userId = UserId(10), tenantId = TenantId(1), issuer = "Acme")
 

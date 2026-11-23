@@ -1,0 +1,74 @@
+/* frontend/css/auth/mfa-setup.css
+ *
+ * Second-factor setup during sign-in: app hint, QR code, manual key, recovery codes.
+ */
+
+.mfa-enroll-apps {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin: 0 0 1.25rem;
+}
+
+.mfa-qr {
+  display: flex;
+  justify-content: center;
+  width: fit-content;
+  min-height: 184px;
+  margin: 0 auto 1rem;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  line-height: 0;
+}
+
+.mfa-manual-key {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  text-align: center;
+  margin: 0 0 1.25rem;
+}
+
+.mfa-manual-key code,
+.mfa-recovery-codes code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--color-text);
+  letter-spacing: 0.06em;
+  word-break: break-all;
+  user-select: all;
+}
+
+.mfa-recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.mfa-recovery-codes li {
+  padding: 8px;
+  text-align: center;
+  font-size: 0.875rem;
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.mfa-copy-codes {
+  margin-bottom: 1rem;
+}
+
+.mfa-codes-saved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  margin: 0 0 1rem;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}

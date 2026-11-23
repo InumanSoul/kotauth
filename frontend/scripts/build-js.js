@@ -54,6 +54,13 @@ const bundles = [
     ],
   },
   {
+    name: 'kotauth-mfa-setup.min.js',
+    files: [
+      src('vendor/qrcode.min.js'),
+      src('auth/mfa-setup.js'),
+    ],
+  },
+  {
     name: 'kotauth-passkeys.min.js',
     files: [
       src('passkeys.js'),

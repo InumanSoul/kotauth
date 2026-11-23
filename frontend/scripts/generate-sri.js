@@ -19,6 +19,7 @@ const bundles = {
   'js.portal.integrity': 'src/main/resources/static/js/kotauth-portal.min.js',
   'js.branding.integrity': 'src/main/resources/static/js/branding.min.js',
   'js.passkeys.integrity': 'src/main/resources/static/js/kotauth-passkeys.min.js',
+  'js.mfa-setup.integrity': 'src/main/resources/static/js/kotauth-mfa-setup.min.js',
 };
 
 const lines = Object.entries(bundles).map(([key, filePath]) => {

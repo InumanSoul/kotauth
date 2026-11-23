@@ -575,11 +575,15 @@ object EnglishStrings {
     const val ADMIN_MFA_ALERT_NO_ENROLLED_TITLE = "No users have enrolled in MFA"
     const val ADMIN_MFA_ALERT_REQUIRED_DESC_PREFIX = "MFA policy is set to"
     const val ADMIN_MFA_ALERT_REQUIRED_DESC_SUFFIX =
-        ". Users who have not enrolled cannot complete sign-in."
+        ". Users who have not enrolled are asked to set up an authenticator app the next time they sign in."
     const val ADMIN_MFA_ALERT_OPTIONAL_DESC =
         "MFA policy is Optional, so there is no sign-in impact. Share the enrollment URL below to " +
             "users to set up two-factor authentication."
     const val ADMIN_MFA_ALERT_REQUIRED_LINK = "Review policy"
+    const val ADMIN_SECURITY_MFA_REQUIRED_DESC =
+        "Every user needs a second factor. Anyone without one sets it up the next time they sign in."
+    const val ADMIN_SECURITY_MFA_REQUIRED_ADMINS_DESC =
+        "Admins need a second factor and set it up the next time they sign in. Other users may opt in."
     const val ADMIN_MFA_ALERT_OPTIONAL_LINK = "Change policy"
     const val ADMIN_MFA_TABLE_COL_USERNAME = "Username"
     const val ADMIN_MFA_TABLE_COL_FULL_NAME = "Full Name"
@@ -610,6 +614,7 @@ object EnglishStrings {
     const val AUTH_PAGE_TITLE_RESET = "{0} | Reset Password"
     const val AUTH_PAGE_TITLE_INVITE = "{0} | Accept Invitation"
     const val AUTH_PAGE_TITLE_MFA = "{0} | Two-Factor Authentication"
+    const val AUTH_PAGE_TITLE_MFA_ENROLL = "{0} | Set Up Two-Factor Authentication"
     const val AUTH_PAGE_TITLE_REGISTER = "{0} | Create Account"
     const val AUTH_PAGE_TITLE_MAGIC_LINK = "{0} | Sign in with email"
     const val AUTH_PAGE_TITLE_EMAIL_OTP = "{0} | Sign in with email code"
@@ -799,9 +804,33 @@ object EnglishStrings {
     const val MFA_CODE_LABEL = "Authentication code"
     const val MFA_CODE_PLACEHOLDER = "Enter 6-digit code or recovery code"
     const val MFA_VERIFY_BUTTON = "Verify"
-    const val MFA_ENROLLMENT_REQUIRED =
-        "Multi-factor authentication is required for your account. " +
-            "Please sign in to the user portal and enable MFA under Security settings."
+
+    // Second-factor setup during sign-in. {0} = workspace name.
+    const val MFA_ENROLL_TITLE = "Set up two-factor authentication"
+    const val MFA_ENROLL_INTRO =
+        "{0} requires a second step when you sign in. Set up an authenticator app now to continue."
+    const val MFA_ENROLL_APPS =
+        "Any authenticator app works, such as Google Authenticator, Microsoft Authenticator, 1Password or Bitwarden."
+    const val MFA_ENROLL_START_BUTTON = "Set up authenticator app"
+    const val MFA_ENROLL_SCAN_TITLE = "Scan the QR code"
+    const val MFA_ENROLL_SCAN_SUBTITLE =
+        "Scan it with your authenticator app, then enter the 6-digit code the app shows."
+    const val MFA_ENROLL_QR_LABEL = "QR code for your authenticator app"
+    const val MFA_ENROLL_MANUAL_KEY = "Can't scan it? Enter this key instead:"
+    const val MFA_ENROLL_CODE_LABEL = "6-digit code"
+    const val MFA_ENROLL_VERIFY_BUTTON = "Verify and continue"
+    const val MFA_ENROLL_INVALID_CODE =
+        "That code didn't match. Check that your device's clock is correct and try again."
+    const val MFA_ENROLL_TOO_MANY_ATTEMPTS = "Too many attempts. Please wait a few minutes and try again."
+    const val MFA_ENROLL_DONE_TITLE = "Two-factor authentication is on"
+    const val MFA_ENROLL_RECOVERY_INTRO =
+        "Save these recovery codes somewhere safe. Each one signs you in once if you lose your phone. " +
+            "They won't be shown again."
+    const val MFA_ENROLL_COPY_CODES = "Copy codes"
+    const val MFA_ENROLL_COPIED = "Copied"
+    const val MFA_ENROLL_CODES_SAVED = "I've saved my recovery codes"
+    const val MFA_ENROLL_DONE_NO_CODES = "Your authenticator app is set up. Continue to finish signing in."
+    const val MFA_ENROLL_CONTINUE = "Continue"
 
     // Transactional emails — see SmtpEmailAdapter. {0} is workspace name unless otherwise noted.
     // Subjects

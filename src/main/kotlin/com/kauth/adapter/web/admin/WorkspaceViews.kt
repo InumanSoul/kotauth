@@ -784,7 +784,7 @@ internal fun securityPolicyPageImpl(
                             div("radio-row__body") {
                                 span("radio-row__label") { +"Required" }
                                 span("radio-row__desc") {
-                                    +"Users must enroll in MFA before they can access applications."
+                                    +EnglishStrings.ADMIN_SECURITY_MFA_REQUIRED_DESC
                                 }
                             }
                         }
@@ -796,7 +796,7 @@ internal fun securityPolicyPageImpl(
                             div("radio-row__body") {
                                 span("radio-row__label") { +"Required for admins only" }
                                 span("radio-row__desc") {
-                                    +"Only admin users must enroll. Regular users may opt in."
+                                    +EnglishStrings.ADMIN_SECURITY_MFA_REQUIRED_ADMINS_DESC
                                 }
                             }
                         }

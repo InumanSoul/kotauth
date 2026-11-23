@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A workspace that requires MFA now has users set it up during sign-in instead of refusing them.**
+  With the policy at `required` (or `required_admins` for an admin), a user who signs in without a
+  second factor is taken to a setup step: scan a QR code, enter a code from the authenticator app,
+  save the recovery codes, then continue to the application. Before, the sign-in stopped with a
+  403 telling them to go enroll in the account portal. This matches Auth0's enrollment prompt and
+  Clerk's `setup-mfa` task. Every sign-in method goes through it, the account portal included,
+  so the portal no longer skips the requirement. Entering the new app's code counts as the second
+  factor for that sign-in. Recovery codes are shown once, after the app is verified. The API
+  email-code endpoint still answers `mfa_enrollment_required`; the user enrolls by signing in once
+  through the hosted pages.
+
 ## [1.29.0] - 2026-11-23
 
 ### Added

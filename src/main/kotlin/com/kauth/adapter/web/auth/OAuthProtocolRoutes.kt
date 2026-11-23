@@ -575,7 +575,6 @@ internal fun Route.oauthProtocolRoutes(
                     oauthService = oauthService,
                     encryptionService = encryptionService,
                     renderError = { renderLoginError(HttpStatusCode.BadRequest, it) },
-                    renderMfaRequired = { renderLoginError(HttpStatusCode.Forbidden, it) },
                 )
             }
         }

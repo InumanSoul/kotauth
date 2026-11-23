@@ -164,6 +164,15 @@ fun Route.authRoutes(
             secure = baseUrl.startsWith("https://", ignoreCase = true),
         )
 
+        mfaEnrollmentRoutes(
+            oauthService = oauthService,
+            mfaService = mfaService,
+            encryptionService = encryptionService,
+            mfaRateLimiter = mfaRateLimiter,
+            ssoTtlSeconds = ssoTtlSeconds,
+            secure = baseUrl.startsWith("https://", ignoreCase = true),
+        )
+
         socialLoginRoutes(
             mfaGate = mfaGate,
             oauthService = oauthService,
