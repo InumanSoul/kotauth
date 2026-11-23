@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **With Redis as the session store, refreshed tokens kept their resource audiences.** The Redis
+  session record didn't store the resources (RFC 8707 `resource`) a session's tokens are bound to,
+  so from v1.19.3 on, a refresh against a Redis-backed install returned an access token without
+  the resource server's audience. A refresh that named a `resource` was refused with
+  `invalid_target`. Postgres-backed installs were not affected. Sessions written before this fix
+  still decode, but they stay without their resources until the user signs in again.
+
 ### Changed
 
 - **A workspace that requires MFA now has users set it up during sign-in instead of refusing them.**

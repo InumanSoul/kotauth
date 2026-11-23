@@ -281,6 +281,17 @@ class RedisSessionRepositoryIntegrationTest {
         assertEquals(0, repo.revokeAllByImpersonator(admin.id))
     }
 
+    @Test
+    fun `a refreshable session keeps the resources its tokens are bound to`() {
+        val now = Instant.now()
+        repo.save(
+            newSession(refreshTokenHash = "refresh-R", refreshExpiresAt = now.plusSeconds(86400))
+                .copy(resources = listOf("https://orders.example.com")),
+        )
+
+        assertEquals(listOf("https://orders.example.com"), repo.findActiveByRefreshTokenHash("refresh-R")?.resources)
+    }
+
     private fun newSession(
         tenantId: Int = 1,
         userId: Int? = 1,
