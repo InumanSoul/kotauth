@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-11-23
+
 ### Added
 
 - **The REST API can read and set a client's allowed scopes on a resource server.**
