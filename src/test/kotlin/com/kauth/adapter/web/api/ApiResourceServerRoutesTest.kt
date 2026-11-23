@@ -606,6 +606,192 @@ class ApiResourceServerRoutesTest {
         }
 
     // -------------------------------------------------------------------------
+    // GET/PUT /applications/{appId}/authorized-resource-servers/{rsId}/scopes
+    // -------------------------------------------------------------------------
+
+    private val declaredScopes = listOf("orders.read", "orders.write", "accounts.write")
+
+    /** A client authorized on one resource server, which (as in production) starts with every scope. */
+    private fun authorizedPair(tenantId: TenantId = TenantId(1)): Pair<Application, ResourceServer> {
+        val app =
+            appRepo.add(
+                Application(
+                    id = ApplicationId(0),
+                    tenantId = tenantId,
+                    clientId = "terminal-${tenantId.value}",
+                    name = "Terminal",
+                    description = null,
+                    accessType = AccessType.PUBLIC,
+                    enabled = true,
+                ),
+            )
+        val rs =
+            resourceServerRepo.seed(
+                ResourceServer(
+                    tenantId = tenantId,
+                    identifier = "https://api-${tenantId.value}.acme.dev",
+                    name = "Acme API",
+                    scopes = declaredScopes,
+                ),
+            )
+        resourceServerRepo.registerClient(app.id, tenantId)
+        resourceServerRepo.setAuthorizedResources(app.id, listOf(rs.id!!))
+        return app to rs
+    }
+
+    private fun scopesPath(
+        app: Application,
+        rs: ResourceServer,
+    ) = "/t/acme/api/v1/applications/${app.id.value}/authorized-resource-servers/${rs.id!!.value}/scopes"
+
+    @Test
+    fun `GET allowed scopes returns what the client may request on that resource server`() =
+        testApplication {
+            application { installTestApp() }
+            val (app, rs) = authorizedPair()
+
+            val response = client.get(scopesPath(app, rs)) { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val scopes =
+                jsonCodec
+                    .parseToJsonElement(response.bodyAsText())
+                    .jsonObject["scopes"]!!
+                    .jsonArray
+                    .map { it.jsonPrimitive.content }
+            assertEquals(declaredScopes.sorted(), scopes)
+        }
+
+    @Test
+    fun `PUT allowed scopes narrows the grant`() =
+        testApplication {
+            application { installTestApp() }
+            val (app, rs) = authorizedPair()
+
+            val response =
+                client.put(scopesPath(app, rs)) {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"scopes":["orders.read"]}""")
+                }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            assertEquals(setOf("orders.read"), resourceServerRepo.findAllowedScopes(app.id)[rs.id!!])
+        }
+
+    @Test
+    fun `PUT allowed scopes accepts an empty list, which grants nothing`() =
+        testApplication {
+            application { installTestApp() }
+            val (app, rs) = authorizedPair()
+
+            val response =
+                client.put(scopesPath(app, rs)) {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"scopes":[]}""")
+                }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            assertEquals(emptySet(), resourceServerRepo.findAllowedScopes(app.id)[rs.id!!].orEmpty())
+        }
+
+    @Test
+    fun `PUT allowed scopes returns 422 for a scope the resource server does not declare`() =
+        testApplication {
+            application { installTestApp() }
+            val (app, rs) = authorizedPair()
+
+            val response =
+                client.put(scopesPath(app, rs)) {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"scopes":["orders.read","admin.everything"]}""")
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertTrue(response.bodyAsText().contains("admin.everything"))
+            assertEquals(declaredScopes.toSet(), resourceServerRepo.findAllowedScopes(app.id)[rs.id!!])
+        }
+
+    @Test
+    fun `PUT allowed scopes returns 404 when the client is not authorized on that resource server`() =
+        testApplication {
+            application { installTestApp() }
+            val (app, _) = authorizedPair()
+            val other =
+                resourceServerRepo.seed(
+                    ResourceServer(
+                        tenantId = TenantId(1),
+                        identifier = "https://other.acme.dev",
+                        name = "Other",
+                        scopes = listOf("x"),
+                    ),
+                )
+
+            val response =
+                client.put(scopesPath(app, other)) {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"scopes":["x"]}""")
+                }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    @Test
+    fun `GET allowed scopes returns 404 when the client is not authorized on that resource server`() =
+        testApplication {
+            application { installTestApp() }
+            val (app, _) = authorizedPair()
+            val other =
+                resourceServerRepo.seed(
+                    ResourceServer(tenantId = TenantId(1), identifier = "https://other.acme.dev", name = "Other"),
+                )
+
+            val response = client.get(scopesPath(app, other)) { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    @Test
+    fun `allowed scopes return 404 for an application of another workspace`() =
+        testApplication {
+            application { installTestApp() }
+            val (app, rs) = authorizedPair(TenantId(2))
+
+            val get = client.get(scopesPath(app, rs)) { bearerAuth(rawApiKey) }
+            val put =
+                client.put(scopesPath(app, rs)) {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"scopes":[]}""")
+                }
+
+            assertEquals(HttpStatusCode.NotFound, get.status)
+            assertEquals(HttpStatusCode.NotFound, put.status)
+            assertEquals(declaredScopes.toSet(), resourceServerRepo.findAllowedScopes(app.id)[rs.id!!])
+        }
+
+    @Test
+    fun `PUT allowed scopes needs resource_servers_write`() =
+        testApplication {
+            application { installTestApp() }
+            val (app, rs) = authorizedPair()
+            val readOnlyKey = apiKeyWithScopes(listOf(ApiScope.RESOURCE_SERVERS_READ))
+
+            val response =
+                client.put(scopesPath(app, rs)) {
+                    bearerAuth(readOnlyKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"scopes":[]}""")
+                }
+
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+            assertEquals(declaredScopes.toSet(), resourceServerRepo.findAllowedScopes(app.id)[rs.id!!])
+        }
+
+    // -------------------------------------------------------------------------
     // Scope enforcement
     // -------------------------------------------------------------------------
 
