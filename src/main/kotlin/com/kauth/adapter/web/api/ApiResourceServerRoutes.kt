@@ -7,6 +7,7 @@ import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.service.ResourceServerResult
 import com.kauth.domain.service.ResourceServerService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -164,5 +165,55 @@ internal fun Route.apiResourceServerRoutes(
                 is ResourceServerResult.Failure -> call.respondResourceServerError(result.error)
             }
         }
+
+        // The scopes this client may request on one resource server it is authorized for (ADR-23).
+        // Authorizing a client starts it with every scope the API declares; this is how a
+        // provisioning script narrows that without the admin console.
+        route("/{rsId}/scopes") {
+            get {
+                requireScope(call, ApiScope.RESOURCE_SERVERS_READ) ?: return@get
+                val (appId, rsId) = call.authorizedPairInTenant(applicationRepository) ?: return@get
+                val allowed =
+                    resourceServerService.allowedScopesFor(appId)[rsId]
+                        ?: return@get call.respondProblem(
+                            HttpStatusCode.NotFound,
+                            "Not Found",
+                            "The application is not authorized for this resource server.",
+                        )
+                call.respond(HttpStatusCode.OK, AllowedScopesDto(scopes = allowed.sorted()))
+            }
+
+            put {
+                requireScope(call, ApiScope.RESOURCE_SERVERS_WRITE) ?: return@put
+                val (appId, rsId) = call.authorizedPairInTenant(applicationRepository) ?: return@put
+                val body = call.receive<SetAllowedScopesRequest>()
+                when (val result = resourceServerService.setAllowedScopes(appId, rsId, body.scopes.toSet())) {
+                    is ResourceServerResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                    is ResourceServerResult.Failure -> call.respondResourceServerError(result.error)
+                }
+            }
+        }
     }
+}
+
+/**
+ * Parses `{appId}` and `{rsId}` and checks the application belongs to the caller's workspace.
+ * Responds and returns null when it does not, so another workspace's application reads as absent.
+ */
+private suspend fun ApplicationCall.authorizedPairInTenant(
+    applicationRepository: ApplicationRepository,
+): Pair<ApplicationId, ResourceServerId>? {
+    val tenantId = attributes[TenantIdAttr]
+    val appId = parameters["appId"]?.toIntOrNull()?.let { ApplicationId(it) }
+    val rsId = parameters["rsId"]?.toIntOrNull()?.let { ResourceServerId(it) }
+    if (appId == null || rsId == null) {
+        respondProblem(HttpStatusCode.BadRequest, "Invalid ID", "appId and rsId must be integers.")
+        return null
+    }
+    val app = applicationRepository.findById(appId)
+    if (app == null || app.tenantId != tenantId) {
+        respondProblem(HttpStatusCode.NotFound, "Not Found", "Application not found in this workspace.")
+        return null
+    }
+    return appId to rsId
 }

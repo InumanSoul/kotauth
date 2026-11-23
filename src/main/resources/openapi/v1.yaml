@@ -630,6 +630,14 @@ components:
           items: { type: string }
           default: []
 
+    AllowedScopes:
+      type: object
+      required: [scopes]
+      properties:
+        scopes:
+          type: array
+          items: { type: string }
+
     SetAuthorizedResourceServersRequest:
       type: object
       required: [resourceServerIds]
@@ -2120,6 +2128,63 @@ paths:
                   resourceServerIds: [1, 2]
       responses:
         "204": { description: Authorization set updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /applications/{appId}/authorized-resource-servers/{rsId}/scopes:
+    parameters:
+      - in: path
+        name: appId
+        required: true
+        schema: { type: integer }
+      - in: path
+        name: rsId
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: getAllowedScopes
+      summary: Scopes a client may request on one resource server
+      description: |
+        The per-client allowlist (ADR-23). A token request gets the
+        intersection of what was requested, what the resource server
+        declares and this list. Authorizing a client on a resource server
+        starts this list with every scope the server declares.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: The allowed scopes, sorted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AllowedScopes" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: setAllowedScopes
+      summary: Replace the scopes a client may request on one resource server
+      description: |
+        Full replacement. The client must already be authorized on the
+        resource server (404 otherwise), and every scope must be declared by
+        it (422 otherwise). An empty list leaves the client authorized but
+        able to request nothing on that server.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AllowedScopes" }
+            examples:
+              narrow:
+                value:
+                  scopes: ["pos.catalog.read", "pos.sales.write"]
+      responses:
+        "204": { description: Allowed scopes replaced }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }

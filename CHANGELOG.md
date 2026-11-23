@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The REST API can read and set a client's allowed scopes on a resource server.**
+  `GET` and `PUT /t/{slug}/api/v1/applications/{appId}/authorized-resource-servers/{rsId}/scopes`
+  expose the per-client allowlist of [ADR-23](docs/adr/ADR-23-per-client-scope-allowlists.md),
+  which until now only the admin console and backup restore could set. Authorizing a client
+  through the API starts it with every scope the resource server declares, so a provisioning
+  script had no way to narrow it without posting the console's form. `PUT` replaces the list;
+  every scope must be declared by the resource server (422) and the client must already be
+  authorized on it (404). Reading needs `resource_servers:read`, writing `resource_servers:write`.
+
 ### Security
 
 - **Signing a user out everywhere now ends every session they can still use (Redis).** With

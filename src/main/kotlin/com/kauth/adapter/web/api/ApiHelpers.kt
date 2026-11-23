@@ -389,6 +389,14 @@ data class ProblemDetail(
     val resourceServerIds: List<Int>,
 )
 
+@Serializable data class SetAllowedScopesRequest(
+    val scopes: List<String>,
+)
+
+@Serializable data class AllowedScopesDto(
+    val scopes: List<String>,
+)
+
 @Serializable data class CreateApiKeyRequest(
     val name: String,
     val scopes: List<String>,
