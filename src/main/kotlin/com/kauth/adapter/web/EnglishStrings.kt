@@ -602,9 +602,22 @@ object EnglishStrings {
      * operator has to be told it happened; the full before-and-after list is in the audit log,
      * which is the only durable record a restore leaves.
      */
-    fun toastBackupImportedWithRewrites(count: Int): String =
-        "Workspace imported. $count username${if (count == 1) " was" else "s were"} rewritten to " +
-            "meet the username format rule — see the audit log for the full list."
+    fun toastBackupImported(
+        rewrites: Int,
+        newSubjects: Int,
+    ): String {
+        if (rewrites == 0 && newSubjects == 0) return TOAST_BACKUP_IMPORTED
+        val parts = mutableListOf("Workspace imported.")
+        if (rewrites > 0) {
+            parts += "$rewrites username${if (rewrites == 1) " was" else "s were"} rewritten to meet the " +
+                "username format rule — see the audit log for the full list."
+        }
+        if (newSubjects > 0) {
+            parts += "The backup predates v1.31.0, so $newSubjects user${if (newSubjects == 1) "" else "s"} got a " +
+                "new sub — apps that store sub must relink them."
+        }
+        return parts.joinToString(" ")
+    }
 
     // -------------------------------------------------------------------------
     // Auth pages — shared chrome (page titles use {0} = workspace name)

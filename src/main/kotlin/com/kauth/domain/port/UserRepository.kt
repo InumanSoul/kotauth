@@ -45,6 +45,12 @@ interface UserRepository {
         email: String,
     ): User?
 
+    /** Finds a user by the `sub` Kotauth issues for them. */
+    fun findBySubject(
+        tenantId: TenantId,
+        subject: String,
+    ): User?
+
     /** Finds a user by the identity provider's key. Null when unprovisioned or unknown. */
     fun findByExternalId(
         tenantId: TenantId,

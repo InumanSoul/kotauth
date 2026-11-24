@@ -21,7 +21,7 @@ Three questions dominated the design.
    parallel.
 2. **How does a downstream API distinguish "alice clicked submit" from
    "admin acting as alice clicked submit"?** Standard JWT shapes do not encode
-   delegation; the access token's `sub` is just a user id.
+   delegation; the access token's `sub` is just the user's subject (ADR-25).
 3. **What does "stop impersonating" mean when the admin's own session has
    expired in the meantime?**
 

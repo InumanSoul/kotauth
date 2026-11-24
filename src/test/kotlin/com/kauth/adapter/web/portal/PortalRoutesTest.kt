@@ -676,6 +676,85 @@ class PortalRoutesTest {
             )
         }
 
+    @Test
+    fun `portal callback finds the user by a UUID subject`() =
+        testApplication {
+            userRepo.add(user.copy(subject = "5b2e8c1d-7a4f-4e3b-9c6d-1f0a2b3c4d5e"))
+            val authCodes = FakeAuthorizationCodeRepository()
+            val jwtTokenPort = JwtFakeTokenPort(userId = user.id!!.value, username = user.username)
+            val apps = FakeApplicationRepository()
+            apps.add(
+                Application(
+                    id = ApplicationId(1),
+                    tenantId = TenantId(1),
+                    clientId = "kotauth-portal",
+                    name = "Portal",
+                    description = null,
+                    accessType = com.kauth.domain.model.AccessType.PUBLIC,
+                    enabled = true,
+                    redirectUris = listOf("http://localhost/t/acme/account/callback"),
+                    grantTypes = GrantType.defaultsFor(com.kauth.domain.model.AccessType.PUBLIC),
+                ),
+            )
+
+            val oauthService =
+                OAuthService(
+                    tenantRepository = tenantRepo,
+                    userRepository = userRepo,
+                    applicationRepository = apps,
+                    sessionRepository = sessionRepo,
+                    authCodeRepository = authCodes,
+                    tokenPort = jwtTokenPort,
+                    passwordHasher = hasher,
+                    auditLog = auditLogPort,
+                )
+
+            val rawCode = "test-code-uuid-sub"
+            authCodes.save(
+                AuthorizationCode(
+                    code = rawCode,
+                    tenantId = TenantId(1),
+                    clientId = ApplicationId(1),
+                    userId = user.id!!,
+                    redirectUri = "http://localhost/t/acme/account/callback",
+                    scopes = "openid profile email",
+                    expiresAt = Instant.now().plusSeconds(300),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                install(Sessions) { cookie<PortalSession>("KOTAUTH_PORTAL") }
+                routing {
+                    portalRoutes(
+                        accountSelfService = buildSelfService(),
+                        tenantRepository = tenantRepo,
+                        encryptionService = encryptionService,
+                        oauthService = oauthService,
+                        baseUrl = "http://localhost",
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val pkcePayload =
+                encryptionService.signCookie(
+                    "verifier|acme|${System.currentTimeMillis()}|state789",
+                )
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get("/t/acme/account/callback?code=$rawCode&state=state789") {
+                    header("Cookie", "KOTAUTH_PORTAL_PKCE=$pkcePayload")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                "/t/acme/launcher",
+                response.headers["Location"],
+                "A UUID sub must still establish the portal session",
+            )
+        }
+
     private fun io.ktor.server.application.Application.installTestAppWithSession() {
         install(ContentNegotiation) { json() }
         install(Sessions) {
@@ -757,14 +836,14 @@ private class JwtFakeTokenPort(
         customAccessClaims: Map<String, String>,
         customIdClaims: Map<String, String>,
         authTime: java.time.Instant?,
-        actingSubject: UserId?,
+        actingSubject: String?,
         audiences: List<String>,
         amr: List<String>,
     ): TokenResponse {
         val header = Base64.getUrlEncoder().withoutPadding().encodeToString("""{"alg":"none"}""".toByteArray())
         val payload =
             Base64.getUrlEncoder().withoutPadding().encodeToString(
-                """{"sub":$userId,"preferred_username":"$username"}""".toByteArray(),
+                """{"sub":"${user.tokenSubject}","preferred_username":"$username"}""".toByteArray(),
             )
         val fakeJwt = "$header.$payload.sig"
         return TokenResponse(

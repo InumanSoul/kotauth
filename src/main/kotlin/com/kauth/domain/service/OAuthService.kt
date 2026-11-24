@@ -1071,6 +1071,12 @@ class OAuthService(
         val name: String,
     )
 
+    /** The `sub` Kotauth issues for [userId], or null when the user is gone. */
+    fun subjectOf(
+        userId: UserId,
+        tenantId: TenantId,
+    ): String? = userRepository.findById(userId, tenantId)?.tokenSubject
+
     fun getUserInfo(accessToken: String): UserInfoResult? {
         val hash = sha256Hex(accessToken)
         val session = sessionRepository.findActiveByAccessTokenHash(hash) ?: return null
@@ -1080,7 +1086,7 @@ class OAuthService(
         if (!user.enabled) return null
 
         return UserInfoResult(
-            sub = userId.value.toString(),
+            sub = user.tokenSubject,
             username = user.username,
             email = user.email,
             emailVerified = user.emailVerified,

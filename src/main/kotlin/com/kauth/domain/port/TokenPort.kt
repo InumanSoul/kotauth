@@ -7,7 +7,6 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
-import com.kauth.domain.model.UserId
 import java.time.Instant
 
 interface TokenPort {
@@ -22,7 +21,7 @@ interface TokenPort {
         customIdClaims: Map<String, String> = emptyMap(),
         authTime: Instant? = null,
         // Sets the RFC 8693 §4.1 nested `act` claim on access + id tokens; `sub` stays the impersonated user.
-        actingSubject: UserId? = null,
+        actingSubject: String? = null,
         audiences: List<String> = emptyList(),
         // RFC 8176 values; the ID token carries them as `amr`, and both tokens carry the `acr` they earn.
         amr: List<String> = emptyList(),

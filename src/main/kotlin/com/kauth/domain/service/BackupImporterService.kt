@@ -438,6 +438,14 @@ class BackupImporterService(
             )
         }
 
+        val badSubjects = invalidSubjects(export.users)
+        if (badSubjects.isNotEmpty()) {
+            error(
+                "Backup import rejected: ${badSubjects.size} user record(s) carry a subject that is blank, " +
+                    "too long or shared with another record. Offending records: ${listForError(badSubjects)}.",
+            )
+        }
+
         val crossNamespace = crossNamespaceCollisions(export.users)
         if (crossNamespace.isNotEmpty()) {
             error(
@@ -468,6 +476,7 @@ class BackupImporterService(
                         externalId = ub.externalId,
                         givenName = ub.givenName,
                         familyName = ub.familyName,
+                        subject = ub.subject,
                     ),
                 )
             val savedId =
@@ -578,6 +587,7 @@ class BackupImporterService(
             signingKeys = export.signingKeys?.size ?: 0,
             auditEvents = export.auditLog?.size ?: 0,
             usernameRewrites = usernameRewrites,
+            usersWithNewSubject = export.users.count { it.subject == null },
         )
     }
 
@@ -729,6 +739,11 @@ data class ImportSummary(
      * out which stored references on their side now point at a username that no longer exists.
      */
     val usernameRewrites: List<UsernameRewrite> = emptyList(),
+    /**
+     * Users the backup carried no `sub` for (taken before v1.31.0), who therefore got a new one.
+     * A relying party that keys records on `sub` must relink these users.
+     */
+    val usersWithNewSubject: Int = 0,
 )
 
 /** One username the importer rewrote, with the email that identifies whose record it was. */
@@ -758,6 +773,25 @@ private fun crossNamespaceCollisions(users: List<UserBackup>): List<String> {
         val username = UsernamePolicy.rewriteLegacy(ub.username)
         byEmail[username].orEmpty().firstOrNull { it !== ub }?.let {
             "'${clip(username)}' is the username of the record for '${ub.email}' and the email of another record"
+        }
+    }
+}
+
+private const val MAX_SUBJECT_LENGTH = 255
+
+/** Subjects a restore can't write: blank, over [MAX_SUBJECT_LENGTH], or carried by two records. */
+private fun invalidSubjects(users: List<UserBackup>): List<String> {
+    val counts = users.mapNotNull { it.subject }.groupingBy { it }.eachCount()
+    return users.mapNotNull { ub ->
+        val subject = ub.subject ?: return@mapNotNull null
+        when {
+            subject.isBlank() -> "user record for email '${ub.email}' has a blank subject"
+            subject.length > MAX_SUBJECT_LENGTH ->
+                "user record for email '${ub.email}' has a subject over $MAX_SUBJECT_LENGTH characters"
+            (counts[subject] ?: 0) > 1 -> "user record for email '${ub.email}' shares subject '${clip(
+                subject,
+            )}' with another record"
+            else -> null
         }
     }
 }

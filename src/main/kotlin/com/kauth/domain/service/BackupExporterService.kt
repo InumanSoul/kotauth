@@ -284,6 +284,7 @@ class BackupExporterService(
                     externalId = user.externalId,
                     givenName = user.givenName,
                     familyName = user.familyName,
+                    subject = user.subject,
                 )
             }
 

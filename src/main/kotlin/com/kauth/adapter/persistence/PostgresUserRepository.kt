@@ -72,6 +72,18 @@ class PostgresUserRepository : UserRepository {
                 .singleOrNull()
         }
 
+    override fun findBySubject(
+        tenantId: TenantId,
+        subject: String,
+    ): User? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where { (UsersTable.tenantId eq tenantId.value) and (UsersTable.subject eq subject) }
+                .singleOrNull()
+                ?.toUser()
+        }
+
     override fun findByExternalId(
         tenantId: TenantId,
         externalId: String,
@@ -186,6 +198,10 @@ class PostgresUserRepository : UserRepository {
 
     override fun save(user: User): User =
         transaction {
+            val assignedSubject =
+                user.subject ?: java.util.UUID
+                    .randomUUID()
+                    .toString()
             val insertedId =
                 UsersTable.insert {
                     it[tenantId] = user.tenantId.value
@@ -199,9 +215,10 @@ class PostgresUserRepository : UserRepository {
                     it[emailVerified] = user.emailVerified
                     it[enabled] = user.enabled
                     it[requiredActions] = user.requiredActions.map { a -> a.name }
+                    it[subject] = assignedSubject
                 } get UsersTable.id
 
-            user.copy(id = UserId(insertedId))
+            user.copy(id = UserId(insertedId), subject = assignedSubject)
         }
 
     override fun existsByUsername(
@@ -292,6 +309,7 @@ class PostgresUserRepository : UserRepository {
             lockedUntil = this[UsersTable.lockedUntil]?.toInstant(),
             failedOtpChallenges = this[UsersTable.failedOtpChallenges],
             createdAt = this[UsersTable.createdAt].toInstant(),
+            subject = this[UsersTable.subject],
         )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)

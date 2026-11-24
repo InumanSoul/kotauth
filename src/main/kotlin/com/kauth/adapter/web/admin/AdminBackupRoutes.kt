@@ -248,6 +248,7 @@ fun Route.adminBackupRoutes(
                                         "applications" to s.applications.toString(),
                                         "resourceServers" to s.resourceServers.toString(),
                                         "usernameRewrites" to s.usernameRewrites.size.toString(),
+                                        "usersWithNewSubject" to s.usersWithNewSubject.toString(),
                                     ),
                             ),
                         )
@@ -279,6 +280,7 @@ fun Route.adminBackupRoutes(
                                     s.usernameRewrites.map {
                                         UsernameRewriteDto(from = it.from, to = it.to, email = it.email)
                                     },
+                                usersWithNewSubject = s.usersWithNewSubject,
                             ),
                         )
                     }
@@ -424,6 +426,8 @@ data class ImportResponse(
      * them no longer resolve.
      */
     val usernameRewrites: List<UsernameRewriteDto> = emptyList(),
+    /** Users the backup carried no `sub` for (taken before v1.31.0); they got a new one. */
+    val usersWithNewSubject: Int = 0,
 )
 
 @Serializable

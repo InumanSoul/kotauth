@@ -128,6 +128,11 @@ class FakeUserRepository :
         return store.values.find { it.tenantId == tenantId && it.email.lowercase() == email.lowercase() }
     }
 
+    override fun findBySubject(
+        tenantId: TenantId,
+        subject: String,
+    ): User? = store.values.find { it.tenantId == tenantId && it.tokenSubject == subject }
+
     override fun findByExternalId(
         tenantId: TenantId,
         externalId: String,
@@ -160,7 +165,16 @@ class FakeUserRepository :
     ): Long = findByTenantId(tenantId, search).size.toLong()
 
     override fun save(user: User): User {
-        val normalized = user.normalizedForWrite()
+        // Like production: a saved user gets a random subject unless it brings one (import).
+        val normalized =
+            user.normalizedForWrite().let {
+                it.copy(
+                    subject =
+                        it.subject ?: java.util.UUID
+                            .randomUUID()
+                            .toString(),
+                )
+            }
         requireUniquePerTenant(normalized)
         val u = if (normalized.id == null) normalized.copy(id = UserId(nextId++)) else normalized
         store[u.id!!.value] = u
@@ -170,7 +184,8 @@ class FakeUserRepository :
     override fun update(user: User): User {
         requireNormalizedUsername(user.username)
         requireUniquePerTenant(user)
-        store[user.id!!.value] = user
+        // Production's update never writes the subject column.
+        store[user.id!!.value] = user.copy(subject = store[user.id.value]?.subject)
         return user
     }
 

@@ -254,6 +254,21 @@ class AdminApplicationRoutesTest {
         }
 
     @Test
+    fun `the import confirmation says how many users got a new sub`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/$tenantSlug?saved=imported&rewrites=0&newsubjects=3").bodyAsText()
+
+            assertTrue(
+                body.contains("3 users got a new sub"),
+                "the operator must learn that relying parties must relink",
+            )
+        }
+
+    @Test
     fun `creating a confidential application with client credentials in one submit succeeds`() =
         testApplication {
             application { installTestApp() }

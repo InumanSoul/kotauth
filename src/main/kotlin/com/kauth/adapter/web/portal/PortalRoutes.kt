@@ -263,9 +263,10 @@ fun Route.portalRoutes(
             // Decode userId and username from the access token payload (base64 JWT claim)
             val accessToken = (tokenResult as OAuthResult.Success).value.access_token
             val claims = decodeJwtPayload(accessToken)
-            val userId = claims["sub"]?.toIntOrNull()
             val username = claims["preferred_username"] ?: ""
             val tenantObj = tenantRepository.findBySlug(slug)
+            val userId =
+                tenantObj?.let { t -> claims["sub"]?.let { accountSelfService.userIdForSubject(t.id, it) } }?.value
 
             if (userId == null || tenantObj == null) {
                 return@get call.respondRedirect(

@@ -269,6 +269,51 @@ class BackupImporterUsernameValidationTest {
     }
 
     @Test
+    fun `import keeps each user's subject`() {
+        val export = exportAcmeWithTwoUsers()
+        val withSubjects =
+            export.copy(users = export.users.map { it.copy(subject = "sub-of-${it.username}") })
+
+        val result = importer().import(withSubjects, newSlug = "acme-restored", currentSchemaVersion = 1)
+
+        assertIs<BackupResult.Success<*>>(result)
+        val tenantId = destTenants.findBySlug("acme-restored")!!.id
+        assertEquals("alice", destUsers.findBySubject(tenantId, "sub-of-alice")?.username)
+        assertEquals("bob", destUsers.findBySubject(tenantId, "sub-of-bob")?.username)
+        assertEquals(0, (result.value as ImportSummary).usersWithNewSubject)
+    }
+
+    @Test
+    fun `a backup without subjects gives users new ones and says how many`() {
+        val export = exportAcmeWithTwoUsers()
+
+        val result =
+            importer().import(
+                export.copy(users = export.users.map { it.copy(subject = null) }),
+                "acme-restored",
+                1,
+            )
+
+        assertIs<BackupResult.Success<*>>(result)
+        assertEquals(2, (result.value as ImportSummary).usersWithNewSubject)
+        val restored = destUsers.findByTenantId(destTenants.findBySlug("acme-restored")!!.id, null, 10, 0)
+        assertTrue(restored.all { it.subject != null && it.subject!!.length == 36 })
+    }
+
+    @Test
+    fun `import rejects two records with the same subject`() {
+        val export = exportAcmeWithTwoUsers()
+        val duplicated = export.copy(users = export.users.map { it.copy(subject = "same") })
+
+        val result = importer().import(duplicated, newSlug = "acme-restored", currentSchemaVersion = 1)
+
+        assertIs<BackupResult.Failure>(result)
+        val error = result.error
+        assertIs<BackupError.InvalidPayload>(error)
+        assertContains(error.message, "shares subject 'same'")
+    }
+
+    @Test
     fun `import accepts a username that is the same record's own email`() {
         val export = exportAcmeWithTwoUsers()
         val ownEmail =

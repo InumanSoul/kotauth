@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A workspace keeps its users' `sub` when it moves to another instance.** Backups now carry each
+  user's `sub`, and import writes it, so relying parties keep every link after an export and
+  import. Users from a backup taken before this release get a new `sub`; the import summary
+  (`usersWithNewSubject` in the API, and the console's confirmation) says how many. Import refuses
+  a backup in which two users share a `sub`. Closes #241.
+
 - **Client addresses behind more than one proxy.** With a CDN in front of a reverse proxy
   (Cloudflare in front of Traefik, as Dokploy and Coolify set it up), Kotauth took the proxy's
   last `X-Forwarded-For` entry, a CDN edge address, as the client. Every per-IP limit (sign-in,
@@ -20,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `X-Forwarded-For` entry from the right outside them. `KAUTH_CLIENT_IP_HEADER` (e.g.
   `CF-Connecting-IP`) can name a header to read from a trusted proxy instead. With neither set,
   nothing changes. Closes #240.
+
+### Changed
+
+- **New users get a random UUID as their `sub`.** `sub` was the user's database row id, which is
+  sequential, so it revealed how many users an instance had and let one be guessed from another.
+  Users that exist when you upgrade keep the `sub` they have (migration V71 copies it), so no
+  token, link or integration changes for them. **If a relying party stores `sub` as an integer,
+  change that column to text before upgrading:** the first user created afterwards has a UUID.
+  See ADR-25.
 
 ## [1.30.2] - 2026-11-24
 

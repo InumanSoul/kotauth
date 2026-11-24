@@ -82,6 +82,9 @@ class ImpersonationService(
         if (!adminSession.isActive || adminSession.userId != adminUserId) {
             return AdminResult.Failure(AdminError.Validation("Admin session is not active"))
         }
+        val admin =
+            userRepository.findById(adminUserId, adminSession.tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Admin not found"))
 
         val tokens =
             tokenPort.issueUserTokens(
@@ -89,7 +92,7 @@ class ImpersonationService(
                 tenant = tenant,
                 client = null,
                 scopes = listOf("openid"),
-                actingSubject = adminUserId,
+                actingSubject = admin.tokenSubject,
             )
 
         val now = Instant.now()

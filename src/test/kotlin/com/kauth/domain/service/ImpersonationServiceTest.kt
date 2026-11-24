@@ -132,7 +132,7 @@ class ImpersonationServiceTest {
             targetUserId = target.id!!,
         )
 
-        assertEquals(admin.id, tokens.lastActingSubject)
+        assertEquals(admin.tokenSubject, tokens.lastActingSubject)
     }
 
     @Test

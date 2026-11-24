@@ -34,6 +34,7 @@ object UsersTable : Table("users") {
     val failedOtpChallenges = integer("failed_otp_challenges").default(0)
 
     val createdAt = timestampWithTimeZone("created_at")
+    val subject = text("subject")
 
     override val primaryKey = PrimaryKey(id)
 }
