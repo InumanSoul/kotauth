@@ -27,13 +27,15 @@ Once a workspace has a domain, Kotauth keeps its pages there:
   relying party that still sends users to the instance address keeps working.
 - **Its domain serves only that workspace.** Another workspace's pages, and the admin console,
   answer 404 there, so no other brand appears under the product's domain.
+- **Admins stay on the instance address.** A browser signed in to the console is not redirected,
+  so impersonating a user, and any workspace link opened from the console, works there.
 - **Servers can use either address.** The admin API, SCIM, discovery, JWKS and the token,
   userinfo, introspection and revocation endpoints answer on both, so backends can migrate on
   their own schedule.
 
 Hosts are compared by name only, not scheme or port. Behind a proxy, make sure it forwards the
 `Host` the user typed (most do by default), or set `X-Forwarded-Host` with `KAUTH_TRUSTED_PROXY`.
-A domain set or cleared on one workspace is enforced for the others within 30 seconds.
+A domain set or cleared in the console or the API applies at once on the replica that saved it, and within 30 seconds on the others.
 
 The domain is an origin only: `https://` plus host and optional port, with no path. Plain `http` is
 accepted only for `localhost` during development. An explicit **Issuer URL** still overrides the
