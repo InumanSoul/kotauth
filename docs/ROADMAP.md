@@ -1,7 +1,7 @@
 # Kotauth — Product Roadmap
 
-> Last updated: 2026-09-05
-> Status: v1.24.0
+> Last updated: 2026-11-24
+> Status: v1.30.0
 
 ---
 
@@ -215,6 +215,8 @@ This is the phase previously listed below as "Phase 7 — Advanced Authenticatio
 - Redirect URI conditional rather than mandatory — a client-credentials service does not need one
 - Token audience settable at creation; authorized APIs reachable from the application page
 - APIs moved beside Applications in the admin navigation
+- A per-application access-token lifetime, settable from the console and the REST API (v1.28.0)
+- An application without the Authorization Code grant hides its sign-in settings — redirect URIs, launcher, registration defaults (v1.28.0)
 
 ---
 
@@ -262,9 +264,63 @@ Conformance target is OpenID Connect Core and Discovery. No identity provider ha
 
 ---
 
+### Signing Key Rotation ✅ Shipped — v1.5.2
+*Goal: Replace a workspace's signing key without invalidating the tokens already in flight*
+
+- Admin-initiated rotation of a workspace's RS256 key pair from the Signing Keys page; the new key signs, the old one stays in the JWKS for verification
+- Every JWT carries a `kid` header, and verification resolves the key by `kid`
+- Key lifecycle: active → verification only → retired. Retirement is a manual step, not a timed overlap window
+- Rotation and retirement are audited
+
+---
+
+### Per-Client Scope Allowlists ✅ Shipped — v1.25.0
+*Goal: Least privilege between clients of the same API*
+
+- Authorizing a client against an API no longer grants it every scope the API declares. A client's scopes are an explicit grant per (client, API) pair ([ADR-23](adr/ADR-23-per-client-scope-allowlists.md))
+- Issuance takes the intersection of what was requested, what the API declares, and what this client was granted, on the authorization-code, refresh-token and client-credentials grants
+- An absent grant means the client may request nothing on that API, never everything
+- Per-scope checkboxes on the authorized-APIs page; adding a scope to an API does not grant it to existing clients
+- `GET` and `PUT /t/{slug}/api/v1/applications/{appId}/authorized-resource-servers/{rsId}/scopes` read and set the allowlist over the REST API (v1.29.0)
+
+---
+
+### Backup Fidelity ✅ Shipped — v1.26.0
+*Goal: A restored workspace behaves like the one that was exported*
+
+- Identity providers, resource servers with their per-client scope grants, and application audience and launcher settings all survive a round trip
+- A client's own access-token lifetime round-trips too (v1.28.0)
+- A pre-1.24 backup with legacy usernames restores, with the same rewrite migration V66 applies and every change reported; usernames that would collapse to nothing or collide are still refused
+- Client secrets, provider secrets, the SMTP password and MFA seeds remain excluded by design and are listed in the export manifest
+- An imported workspace issues tokens without a restart (v1.27.0)
+
+---
+
+### Multi-Factor on Every Sign-In Path ✅ Shipped — v1.28.1 to v1.30.0
+*Goal: The second factor cannot be skipped by choosing a different way in*
+
+- Magic link, email code, social sign-in and passkeys without user verification all go through the same MFA step as password sign-in (v1.28.1). A passkey with user verification still counts as both factors
+- Social sign-in opens no session before the second factor; the authorization-code exchange opens it, as for every other method (v1.29.0)
+- The email-code API answers `mfa_required` with a short-lived `mfaToken`, exchanged at `POST /auth/verify-mfa` for the authorization code (v1.29.0)
+- A workspace that requires MFA has users enroll an authenticator during sign-in instead of refusing them, the account portal included (v1.30.0)
+- ID tokens carry `amr` (RFC 8176); a multi-factor sign-in also carries `acr`, and clients can require a second factor per request with `acr_values`. Refreshed ID tokens keep the original `auth_time`, `amr` and `acr` (v1.30.0, [ADR-24](adr/ADR-24-sign-in-methods-amr-acr-step-up.md))
+- Users are emailed when their sign-in factors change — an authenticator added or removed, an admin MFA reset, a recovery code used, a passkey added or removed (v1.30.0)
+
+---
+
+### Session and Refresh Hardening ✅ Shipped — v1.29.0 to v1.30.0
+*Goal: A session ends when it should, and a refresh token works only where it was issued*
+
+- The max-concurrent-sessions setting works, per application: a sign-in past the limit ends that user's oldest session in the same application, and it is settable from the console and the API (v1.29.0)
+- Signing a user out everywhere ends every session they can still refresh, with Redis as the session store (v1.29.0)
+- A refresh token works only in its own workspace, for its own client, while that client exists and is enabled. A deleted client's sessions end; a disabled client's refresh tokens and unredeemed codes are refused until it is re-enabled (v1.30.0)
+- Refreshed tokens keep their resource audiences with Redis as the session store, and social sign-in carries RFC 8707 `resource` through (v1.30.0)
+
+---
+
 ## Where the product stands
 
-Everything in Phases 0–5 shipped, as did the whole of the original Phase 7 except SMS OTP, the impersonation item from Phase 9, and the Redis work that Phase 8 anticipated. Federation (Phase 6) is the one large phase untouched.
+Everything in Phases 0–5 shipped, as did the whole of the original Phase 7 except SMS OTP, the impersonation item from Phase 9, and the Redis and key-rotation work that Phase 8 anticipated. Per-client scope allowlists, the one security item in Phase 7, shipped in v1.25.0. Federation (Phase 6) is the one large phase untouched.
 
 In protocol terms Kotauth is a compliant OAuth 2.0 / OIDC authorization server with SCIM 2.0 provisioning, OIDC identity brokering, and four sign-in methods (password, magic link, email OTP, passkey). The remaining distance to the enterprise checklist is SAML and LDAP.
 
@@ -274,16 +330,19 @@ In protocol terms Kotauth is a compliant OAuth 2.0 / OIDC authorization server w
 
 Recorded here because a roadmap that only lists future features overstates the present.
 
-**Scopes now isolate clients from one another** as of v1.25.0 — a client's scopes are an
-explicit per-client grant rather than everything its API declares. See ADR-23.
+**Cross-namespace collision prevention is a read-before-write** ([#144](https://github.com/InumanSoul/kotauth/issues/144)). Two concurrent creates with mirrored identifiers can both pass the check, because no database constraint spans the username and email namespaces. The runtime refusal bounds the consequence to two users seeing a generic failure until an administrator intervenes.
 
-**Backups reproduce a workspace's configuration** as of v1.26.0 — identity providers, resource
-servers with their per-client scope grants, and application audience and launcher settings all
-survive a round trip. Client secrets, provider secrets, the SMTP password and MFA seeds remain
-excluded by design and are listed in the export manifest. A client's own access-token lifetime
-round-trips too, as of v1.28.0.
+**The email-OTP back-channel issues fixed scopes** ([#160](https://github.com/InumanSoul/kotauth/issues/160)) and cannot honour a client's per-client allowlist the way the other grants do.
 
-**Cross-namespace collision prevention is a read-before-write.** Two concurrent creates with mirrored identifiers can both pass the check, because no database constraint spans the username and email namespaces. The runtime refusal bounds the consequence to two users seeing a generic failure until an administrator intervenes.
+**Webhook delivery has no SSRF guard.** Delivery sits behind a port as of v1.25.1, but the adapter is still a blocking `HttpURLConnection` that does not refuse loopback, link-local or private destinations on operator-supplied URLs.
+
+**Admin flash messages live in one replica's memory.** A one-time value shown after a redirect, such as a newly issued client secret, can be lost when the redirect lands on another replica, and a value that is never read is never expired.
+
+**There is no SMS second factor.** The second factor is an authenticator app, a recovery code or a passkey with user verification.
+
+**A linked identity cannot be unlinked** ([#131](https://github.com/InumanSoul/kotauth/issues/131)), by the user or by an administrator.
+
+**Inbound identity-provider claims are not mapped to roles or groups** ([#135](https://github.com/InumanSoul/kotauth/issues/135)). See Phase 6.
 
 **The runtime image is large.** Roughly 410 MB, of which the great majority is the
 `eclipse-temurin` JRE base. Swagger UI is bundled into the JAR (~1.6 MB of assets served from
@@ -318,7 +377,6 @@ The largest remaining gap, and the most common adoption blocker. Organizations w
 
 Authentication is broadly complete; authorization is where the gaps now are.
 
-- **Per-client scope allowlists** — the `allowedScopes` field described in Known Gaps. This is the one item on this page that closes a security gap rather than adding a capability
 - **OAuth consent screen** — user-facing grant approval for third-party clients
 - **Resource-indicator phase 4** — introspection widening, and an ADR recording the immutable-identifier decision
 - **SMS OTP** — the last unshipped part of the original passwordless phase. The multi-channel port is designed; the adapters are not. Noted as controversial due to SIM-swap risk
@@ -329,10 +387,9 @@ Authentication is broadly complete; authorization is where the gaps now are.
 *Goal: Production-grade insight into a running deployment*
 
 - **Prometheus / Micrometer metrics** — login rates, error rates by type, token issuance volume, active sessions, webhook delivery success
-- **Key rotation** — admin-initiated rotation of per-workspace RS256 key pairs with a configurable overlap window for in-flight tokens
 - **Helm chart** — Kubernetes manifests with configurable replicas, probes, and secret integration
 - **Structured JSON log output** — the encoder is already in the dependency tree; field normalization remains
-- **Non-blocking webhook delivery** — replace blocking `HttpURLConnection` with Ktor's `HttpClient`, paired with SSRF hardening on operator-supplied URLs
+- **Non-blocking webhook delivery** — replace the blocking `HttpURLConnection` adapter behind the webhook port with Ktor's `HttpClient`, paired with SSRF hardening on operator-supplied URLs
 - **Audit log export** — scheduled export to object storage or a SIEM webhook
 
 ---
@@ -408,6 +465,7 @@ Recorded ADRs live in [`docs/adr/`](adr/). This table is generated from those fi
 | [ADR-21](adr/ADR-21-just-in-time-provisioning.md) | Just-in-time provisioning only creates; linking happens before the gate |
 | [ADR-22](adr/ADR-22-rfc8252-loopback-redirect-matching.md) | Loopback redirect URIs match on any port, for public clients only |
 | [ADR-23](adr/ADR-23-per-client-scope-allowlists.md) | A client's scopes are granted per client, not inherited from the API |
+| [ADR-24](adr/ADR-24-sign-in-methods-amr-acr-step-up.md) | Sign-in methods as `amr`, multi-factor as `acr`, and step-up through `acr_values` |
 
 ### Decisions without an ADR
 
