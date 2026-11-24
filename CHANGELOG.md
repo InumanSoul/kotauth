@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`POST /applications` accepts `audience`, and a body that doesn't decode answers 400.**
+  Creating an application with an `audience` answered 500, because the create request had no such
+  field and the API decodes strictly. It now sets the audience in the same call, as `PUT` already
+  did. Any API, SCIM or protocol request whose body or parameters can't be read now answers 400 in
+  that surface's own error format, instead of a 500. The OpenAPI document lists `audience` on the
+  create request. Closes #193.
+
 ## [1.30.0] - 2026-11-24
 
 ### Added

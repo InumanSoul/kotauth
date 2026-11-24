@@ -79,6 +79,7 @@ internal fun Route.apiApplicationRoutes(
                         accessType = body.accessType,
                         redirectUris = body.redirectUris,
                         grantTypes = grantTypes,
+                        audience = body.audience,
                     )
             ) {
                 is AdminResult.Failure -> call.respondAdminError(result.error)
