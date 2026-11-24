@@ -307,4 +307,97 @@ class ApiKeyBootstrapServiceTest {
 
         assertEquals(ApiKey.DEFAULT_SCIM_DIALECT, apiKeys.findByTenantAndName(tenant.id, "zion-scim")!!.scimDialect)
     }
+
+    private fun provisioner(hash: String = "hash-v1") =
+        ApiKeyBootstrapService.Entry(
+            tenantSlug = "zion",
+            name = "tmp-provisioner",
+            scopes = listOf(ApiScope.AUTH_SEND_OTP),
+            keyHash = hash,
+        )
+
+    @Test
+    fun `removing an entry revokes its key and hands it back to the console`() {
+        service.ensureBootstrapped(listOf(provisioner()))
+
+        val result = service.ensureBootstrapped(emptyList())
+
+        assertTrue(result is ApiKeyBootstrapService.Result.Provisioned)
+        val outcome = result.applied.single()
+        assertEquals(ApiKeyBootstrapService.Action.REVOKED, outcome.action)
+        assertEquals("zion" to "tmp-provisioner", outcome.tenantSlug to outcome.name)
+        val key = apiKeys.findByTenantAndName(tenant.id, "tmp-provisioner")!!
+        assertEquals(false, key.enabled)
+        assertEquals(null, key.bootstrapName, "A key the env no longer manages must not stay env-locked")
+    }
+
+    @Test
+    fun `a revoked key is reported once, not on every later start`() {
+        service.ensureBootstrapped(listOf(provisioner()))
+        service.ensureBootstrapped(emptyList())
+
+        val again = service.ensureBootstrapped(emptyList())
+
+        assertTrue(again is ApiKeyBootstrapService.Result.Provisioned)
+        assertTrue(again.applied.isEmpty())
+    }
+
+    @Test
+    fun `restoring a removed entry enables the key again`() {
+        service.ensureBootstrapped(listOf(provisioner()))
+        service.ensureBootstrapped(emptyList())
+
+        val result = service.ensureBootstrapped(listOf(provisioner()))
+
+        assertTrue(result is ApiKeyBootstrapService.Result.Provisioned)
+        assertEquals(ApiKeyBootstrapService.Action.UPDATED, result.applied.single().action)
+        val key = apiKeys.findByTenantAndName(tenant.id, "tmp-provisioner")!!
+        assertTrue(key.enabled)
+        assertEquals("tmp-provisioner", key.bootstrapName)
+    }
+
+    @Test
+    fun `keys still listed, and keys created in the console, are left alone`() {
+        val kept =
+            ApiKeyBootstrapService.Entry(
+                tenantSlug = "zion",
+                name = "kept",
+                scopes = listOf(ApiScope.AUTH_SEND_OTP),
+                keyHash = "hash-kept",
+            )
+        service.ensureBootstrapped(listOf(kept, provisioner()))
+        apiKeys.save(
+            ApiKey(
+                tenantId = tenant.id,
+                name = "console-key",
+                keyPrefix = "kauth_console",
+                keyHash = "hash-console",
+                scopes = listOf(ApiScope.AUTH_SEND_OTP),
+                enabled = true,
+            ),
+        )
+
+        val result = service.ensureBootstrapped(listOf(kept))
+
+        assertTrue(result is ApiKeyBootstrapService.Result.Provisioned)
+        assertEquals(
+            mapOf(
+                "kept" to ApiKeyBootstrapService.Action.UNCHANGED,
+                "tmp-provisioner" to ApiKeyBootstrapService.Action.REVOKED,
+            ),
+            result.applied.associate { it.name to it.action },
+        )
+        assertTrue(apiKeys.findByTenantAndName(tenant.id, "kept")!!.enabled)
+        assertTrue(apiKeys.findByTenantAndName(tenant.id, "console-key")!!.enabled)
+    }
+
+    @Test
+    fun `an invalid list revokes nothing`() {
+        service.ensureBootstrapped(listOf(provisioner()))
+
+        val result = service.ensureBootstrapped(listOf(provisioner().copy(name = "typo", tenantSlug = "nope")))
+
+        assertTrue(result is ApiKeyBootstrapService.Result.Failure)
+        assertTrue(apiKeys.findByTenantAndName(tenant.id, "tmp-provisioner")!!.enabled)
+    }
 }

@@ -77,7 +77,7 @@ class AdminUserE2ETest : E2ETestBase() {
 
         val toggleForm = page.querySelector("form[action*='/toggle']")
         if (toggleForm != null) {
-            val action = toggleForm.getAttribute("action")
+            val action = toggleForm.getAttribute("action").orEmpty()
             // Action must use numeric user ID
             assertTrue(
                 action.matches(Regex(".*/users/\\d+/toggle")),
@@ -102,7 +102,7 @@ class AdminUserE2ETest : E2ETestBase() {
 
         val revokeForm = page.querySelector("form[action*='/revoke-sessions']")
         if (revokeForm != null) {
-            val action = revokeForm.getAttribute("action")
+            val action = revokeForm.getAttribute("action").orEmpty()
             assertTrue(
                 action.matches(Regex(".*/users/\\d+/revoke-sessions")),
                 "Revoke form action must use numeric ID, got: $action",
