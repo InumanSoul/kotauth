@@ -18,8 +18,22 @@ their `/t/{slug}` prefix:
 | Emailed links (verify, reset, invite, magic link) | instance address | the domain |
 | Social and OIDC broker callback | `https://sso.example.com/t/acme/auth/social/{p}/callback` | `https://auth.acme.com/t/acme/auth/social/{p}/callback` |
 
-The admin console stays on the instance address. The admin API, SCIM and the token endpoints answer
-on both addresses.
+## Which address answers what
+
+Once a workspace has a domain, Kotauth keeps its pages there:
+
+- **Its pages on the instance address are redirected** (308, path and query kept) to the domain:
+  sign-in, authorize, registration, MFA, the account portal, emailed links. An old bookmark or a
+  relying party that still sends users to the instance address keeps working.
+- **Its domain serves only that workspace.** Another workspace's pages, and the admin console,
+  answer 404 there, so no other brand appears under the product's domain.
+- **Servers can use either address.** The admin API, SCIM, discovery, JWKS and the token,
+  userinfo, introspection and revocation endpoints answer on both, so backends can migrate on
+  their own schedule.
+
+Hosts are compared by name only, not scheme or port. Behind a proxy, make sure it forwards the
+`Host` the user typed (most do by default), or set `X-Forwarded-Host` with `KAUTH_TRUSTED_PROXY`.
+A domain set or cleared on one workspace is enforced for the others within 30 seconds.
 
 The domain is an origin only: `https://` plus host and optional port, with no path. Plain `http` is
 accepted only for `localhost` during development. An explicit **Issuer URL** still overrides the
