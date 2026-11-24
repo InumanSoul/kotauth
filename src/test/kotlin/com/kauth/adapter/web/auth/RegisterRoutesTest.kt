@@ -69,10 +69,8 @@ class RegisterRoutesTest {
                         AuthService(
                             userRepository = userRepo,
                             tenantRepository = tenantRepo,
-                            tokenPort = tokenPort,
                             passwordHasher = hasher,
                             auditLog = auditLog,
-                            sessionRepository = sessionRepo,
                             identifierResolver = UserIdentifierResolver(userRepo),
                             collisionCheck = IdentifierCollisionCheck(userRepo),
                         ),
