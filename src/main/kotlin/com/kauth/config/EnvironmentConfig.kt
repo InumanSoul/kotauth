@@ -91,6 +91,8 @@ data class EnvironmentConfig(
     val bootstrapApiKeysJson: String?,
     val bootstrapAdminPassword: String?,
     val trustedProxy: Boolean,
+    /** Lets webhooks reach loopback and private addresses. Link-local and metadata stay refused. */
+    val webhookAllowPrivateNetworks: Boolean = false,
     val maxRequestBodyBytes: Long,
     val maxBackupImportBodyBytes: Long,
 ) {
@@ -157,6 +159,8 @@ data class EnvironmentConfig(
                 bootstrapApiKeysJson = envOrFile("KAUTH_BOOTSTRAP_API_KEYS")?.takeIf { it.isNotBlank() },
                 bootstrapAdminPassword = bootstrapAdminPassword,
                 trustedProxy = System.getenv("KAUTH_TRUSTED_PROXY")?.lowercase() == "true",
+                webhookAllowPrivateNetworks =
+                    System.getenv("KAUTH_WEBHOOK_ALLOW_PRIVATE_NETWORKS")?.lowercase() == "true",
                 maxRequestBodyBytes = maxRequestBodyBytes,
                 maxBackupImportBodyBytes = maxBackupImportBodyBytes,
             )

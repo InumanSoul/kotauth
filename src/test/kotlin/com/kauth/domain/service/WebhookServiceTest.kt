@@ -26,17 +26,35 @@ class WebhookServiceTest {
     private val endpoints = FakeWebhookEndpointRepository()
     private val deliveries = FakeWebhookDeliveryRepository()
 
+    private val sender = FakeWebhookSender()
     private val svc =
         WebhookService(
             endpointRepository = endpoints,
             deliveryRepository = deliveries,
-            sender = FakeWebhookSender(),
+            sender = sender,
         )
 
     @BeforeTest
     fun setup() {
         endpoints.clear()
         deliveries.clear()
+        sender.clear()
+    }
+
+    @Test
+    fun `createEndpoint - a URL the transport refuses is not saved`() {
+        sender.refusal = "The host internal.example resolves to a private or loopback address."
+
+        val result =
+            svc.createEndpoint(
+                tenantId = TenantId(1),
+                url = "https://internal.example/hook",
+                events = setOf(WebhookEventType.USER_CREATED),
+            )
+
+        assertIs<WebhookResult.Failure>(result)
+        assertEquals(sender.refusal, result.error)
+        assertTrue(endpoints.findByTenantId(TenantId(1)).isEmpty())
     }
 
     // =========================================================================

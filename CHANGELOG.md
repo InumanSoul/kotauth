@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Webhooks can no longer reach internal addresses (SSRF).** A webhook URL is set by a workspace
+  admin or an API key, and Kotauth called whatever it pointed to, including cloud metadata at
+  `169.254.169.254`, loopback and private-network services, and wherever a redirect led. Kotauth
+  now checks every address the host resolves to, both when the endpoint is saved and before each
+  delivery, and never follows redirects. Link-local, metadata, unspecified and multicast
+  addresses are always refused. Loopback, private and carrier-grade NAT addresses are refused
+  unless `KAUTH_WEBHOOK_ALLOW_PRIVATE_NETWORKS=true`.
+
+  **Upgrade note:** if your webhooks go to services on your own network (for example
+  `http://app:8080` on a Docker network), set `KAUTH_WEBHOOK_ALLOW_PRIVATE_NETWORKS=true` before
+  upgrading, or their deliveries will fail.
+
 ## [1.30.0] - 2026-11-24
 
 ### Added
