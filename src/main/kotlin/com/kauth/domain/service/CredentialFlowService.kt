@@ -265,6 +265,7 @@ class CredentialFlowService(
         userRepository.resetFailedLogins(token.userId)
         sessionRepository.revokeAllForUser(token.tenantId, token.userId, now)
         prTokenRepo.markUsed(token.id!!, now)
+        settleAfterReset(token.userId, token.tenantId)
 
         if (tenant != null && tenant.isSmtpReady) {
             val resetUser = userRepository.findById(token.userId, token.tenantId)
@@ -395,6 +396,23 @@ class CredentialFlowService(
         }
 
         return SelfServiceResult.Success(Unit)
+    }
+
+    /**
+     * A reset link reaches only the user's mailbox, so completing one proves what accepting an
+     * invite proves: the email is verified, and the password is one the user chose. Without this an
+     * invited user who reset instead of accepting kept SET_PASSWORD and could never sign in.
+     */
+    private fun settleAfterReset(
+        userId: UserId,
+        tenantId: TenantId,
+    ) {
+        val user = userRepository.findById(userId, tenantId) ?: return
+        val settled = user.requiredActions - RequiredAction.SET_PASSWORD - RequiredAction.CHANGE_PASSWORD
+        if (!user.emailVerified || settled != user.requiredActions) {
+            userRepository.update(user.copy(emailVerified = true, requiredActions = settled))
+        }
+        prTokenRepo.deleteByUserAndPurpose(userId, TokenPurpose.INVITE)
     }
 
     fun confirmAcceptInvite(

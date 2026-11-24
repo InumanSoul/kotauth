@@ -1168,10 +1168,36 @@ paths:
       description: |
         Generates a password-reset token and emails it to the user via the
         tenant's configured SMTP. Idempotent — safe to call multiple times.
-        Requires SMTP to be configured on the tenant.
+        Requires SMTP to be configured on the tenant. Completing the reset also
+        verifies the user's email and settles a pending invite, so a user who
+        resets instead of accepting their invite can sign in.
       security: [{ bearerAuth: [users:write] }]
       responses:
         "204": { description: Reset email queued }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /users/{userId}/resend-invite:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+
+    post:
+      operationId: resendInvite
+      summary: Resend a pending invite
+      tags: [Users]
+      description: |
+        Emails a new invite link to a user who has not accepted their invite yet,
+        and invalidates the previous link. Use it when an invite expired.
+        Answers 422 when the user has no pending invite or the tenant's SMTP
+        is not configured.
+      security: [{ bearerAuth: [users:write] }]
+      responses:
+        "204": { description: Invite email queued }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
