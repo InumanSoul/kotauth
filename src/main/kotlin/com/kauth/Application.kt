@@ -14,6 +14,7 @@ import com.kauth.adapter.web.auth.authRoutes
 import com.kauth.adapter.web.badRequestsAsClientErrors
 import com.kauth.adapter.web.healthRoutes
 import com.kauth.adapter.web.loadAppInfo
+import com.kauth.adapter.web.plugin.WorkspaceHostPlugin
 import com.kauth.adapter.web.plugin.buildCspPolicy
 import com.kauth.adapter.web.plugin.requestBodySizeLimitPlugin
 import com.kauth.adapter.web.portal.PortalSession
@@ -273,6 +274,8 @@ fun Application.module(
     versionCheckService: VersionCheckService,
 ) {
     installForwardedHeaders(config)
+    // After forwarded headers, so the host it compares is the one the user typed.
+    install(WorkspaceHostPlugin) { tenantRepository = s.tenantRepository }
 
     // -- Security headers ----------------------------------------------------
     install(DefaultHeaders) {
