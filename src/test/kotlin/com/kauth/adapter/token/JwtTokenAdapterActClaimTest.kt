@@ -156,4 +156,13 @@ class JwtTokenAdapterActClaimTest {
                 .subject,
         )
     }
+
+    @Test
+    fun `the issuer is on the workspace's public domain, and an explicit issuer URL still wins`() {
+        val onDomain = tenant.copy(publicBaseUrl = "https://auth.acme.test")
+
+        assertEquals("https://auth.acme.test/t/acme", adapter.issuerFor(onDomain))
+        assertEquals("http://localhost:8080/t/acme", adapter.issuerFor(tenant))
+        assertEquals("https://iss.acme.test", adapter.issuerFor(onDomain.copy(issuerUrl = "https://iss.acme.test")))
+    }
 }

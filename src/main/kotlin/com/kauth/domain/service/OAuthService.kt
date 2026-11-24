@@ -1071,6 +1071,9 @@ class OAuthService(
         val name: String,
     )
 
+    /** The `iss` this workspace's tokens carry and its discovery document advertises. */
+    fun issuerFor(tenant: Tenant): String = tokenPort.issuerFor(tenant)
+
     /** The `sub` Kotauth issues for [userId], or null when the user is gone. */
     fun subjectOf(
         userId: UserId,

@@ -84,6 +84,10 @@ fun Route.portalRoutes(
     impersonationService: com.kauth.domain.service.ImpersonationService? = null,
     webAuthnService: WebAuthnService? = null,
 ) {
+    // Must equal the portal client's registered redirect URI (PortalClientProvisioning).
+    fun portalCallbackUri(slug: String): String =
+        (tenantRepository.findBySlug(slug)?.publicPrefix(baseUrl) ?: "$baseUrl/t/$slug") + "/account/callback"
+
     fun ApplicationCall.portalViewContext(tenant: Tenant?): ViewContext {
         val theme = tenant?.theme ?: TenantTheme.DEFAULT
         val portal = sessions.get<PortalSession>()
@@ -154,7 +158,7 @@ fun Route.portalRoutes(
             // bouncing back here with ?prompt_failed=true to break the loop.
             val promptFailed = call.request.queryParameters["prompt_failed"] == "true"
 
-            val redirectUri = "$baseUrl/t/$slug/account/callback"
+            val redirectUri = portalCallbackUri(slug)
             val authEndpoint = "/t/$slug/authorize"
             val authUrl =
                 buildString {
@@ -238,7 +242,7 @@ fun Route.portalRoutes(
                 httpOnly = true,
             )
 
-            val redirectUri = "$baseUrl/t/$slug/account/callback"
+            val redirectUri = portalCallbackUri(slug)
             val ipAddress = call.request.origin.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
 

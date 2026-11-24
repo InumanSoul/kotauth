@@ -388,6 +388,34 @@ class ApiWorkspaceRoutesTest {
         }
 
     @Test
+    fun `PATCH workspace sets, normalizes and clears the public domain, and refuses a path`() =
+        testApplication {
+            application { installTestApp() }
+            val key = writeKey()
+
+            val set = patchWorkspace("""{"publicBaseUrl": "https://Auth.Acme.test/"}""", key)
+            val withPath = patchWorkspace("""{"publicBaseUrl": "https://auth.acme.test/t/acme"}""", key)
+            val cleared = patchWorkspace("""{"publicBaseUrl": ""}""", key)
+
+            assertEquals(HttpStatusCode.OK, set.status, set.bodyAsText())
+            assertEquals(
+                "https://auth.acme.test",
+                jsonCodec
+                    .parseToJsonElement(set.bodyAsText())
+                    .jsonObject["publicBaseUrl"]!!
+                    .jsonPrimitive.content,
+            )
+            assertEquals(HttpStatusCode.UnprocessableEntity, withPath.status)
+            assertEquals(HttpStatusCode.OK, cleared.status)
+            assertTrue(
+                jsonCodec
+                    .parseToJsonElement(cleared.bodyAsText())
+                    .jsonObject["publicBaseUrl"]
+                    .let { it == null || it.toString() == "null" },
+            )
+        }
+
+    @Test
     fun `PATCH workspace sets defaultLocale`() =
         testApplication {
             application { installTestApp() }

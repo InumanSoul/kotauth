@@ -368,6 +368,38 @@ class SocialLoginRoutesTest {
     }
 
     @Test
+    fun `the broker callback is on the workspace's public domain, at authorize and at exchange`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.update(tenantRepo.findBySlug("acme")!!.copy(publicBaseUrl = "https://auth.acme.test"))
+            installSocialRoutes(baseUrl = "http://localhost")
+            val client =
+                createClient {
+                    followRedirects = false
+                    install(HttpCookies)
+                }
+            idpRepo.seed(TenantId(1), "oriana")
+            userRepo.add(alice)
+            appRepo.add(spaApp)
+            orianaAdapter.profileToReturn =
+                SocialUserProfile(
+                    providerUserId = "oriana|42",
+                    email = alice.email,
+                    name = "Alice",
+                    emailVerified = true,
+                )
+            val expected = "https://auth.acme.test/t/acme/auth/social/oriana/callback"
+
+            val redirect = client.get("/t/acme/auth/social/oriana/redirect")
+            client.get(
+                "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+            )
+
+            assertTrue(redirect.headers["Location"]!!.contains("redirect_uri=$expected"), redirect.headers["Location"])
+            assertEquals(expected, orianaAdapter.redirectUriAtExchange)
+        }
+
+    @Test
     fun `a social sign-in for a user with TOTP goes to the MFA challenge, not the client`() =
         testApplication {
             resetFixtures()

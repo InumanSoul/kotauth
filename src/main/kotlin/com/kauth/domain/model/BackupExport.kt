@@ -77,6 +77,8 @@ data class TenantBackup(
     val smtp: SmtpConfigBackup,
     // Null for backups taken before email branding existed.
     val emailBranding: EmailBrandingBackup? = null,
+    /** Null for backups taken before v1.31.0 or for a workspace on the instance origin. */
+    val publicBaseUrl: String? = null,
 )
 
 @Serializable

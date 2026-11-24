@@ -75,6 +75,7 @@ fun Route.adminSettingsRoutes(
             WorkspaceSettingsUpdate.from(workspace).copy(
                 displayName = params["displayName"]?.trim() ?: "",
                 issuerUrl = params["issuerUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                publicBaseUrl = params["publicBaseUrl"]?.trim()?.takeIf { it.isNotBlank() },
                 tokenExpirySeconds = params["tokenExpirySeconds"]?.toLongOrNull() ?: 3600L,
                 refreshTokenExpirySeconds = params["refreshTokenExpirySeconds"]?.toLongOrNull() ?: 86400L,
                 registrationEnabled = params["registrationEnabled"] == "true",
@@ -225,7 +226,7 @@ fun Route.adminSettingsRoutes(
                 existing = null,
                 allWorkspaces = call.attributes[WsPairsAttr],
                 loggedInAs = session.username,
-                baseUrl = baseUrl,
+                baseUrl = workspace.publicOrigin(baseUrl),
             ),
         )
     }
@@ -256,7 +257,7 @@ fun Route.adminSettingsRoutes(
                 loggedInAs = session.username,
                 saved = call.request.queryParameters["saved"] == "true",
                 failures = auditLogRepository.recentSignInFailures(workspace.id)[provider].orEmpty(),
-                baseUrl = baseUrl,
+                baseUrl = workspace.publicOrigin(baseUrl),
             ),
         )
     }
@@ -372,7 +373,7 @@ fun Route.adminSettingsRoutes(
                 allWorkspaces = call.attributes[WsPairsAttr],
                 loggedInAs = session.username,
                 failures = auditLogRepository.recentSignInFailures(workspace.id)[provider].orEmpty(),
-                baseUrl = baseUrl,
+                baseUrl = workspace.publicOrigin(baseUrl),
                 probe = probeService.probe(stored),
             ),
         )
@@ -659,7 +660,13 @@ fun Route.adminSettingsRoutes(
         val userWithPasskey = users.map { u -> u to (u.id in enrolledUserIds) }
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.passkeysPage(workspace, wsPairs, session.username, userWithPasskey, baseUrl),
+            AdminView.passkeysPage(
+                workspace,
+                wsPairs,
+                session.username,
+                userWithPasskey,
+                workspace.publicOrigin(baseUrl),
+            ),
         )
     }
 
@@ -688,7 +695,7 @@ fun Route.adminSettingsRoutes(
                 enrolledUsers = enrolled.size,
                 enrolledUserList = enrolled,
                 notEnrolledUserList = notEnrolled,
-                baseUrl = baseUrl,
+                baseUrl = workspace.publicOrigin(baseUrl),
             ),
         )
     }
@@ -769,7 +776,7 @@ private suspend fun ApplicationCall.respondIdentityProviderError(
             loggedInAs = sessions.get<AdminSession>()!!.username,
             error = error,
             failures = provider?.let { auditLogRepository.recentSignInFailures(workspace.id)[it] }.orEmpty(),
-            baseUrl = baseUrl,
+            baseUrl = workspace.publicOrigin(baseUrl),
         ),
     )
 }

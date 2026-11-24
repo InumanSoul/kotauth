@@ -269,6 +269,28 @@ class BackupImporterUsernameValidationTest {
     }
 
     @Test
+    fun `import keeps the workspace's public domain and refuses a malformed one`() {
+        val export = exportAcmeWithTwoUsers()
+
+        val kept =
+            importer().import(
+                export.copy(tenant = export.tenant.copy(publicBaseUrl = "https://auth.acme.test")),
+                "acme-a",
+                1,
+            )
+        val bad =
+            importer().import(
+                export.copy(tenant = export.tenant.copy(publicBaseUrl = "https://auth.acme.test/x")),
+                "acme-b",
+                1,
+            )
+
+        assertIs<BackupResult.Success<*>>(kept)
+        assertEquals("https://auth.acme.test", destTenants.findBySlug("acme-a")!!.publicBaseUrl)
+        assertIs<BackupResult.Failure>(bad)
+    }
+
+    @Test
     fun `import keeps each user's subject`() {
         val export = exportAcmeWithTwoUsers()
         val withSubjects =

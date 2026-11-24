@@ -98,6 +98,7 @@ class BackupExporterService(
                 slug = tenant.slug,
                 displayName = tenant.displayName,
                 issuerUrl = tenant.issuerUrl,
+                publicBaseUrl = tenant.publicBaseUrl,
                 tokenExpirySeconds = tenant.tokenExpirySeconds,
                 refreshTokenExpirySeconds = tenant.refreshTokenExpirySeconds,
                 registrationEnabled = tenant.registrationEnabled,

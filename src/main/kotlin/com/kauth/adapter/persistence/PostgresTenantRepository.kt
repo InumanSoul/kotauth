@@ -97,6 +97,7 @@ class PostgresTenantRepository(
             TenantsTable.update({ TenantsTable.id eq tenant.id.value }) {
                 it[displayName] = tenant.displayName
                 it[issuerUrl] = tenant.issuerUrl
+                it[publicBaseUrl] = tenant.publicBaseUrl
                 it[tokenExpirySeconds] = tenant.tokenExpirySeconds.toInt()
                 it[refreshTokenExpirySeconds] = tenant.refreshTokenExpirySeconds.toInt()
                 it[registrationEnabled] = tenant.registrationEnabled
@@ -206,6 +207,7 @@ class PostgresTenantRepository(
             slug = this[TenantsTable.slug],
             displayName = this[TenantsTable.displayName],
             issuerUrl = this[TenantsTable.issuerUrl],
+            publicBaseUrl = this[TenantsTable.publicBaseUrl],
             tokenExpirySeconds = this[TenantsTable.tokenExpirySeconds].toLong(),
             refreshTokenExpirySeconds = this[TenantsTable.refreshTokenExpirySeconds].toLong(),
             registrationEnabled = this[TenantsTable.registrationEnabled],

@@ -12,6 +12,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.model.workspacePageUrl
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuthorizationCodeRepository
@@ -63,6 +64,8 @@ class EmailOtpService(
     private val clock: Clock = Clock.systemUTC(),
     private val usernameGenerator: UsernameGenerator = UsernameGenerator(userRepository),
     private val emailScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    // KAUTH_BASE_URL, for links into a workspace that has no public domain of its own.
+    private val instanceBaseUrl: String = "",
 ) {
     private val log = LoggerFactory.getLogger(EmailOtpService::class.java)
 
@@ -448,9 +451,7 @@ class EmailOtpService(
     private fun generateAuthCode(): String = "${UUID.randomUUID()}${UUID.randomUUID()}".replace("-", "")
 
     private fun passwordResetUrl(tenant: Tenant): String =
-        tenant.issuerUrl
-            ?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/account/forgot-password")
-            ?: ""
+        workspacePageUrl(tenant, instanceBaseUrl, "/account/forgot-password")
 }
 
 sealed class OtpSendResult {

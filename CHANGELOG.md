@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A public domain per workspace.** A workspace can be given its own origin, such as
+  `https://auth.acme.com`, in the console (Workspace settings → General) or with
+  `PATCH /workspace` (`publicBaseUrl`). Its issuer, discovery document, sign-in and account pages,
+  emailed links and broker callbacks are then built on it, keeping their `/t/{slug}` paths. The
+  admin console stays on `KAUTH_BASE_URL`. Backups carry the domain. Comes with migration V72. See
+  `docs/operations/custom-domains.md`. Refs #239.
+
 - **A workspace keeps its users' `sub` when it moves to another instance.** Backups now carry each
   user's `sub`, and import writes it, so relying parties keep every link after an export and
   import. Users from a backup taken before this release get a new `sub`; the import summary
@@ -29,12 +36,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Discovery advertises the issuer the tokens carry.** Without an issuer URL, the discovery
+  document built its issuer from the address the request arrived on, while tokens used
+  `KAUTH_BASE_URL`. A client that reached the instance under another name got an issuer its tokens
+  never matched. Both now come from one place.
+
 - **New users get a random UUID as their `sub`.** `sub` was the user's database row id, which is
   sequential, so it revealed how many users an instance had and let one be guessed from another.
   Users that exist when you upgrade keep the `sub` they have (migration V71 copies it), so no
   token, link or integration changes for them. **If a relying party stores `sub` as an integer,
   change that column to text before upgrading:** the first user created afterwards has a UUID.
   See ADR-25.
+
+### Fixed
+
+- **Two emailed links work without an issuer URL.** The password-changed email's sign-in link and
+  the email-code email's reset link were built from the workspace's issuer URL and came out empty
+  when none was set. They're now built on the workspace's address.
 
 ## [1.30.2] - 2026-11-24
 

@@ -396,7 +396,16 @@ internal fun Route.socialLoginRoutes(
 
         val secure = baseUrl.startsWith("https://", ignoreCase = true)
 
-        when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl, binding)) {
+        when (
+            val result =
+                socialLoginService.buildRedirectUrl(
+                    slug,
+                    provider,
+                    signedState,
+                    tenant?.publicOrigin(baseUrl) ?: baseUrl,
+                    binding,
+                )
+        ) {
             is SocialLoginResult.Success -> {
                 call.setSocialStateCookie(slug, provider, encryptionService.signCookie(csrfNonce), secure)
                 call.respondRedirect(result.value)
@@ -594,7 +603,8 @@ internal fun Route.socialLoginRoutes(
                     tenantSlug = slug,
                     provider = provider,
                     code = code,
-                    baseUrl = baseUrl,
+                    // The provider checks this against the redirect_uri the authorize request sent.
+                    baseUrl = tenant?.publicOrigin(baseUrl) ?: baseUrl,
                     ipAddress = ipAddress,
                     userAgent = userAgent,
                     binding = socialState.binding,

@@ -161,6 +161,36 @@ class AdminServicesTest {
     // =========================================================================
 
     @Test
+    fun `a public domain is stored normalized and re-registers the workspace's redirect URIs once`() {
+        val changed = mutableListOf<String?>()
+        val svc =
+            WorkspaceSettingsService(
+                tenantRepository = tenants,
+                auditLog = auditLog,
+                onPublicOriginChanged = { changed += it.publicBaseUrl },
+            )
+        val base = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!)
+
+        val saved = svc.updateWorkspaceSettings("acme", base.copy(publicBaseUrl = "HTTPS://Auth.Acme.test/"))
+        svc.updateWorkspaceSettings("acme", WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!))
+
+        assertEquals("https://auth.acme.test", assertIs<AdminResult.Success<Tenant>>(saved).value.publicBaseUrl)
+        assertEquals(listOf<String?>("https://auth.acme.test"), changed)
+    }
+
+    @Test
+    fun `a public domain with a path or plain http is refused`() {
+        val base = WorkspaceSettingsUpdate.from(tenants.findBySlug("acme")!!)
+
+        val withPath = wsSvc.updateWorkspaceSettings("acme", base.copy(publicBaseUrl = "https://auth.acme.test/t/acme"))
+        val plainHttp = wsSvc.updateWorkspaceSettings("acme", base.copy(publicBaseUrl = "http://auth.acme.test"))
+
+        assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(withPath).error)
+        assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(plainHttp).error)
+        assertEquals(null, tenants.findBySlug("acme")!!.publicBaseUrl)
+    }
+
+    @Test
     fun `updateWorkspaceSettings - tenant not found`() {
         val result = callUpdateSettings(slug = "unknown")
         assertIs<AdminResult.Failure>(result)
@@ -1616,6 +1646,7 @@ class AdminServicesTest {
         WorkspaceSettingsUpdate(
             displayName = "Acme Corp",
             issuerUrl = null,
+            publicBaseUrl = null,
             tokenExpirySeconds = 3600L,
             refreshTokenExpirySeconds = 86400L,
             registrationEnabled = true,

@@ -1296,6 +1296,12 @@ object EnglishStrings {
     const val IDP_KEY_HINT =
         "Lower-case letters, digits and hyphens. It appears in the callback URL and cannot be " +
             "changed once saved, because accounts already linked to this provider point at it."
+    const val WORKSPACE_PUBLIC_DOMAIN_LABEL = "Public domain"
+    const val WORKSPACE_PUBLIC_DOMAIN_HINT =
+        "The origin your users sign in on, such as https://auth.example.com. The issuer, sign-in and " +
+            "account pages, and every link Kotauth emails move to it. Point the domain at this instance " +
+            "first. Leave blank to use the instance's own address."
+
     const val IDP_KEY_INVALID =
         "That is not a provider key. Use 1 to 32 lower-case letters, digits or hyphens."
     const val IDP_KIND_OIDC = "OpenID Connect"

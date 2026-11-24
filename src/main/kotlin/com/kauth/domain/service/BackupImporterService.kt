@@ -16,6 +16,7 @@ import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.ProviderKind
+import com.kauth.domain.model.PublicBaseUrl
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.ResourceServerId
 import com.kauth.domain.model.Role
@@ -143,6 +144,13 @@ class BackupImporterService(
 
         val fullTenant =
             createdTenant.copy(
+                publicBaseUrl =
+                    tb.publicBaseUrl?.let {
+                        (PublicBaseUrl.parse(it) as? PublicBaseUrl.Result.Valid)?.origin
+                            ?: error(
+                                "Backup import rejected: the workspace's public domain '$it' is not a valid origin.",
+                            )
+                    },
                 tokenExpirySeconds = tb.tokenExpirySeconds,
                 refreshTokenExpirySeconds = tb.refreshTokenExpirySeconds,
                 registrationEnabled = tb.registrationEnabled,

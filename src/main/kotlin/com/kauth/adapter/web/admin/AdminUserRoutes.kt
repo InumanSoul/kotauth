@@ -492,7 +492,7 @@ fun Route.adminUserRoutes(
                 val baseUrl = call.resolvedBaseUrl()
                 when (val result = accountService.setTemporaryPassword(userId, workspace.id)) {
                     is AdminResult.Success -> {
-                        val changeUrl = "$baseUrl/t/$slug/change-password?token=${result.value}"
+                        val changeUrl = "${workspace.publicPrefix(baseUrl)}/change-password?token=${result.value}"
                         flash.put(call, "temp-password:$slug/${userId.value}", session.username, changeUrl)
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=temp_password_set")
                     }

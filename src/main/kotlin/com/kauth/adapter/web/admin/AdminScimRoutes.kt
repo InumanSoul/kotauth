@@ -43,7 +43,7 @@ fun Route.adminScimRoutes(
             AdminView.scimProvisioningPage(
                 workspace = workspace,
                 scimKeys = scimKeys,
-                endpointUrl = scimEndpointUrl(baseUrl, workspace.slug),
+                endpointUrl = scimEndpointUrl(workspace.publicOrigin(baseUrl), workspace.slug),
                 allWorkspaces = wsPairs,
                 loggedInAs = session.username,
                 toastMessage = toast,
