@@ -27,6 +27,7 @@ import com.kauth.config.EnvironmentConfig
 import com.kauth.config.ServiceGraph
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
+import com.kauth.infrastructure.TrustedProxies
 import com.kauth.infrastructure.VersionCheckService
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -217,8 +218,51 @@ fun main(args: Array<String> = emptyArray()) {
  *
  * Shared with the route tests so they exercise the deployed configuration rather than a copy.
  */
-internal fun Application.installTrustedProxyHeaders() {
-    install(XForwardedHeaders) { useLastProxy() }
+internal fun Application.installTrustedProxyHeaders(
+    proxies: TrustedProxies? = null,
+    clientIpHeader: String? = null,
+) {
+    install(XForwardedHeaders) {
+        if (proxies == null) {
+            useLastProxy()
+            return@install
+        }
+        // A trusted client-IP header (e.g. CF-Connecting-IP) wins over X-Forwarded-For when present.
+        clientIpHeader?.let { forHeaders.add(0, it) }
+        extractEdgeProxy { connectionPoint, headers ->
+            // Headers from a peer outside the trusted ranges are the client's own: ignore them all.
+            if (!proxies.isTrusted(connectionPoint.remoteAddress)) return@extractEdgeProxy
+            headers.protoHeader?.split(',')?.lastOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                connectionPoint.scheme = it
+            }
+            headers.hostHeader?.split(',')?.lastOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                connectionPoint.serverHost = it.substringBefore(':')
+            }
+            headers.forHeader?.let { proxies.clientFrom(it.split(',')) }?.let {
+                connectionPoint.remoteHost = it
+                connectionPoint.remoteAddress = it
+            }
+        }
+    }
+}
+
+private fun Application.installForwardedHeaders(config: EnvironmentConfig) {
+    // Forwarded headers are attacker-controlled unless a trusted reverse proxy
+    // strips/sets them. Honoring them on a directly-exposed instance lets
+    // clients spoof X-Forwarded-For and bypass every per-IP rate limit.
+    // Only enable behind a proxy that overwrites these headers (see ENV_REFERENCE).
+    if (config.trustedProxyCidrs != null) {
+        installTrustedProxyHeaders(config.trustedProxyCidrs, config.clientIpHeader)
+        startupLog.info(
+            "KAUTH_TRUSTED_PROXY_CIDRS set — honoring forwarded headers only from trusted proxies" +
+                (config.clientIpHeader?.let { ", client IP from $it when present" } ?: ""),
+        )
+    } else if (config.trustedProxy) {
+        installTrustedProxyHeaders()
+        startupLog.info("KAUTH_TRUSTED_PROXY=true — honoring X-Forwarded-* headers for client IPs")
+    } else {
+        startupLog.info("Forwarded headers ignored (KAUTH_TRUSTED_PROXY not set) — using socket peer IPs")
+    }
 }
 
 fun Application.module(
@@ -228,16 +272,7 @@ fun Application.module(
     startTime: Long,
     versionCheckService: VersionCheckService,
 ) {
-    // Forwarded headers are attacker-controlled unless a trusted reverse proxy
-    // strips/sets them. Honoring them on a directly-exposed instance lets
-    // clients spoof X-Forwarded-For and bypass every per-IP rate limit.
-    // Only enable behind a proxy that overwrites these headers (see ENV_REFERENCE).
-    if (config.trustedProxy) {
-        installTrustedProxyHeaders()
-        startupLog.info("KAUTH_TRUSTED_PROXY=true — honoring X-Forwarded-* headers for client IPs")
-    } else {
-        startupLog.info("Forwarded headers ignored (KAUTH_TRUSTED_PROXY not set) — using socket peer IPs")
-    }
+    installForwardedHeaders(config)
 
     // -- Security headers ----------------------------------------------------
     install(DefaultHeaders) {

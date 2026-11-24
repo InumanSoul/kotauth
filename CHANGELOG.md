@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Client addresses behind more than one proxy.** With a CDN in front of a reverse proxy
+  (Cloudflare in front of Traefik, as Dokploy and Coolify set it up), Kotauth took the proxy's
+  last `X-Forwarded-For` entry, a CDN edge address, as the client. Every per-IP limit (sign-in,
+  token, MFA, email code) and every audit-log address collapsed onto a few edge addresses, so one
+  abusive client could lock out everyone behind the same edge. `KAUTH_TRUSTED_PROXY_CIDRS` lists
+  the proxies' ranges. Forwarded headers are honored only from them, and the client is the first
+  `X-Forwarded-For` entry from the right outside them. `KAUTH_CLIENT_IP_HEADER` (e.g.
+  `CF-Connecting-IP`) can name a header to read from a trusted proxy instead. With neither set,
+  nothing changes. Closes #240.
+
 ## [1.30.2] - 2026-11-24
 
 ### Security
