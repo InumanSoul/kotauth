@@ -152,6 +152,20 @@ class WebAuthnServiceTest {
     }
 
     @Test
+    fun `ceremonies accept the workspace's own domain`() {
+        val onDomain = tenant.copy(publicBaseUrl = "https://auth.acme.test")
+
+        service.finishRegistration(
+            user = user,
+            tenant = onDomain,
+            creationOptionsJson = FakeRelyingPartyAdapter.CANNED_CREATION_OPTIONS_JSON,
+            request = RegistrationFinishRequest(credentialJson = "{}", name = "Laptop"),
+        )
+
+        assertEquals(listOf<String?>("https://auth.acme.test"), relyingParty.workspaceOrigins)
+    }
+
+    @Test
     fun `finishRegistration trims name to 64 characters`() {
         val longName = "A".repeat(100)
         val result =

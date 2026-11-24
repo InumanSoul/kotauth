@@ -40,6 +40,16 @@ class YubicoRelyingPartyAdapter(
 ) : RelyingPartyAdapter {
     private val jsonMapper = ObjectMapper()
 
+    // The RP ID never changes; a workspace with its own domain only widens the accepted origins.
+    private val byWorkspaceOrigin = java.util.concurrent.ConcurrentHashMap<String, RelyingParty>()
+
+    internal fun verifierFor(workspaceOrigin: String?): RelyingParty =
+        workspaceOrigin?.let { origin ->
+            byWorkspaceOrigin.computeIfAbsent(origin) {
+                relyingParty.toBuilder().origins(relyingParty.origins + it).build()
+            }
+        } ?: relyingParty
+
     @Suppress("UnusedParameter")
     override fun startRegistration(
         userHandle: ByteArray,
@@ -76,13 +86,14 @@ class YubicoRelyingPartyAdapter(
     override fun finishRegistration(
         creationOptionsJson: String,
         credentialResponseJson: String,
+        workspaceOrigin: String?,
     ): RegisteredCredentialData {
         val request = PublicKeyCredentialCreationOptions.fromJson(creationOptionsJson)
         val credential = PublicKeyCredential.parseRegistrationResponseJson(credentialResponseJson)
 
         val result =
             try {
-                relyingParty.finishRegistration(
+                verifierFor(workspaceOrigin).finishRegistration(
                     FinishRegistrationOptions
                         .builder()
                         .request(request)
@@ -125,6 +136,7 @@ class YubicoRelyingPartyAdapter(
     override fun finishAssertion(
         assertionRequestJson: String,
         credentialResponseJson: String,
+        workspaceOrigin: String?,
     ): AssertionResultData {
         val browserTree = jsonMapper.readTree(assertionRequestJson)
         val innerNode = browserTree.get("publicKey") ?: browserTree
@@ -135,7 +147,7 @@ class YubicoRelyingPartyAdapter(
 
         val result =
             try {
-                relyingParty.finishAssertion(
+                verifierFor(workspaceOrigin).finishAssertion(
                     FinishAssertionOptions
                         .builder()
                         .request(request)

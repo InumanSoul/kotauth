@@ -68,10 +68,15 @@ class FakeRelyingPartyAdapter : RelyingPartyAdapter {
         excludeCredentialIds: List<String>,
     ): Pair<String, String> = CANNED_CREATION_OPTIONS_JSON to CANNED_CHALLENGE
 
+    /** The workspace origin each finish call was told to accept, in order. */
+    val workspaceOrigins = mutableListOf<String?>()
+
     override fun finishRegistration(
         creationOptionsJson: String,
         credentialResponseJson: String,
+        workspaceOrigin: String?,
     ): RegisteredCredentialData {
+        workspaceOrigins += workspaceOrigin
         throwOnFinishRegistration?.let { throw IllegalStateException(it) }
         return if (registrationQueue.isNotEmpty()) registrationQueue.removeFirst() else DEFAULT_REGISTERED_CREDENTIAL
     }
@@ -91,7 +96,9 @@ class FakeRelyingPartyAdapter : RelyingPartyAdapter {
     override fun finishAssertion(
         assertionRequestJson: String,
         credentialResponseJson: String,
+        workspaceOrigin: String?,
     ): AssertionResultData {
+        workspaceOrigins += workspaceOrigin
         verifiedAssertionRequests += assertionRequestJson
         throwOnFinishAssertion?.let { throw IllegalStateException(it) }
         return if (assertionQueue.isNotEmpty()) assertionQueue.removeFirst() else DEFAULT_ASSERTION_RESULT

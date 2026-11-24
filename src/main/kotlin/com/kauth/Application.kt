@@ -23,6 +23,7 @@ import com.kauth.adapter.web.portal.passkeyPortalRoutes
 import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.adapter.web.scim.scimAuthError
 import com.kauth.adapter.web.versionCheckRoutes
+import com.kauth.adapter.web.webAuthnRelatedOriginsRoutes
 import com.kauth.adapter.web.welcomeRoutes
 import com.kauth.config.EnvironmentConfig
 import com.kauth.config.ServiceGraph
@@ -468,6 +469,7 @@ fun Application.module(
         )
 
         healthRoutes(config.baseUrl)
+        webAuthnRelatedOriginsRoutes(s.tenantRepository)
         versionCheckRoutes(versionCheckService)
 
         authRoutes(
