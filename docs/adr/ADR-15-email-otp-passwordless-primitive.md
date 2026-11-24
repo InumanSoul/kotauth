@@ -285,3 +285,11 @@ signed, workspace- and user-bound `mfaToken` (5 minutes), and `verify-mfa`
 takes that token with a TOTP or recovery code and returns the code. A user who
 must enroll first gets `mfa_enrollment_required`. If the server cannot sign MFA
 tokens, a user who owes the second factor is refused, never let through.
+
+## Addendum — removing an entry revokes its key (1.30.1)
+
+The env var is authoritative in both directions. At startup, a bootstrapped key whose
+`(tenant, name)` is no longer listed is disabled and its `bootstrap_name` cleared, so the console
+can delete it. An unset `KAUTH_BOOTSTRAP_API_KEYS` counts as an empty list. Disabling rather than
+deleting keeps the key's audit trail, and putting the entry back enables the key again. A list that
+fails validation revokes nothing.

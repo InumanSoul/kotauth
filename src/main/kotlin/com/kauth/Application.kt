@@ -85,7 +85,8 @@ fun main(args: Array<String> = emptyArray()) {
 
     val services = ServiceGraph.create(config)
 
-    config.bootstrapApiKeysJson?.let { json ->
+    // Unset means no entries: keys provisioned by an earlier list are still revoked.
+    (config.bootstrapApiKeysJson ?: "[]").let { json ->
         runCatching { com.kauth.config.parseBootstrapApiKeyEntries(json) }
             .onFailure { e ->
                 startupLog.error("KAUTH_BOOTSTRAP_API_KEYS parse failed: {}", e.message)
