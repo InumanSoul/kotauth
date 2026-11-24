@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when an invite expired, which before was only possible from the console. It answers `204` when
   sent, and `422` when the user has no pending invite or SMTP isn't configured.
 
+### Security
+
+- **Removing a key from `KAUTH_BOOTSTRAP_API_KEYS` now revokes it.** Before, a bootstrapped key
+  whose entry was removed stayed active, and the console and admin routes refused to revoke it
+  because it was env-managed. The key that matters most is a short-lived `tenants:write` key used
+  to create workspaces once. At startup, a bootstrapped key that is no longer listed is now
+  disabled, logged as `revoked`, and handed back to the console, which can then delete it. Leaving
+  the variable unset counts as an empty list. Putting the entry back enables the key again. Closes
+  #221.
+
 ### Fixed
 
 - **An invited user who resets their password instead of accepting the invite can sign in.** The
