@@ -11,9 +11,7 @@ import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.RoleRepository
-import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
-import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
 import java.time.Duration
 import java.time.Instant
@@ -36,10 +34,8 @@ import java.time.Instant
 class AuthService(
     private val userRepository: UserRepository,
     private val tenantRepository: TenantRepository,
-    private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
-    private val sessionRepository: SessionRepository,
     private val credentialFlowService: CredentialFlowService? = null,
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val applicationRepository: ApplicationRepository? = null,

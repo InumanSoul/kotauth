@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`POST /users/{userId}/resend-invite` in the admin API** (scope `users:write`). It sends a new
+  invite to a user who hasn't accepted theirs and invalidates the old link. It's the call to use
+  when an invite expired, which before was only possible from the console. It answers `204` when
+  sent, and `422` when the user has no pending invite or SMTP isn't configured.
+
 ### Security
 
 - **Removing a key from `KAUTH_BOOTSTRAP_API_KEYS` now revokes it.** Before, a bootstrapped key
@@ -19,7 +26,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the variable unset counts as an empty list. Putting the entry back enables the key again. Closes
   #221.
 
+- **Webhooks can no longer reach internal addresses (SSRF).** A webhook URL is set by a workspace
+  admin or an API key, and Kotauth called whatever it pointed to, including cloud metadata at
+  `169.254.169.254`, loopback and private-network services, and wherever a redirect led. Kotauth
+  now checks every address the host resolves to, both when the endpoint is saved and before each
+  delivery, and never follows redirects. Link-local, metadata, unspecified and multicast
+  addresses are always refused. Loopback, private and carrier-grade NAT addresses are refused
+  unless `KAUTH_WEBHOOK_ALLOW_PRIVATE_NETWORKS=true`.
+
+  **Upgrade note:** if your webhooks go to services on your own network (for example
+  `http://app:8080` on a Docker network), set `KAUTH_WEBHOOK_ALLOW_PRIVATE_NETWORKS=true` before
+  upgrading, or their deliveries will fail.
+
 ### Fixed
+
+- **A new client secret or temporary-password link shows up on any replica.** The console held
+  these one-time values in one server's memory and put a lookup token in the redirect URL. With
+  more than one replica, the page after the redirect could land on another server and show
+  nothing, so the secret was lost. An unread value also stayed in memory for good. They now travel
+  in an encrypted cookie in the admin's own browser. The cookie lasts two minutes, is bound to the
+  admin and to the page it's for, and is read once. Nothing about the value appears in the URL
+  any more.
+
+- **The "Workspace imported" confirmation is shown after a console import.** The message went
+  into the same store but no page ever read it.
 
 - **`POST /applications` accepts `audience`, and a body that doesn't decode answers 400.**
   Creating an application with an `audience` answered 500, because the create request had no such
@@ -27,6 +57,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   did. Any API, SCIM or protocol request whose body or parameters can't be read now answers 400 in
   that surface's own error format, instead of a 500. The OpenAPI document lists `audience` on the
   create request. Closes #193.
+
+- **An invited user who resets their password instead of accepting the invite can sign in.** The
+  reset set the password but left the pending invite in place, so every sign-in was refused and
+  the account was stuck. Completing a reset now does what accepting an invite does: it marks the
+  email verified and clears the pending set-password step. Like Keycloak, it also clears a forced
+  password change, since the user just chose a new password. Any outstanding invite link stops
+  working. Closes #227.
+
+- **ID tokens are addressed to the client again when the application has an audience.** With an
+  `audience` set on the application, the ID token's `aud` carried that audience instead of the
+  client id. OIDC Core requires the client id, so standard validators refused the token. The
+  access token is unchanged: it still carries the requested resources, else the application's
+  audience, else the client id.
 
 ## [1.30.0] - 2026-11-24
 
