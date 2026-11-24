@@ -47,10 +47,8 @@ class ClientDefaultRolesRegistrationTest {
         AuthService(
             userRepository = users,
             tenantRepository = tenants,
-            tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
-            sessionRepository = sessions,
             applicationRepository = apps,
             roleRepository = roles,
             identifierResolver = UserIdentifierResolver(users),
