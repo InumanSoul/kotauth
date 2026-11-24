@@ -12,7 +12,7 @@ import com.kauth.domain.port.TenantRepository
  * Called at boot from `Application.kt` with entries decoded from the
  * `KAUTH_BOOTSTRAP_API_KEYS` env var. Each entry is upserted by
  * (tenant, name) — re-running with the same hash is a no-op; changing the
- * hash rotates the key in place.
+ * hash rotates the key in place; removing the entry revokes the key.
  *
  * Unknown tenant slugs cause a fail-fast result so a typo can't silently
  * leave a partner BFF without its key at startup. Unknown scopes are
@@ -60,7 +60,7 @@ class ApiKeyBootstrapService(
         val action: Action,
     )
 
-    enum class Action { CREATED, UPDATED, UNCHANGED, PENDING }
+    enum class Action { CREATED, UPDATED, UNCHANGED, PENDING, REVOKED }
 
     private val pending = mutableListOf<Entry>()
 
@@ -95,6 +95,7 @@ class ApiKeyBootstrapService(
                 }
             }
         }
+        outcomes += revokeRemoved(entries)
         return Result.Provisioned(outcomes)
     }
 
@@ -107,6 +108,24 @@ class ApiKeyBootstrapService(
         synchronized(pending) {
             pending.filter { it.tenantSlug == tenant.slug }.map { apply(it, tenant) }
         }
+
+    /**
+     * The list is authoritative: a key provisioned from an entry that is no longer in it is
+     * disabled and handed back to the console. Disabled rather than deleted, so its audit trail
+     * stays, and restoring the entry enables it again.
+     */
+    private fun revokeRemoved(entries: List<Entry>): List<Outcome> {
+        val listed = entries.map { it.tenantSlug to it.name }.toSet()
+        return tenantRepository.findAll().flatMap { tenant ->
+            apiKeyRepository
+                .findByTenantId(tenant.id)
+                .filter { it.bootstrapName != null && (tenant.slug to it.bootstrapName) !in listed }
+                .map { key ->
+                    apiKeyRepository.revoke(key.id!!, tenant.id, releaseBootstrap = true)
+                    Outcome(tenant.slug, key.bootstrapName!!, Action.REVOKED)
+                }
+        }
+    }
 
     private fun apply(
         entry: Entry,

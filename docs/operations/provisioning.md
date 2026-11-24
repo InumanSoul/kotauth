@@ -137,3 +137,19 @@ SMTP. The full list is in the OpenAPI document at `/api/docs`.
 - An unknown field is refused with `400` rather than ignored, so a typo cannot pass as a no-op.
 - Sending the same body again is harmless, so the call belongs in the same idempotent script as
   step 2.
+
+## 4. Retire a key
+
+Remove its entry from `KAUTH_BOOTSTRAP_API_KEYS` and restart. At startup the key is disabled and
+the log says so:
+
+```
+Bootstrap API key 'provisioner' for tenant 'master' — revoked
+```
+
+Do this for the `tenants:write` key once the workspaces exist. A revoked key stops authenticating
+straight away. It is disabled, not deleted, so its audit trail stays. It is no longer env-managed,
+so the console can delete it. Putting the entry back enables the key again with whatever hash the
+entry carries.
+
+Unsetting `KAUTH_BOOTSTRAP_API_KEYS` altogether revokes every key it provisioned.
