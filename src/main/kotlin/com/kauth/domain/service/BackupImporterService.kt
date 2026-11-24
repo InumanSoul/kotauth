@@ -27,6 +27,7 @@ import com.kauth.domain.model.TenantKey
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserAttribute
+import com.kauth.domain.model.UserBackup
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
@@ -437,6 +438,15 @@ class BackupImporterService(
             )
         }
 
+        val crossNamespace = crossNamespaceCollisions(export.users)
+        if (crossNamespace.isNotEmpty()) {
+            error(
+                "Backup import rejected: ${crossNamespace.size} username(s) are another user's email address. " +
+                    "A workspace keeps usernames and emails in one namespace, so rename these users on the " +
+                    "source deployment and export again. Collisions: ${listForError(crossNamespace)}.",
+            )
+        }
+
         val userPkByUsername: MutableMap<String, UserId> = mutableMapOf()
         export.users.forEach { ub ->
             val normalizedUsername = UsernamePolicy.rewriteLegacy(ub.username)
@@ -740,3 +750,14 @@ private fun listForError(items: List<String>): String {
 
 private fun clip(username: String): String =
     if (username.length <= MAX_QUOTED_USERNAME) username else username.take(MAX_QUOTED_USERNAME) + "…"
+
+/** Usernames, as the import will write them, that are another record's email address. */
+private fun crossNamespaceCollisions(users: List<UserBackup>): List<String> {
+    val byEmail = users.groupBy { it.email.trim().lowercase() }
+    return users.mapNotNull { ub ->
+        val username = UsernamePolicy.rewriteLegacy(ub.username)
+        byEmail[username].orEmpty().firstOrNull { it !== ub }?.let {
+            "'${clip(username)}' is the username of the record for '${ub.email}' and the email of another record"
+        }
+    }
+}

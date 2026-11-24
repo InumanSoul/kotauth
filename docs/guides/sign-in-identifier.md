@@ -39,17 +39,22 @@ lookup path; it would be a regression, not a fix.
 
 ## Preventing an unresolvable pair
 
-Because usernames and email addresses are separately unique namespaces, the
-database alone would allow a pair that `EITHER` mode cannot resolve: user A's
-username equal to user B's email (or vice versa). Kotauth rejects that pair
-at write time instead — across admin user creation and update, SCIM, and
-self-registration — regardless of which mode the workspace currently uses,
-so switching to `EITHER` later never surfaces a latent collision.
+Usernames and email addresses share one namespace per workspace: user A's
+username can never equal user B's email address, a pair `EITHER` mode could
+not resolve. Kotauth refuses that pair whichever mode the workspace uses, so
+switching to `EITHER` later never surfaces a latent collision.
 
-Social login, JIT provisioning, and backup import do not run this check —
-they provision users outside the admin/SCIM/self-registration paths and can
-still create a colliding pair. An administrator can resolve one after the
-fact by renaming the username, which is validated the same way.
+Two layers enforce it. Admin user creation and update, SCIM,
+self-registration and the account portal check before writing and answer
+with a readable message. Underneath, the database keeps every username and
+email of a workspace under one key (migration V70), so every write path is
+covered, including social sign-in, JIT provisioning and two requests racing
+each other: the second write fails instead of creating the pair.
+
+Pairs created before V70 are kept: sign-in refuses to guess between them,
+and an administrator resolves one by renaming it. Backup import refuses an
+export that contains such a pair; rename one of the two users on the source
+deployment and export again.
 
 A user whose username **is their own** email address is unaffected and
 remains fully supported; that is the shape most integrators actually want.

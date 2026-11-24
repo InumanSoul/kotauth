@@ -239,6 +239,47 @@ class BackupImporterUsernameValidationTest {
     }
 
     @Test
+    fun `import rejects a username that is another record's email`() {
+        val export = exportAcmeWithTwoUsers()
+        val badExport =
+            export.copy(
+                users =
+                    export.users.map {
+                        if (it.username ==
+                            "bob"
+                        ) {
+                            it.copy(username = "alice@acme.example.com")
+                        } else {
+                            it
+                        }
+                    },
+            )
+
+        val result = importer().import(badExport, newSlug = "acme-restored", currentSchemaVersion = 1)
+
+        assertIs<BackupResult.Failure>(result)
+        val error = result.error
+        assertIs<BackupError.InvalidPayload>(error)
+        assertContains(error.message, "another user's email")
+        assertContains(error.message, "bob@acme.example.com")
+        val createdTenant = destTenants.findBySlug("acme-restored")
+        if (createdTenant != null) {
+            assertTrue(destUsers.findByTenantId(createdTenant.id, null, 100, 0).isEmpty())
+        }
+    }
+
+    @Test
+    fun `import accepts a username that is the same record's own email`() {
+        val export = exportAcmeWithTwoUsers()
+        val ownEmail =
+            export.copy(users = export.users.map { if (it.username == "bob") it.copy(username = it.email) else it })
+
+        val result = importer().import(ownEmail, newSlug = "acme-restored", currentSchemaVersion = 1)
+
+        assertIs<BackupResult.Success<*>>(result)
+    }
+
+    @Test
     fun `import reports every unrewritable record in one failure, not just the first`() {
         val export = exportAcmeWithTwoUsers()
         val badExport =

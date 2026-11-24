@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A username can no longer equal another user's email address, even under concurrent writes.**
+  Kotauth checked for such a pair before writing, but two requests at the same moment could both
+  pass the check. The database now keeps every username and email of a workspace under one key
+  (migration V70), so the second write fails, on every write path, including social sign-in and
+  JIT provisioning. Pairs created before the upgrade are kept, and sign-in still refuses to guess
+  between them. Changing your email in the account portal to another user's username is now
+  refused with a message. Before, it went through. Closes #144.
+
+- **Backup import refuses an export in which a username is another user's email address,** with a
+  message naming the records, instead of failing on the database. Rename one of the two users on
+  the source deployment and export again.
+
 - **An email-code sign-in can ask for API scopes.** `POST /auth/send-otp` accepts `scope`, like
   the OAuth `scope` parameter. The authorization code issued after verification carries it,
   narrowed as at the token endpoint: an API scope must be declared by a requested resource and

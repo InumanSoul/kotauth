@@ -31,6 +31,7 @@ class AccountSelfService(
     private val emailPort: EmailPort,
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val collisionCheck: IdentifierCollisionCheck = IdentifierCollisionCheck(userRepository),
 ) {
     private val log = LoggerFactory.getLogger(AccountSelfService::class.java)
 
@@ -64,6 +65,11 @@ class AccountSelfService(
         val newEmail = email.trim().lowercase()
         if (newEmail != user.email && userRepository.existsByEmail(tenantId, newEmail)) {
             return SelfServiceResult.Failure(SelfServiceError.Validation("That email address is already in use."))
+        }
+        if (newEmail != user.email) {
+            collisionCheck.checkEmailOnly(tenantId, newEmail, userId)?.let {
+                return SelfServiceResult.Failure(SelfServiceError.Validation(it))
+            }
         }
 
         val emailChanged = newEmail != user.email
