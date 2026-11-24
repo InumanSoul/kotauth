@@ -7,6 +7,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.model.UserSubject
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.EmailPort
 import com.kauth.domain.port.PasswordHasher
@@ -27,6 +28,12 @@ class AdminUserService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailPort: EmailPort? = null,
 ) {
+    /** The user whose `sub` is exactly [subject] in [tenantId], or null. */
+    fun findBySubject(
+        tenantId: TenantId,
+        subject: String,
+    ): User? = userRepository.findBySubject(tenantId, subject)
+
     fun createUser(
         tenantId: TenantId,
         username: String,
@@ -38,6 +45,8 @@ class AdminUserService(
         externalId: String? = null,
         givenName: String? = null,
         familyName: String? = null,
+        // A `sub` the caller chooses (seeds, migrations from another IdP); null assigns a UUID.
+        subject: String? = null,
         // False lets a caller that holds this create inside its own DB transaction (SCIM's
         // create-then-enable/disable pair) defer the SMTP round-trip until after it commits,
         // via dispatchPendingInvite. Every other caller keeps the send-inline default.
@@ -113,6 +122,14 @@ class AdminUserService(
         if (userRepository.existsByEmail(tenantId, resolvedEmail)) {
             return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
         }
+        if (subject != null) {
+            UserSubject.problemWith(subject)?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+            if (userRepository.findBySubject(tenantId, subject) != null) {
+                return AdminResult.Failure(
+                    AdminError.Conflict("Another user in this workspace already has that subject."),
+                )
+            }
+        }
 
         val user =
             userRepository.save(
@@ -128,6 +145,7 @@ class AdminUserService(
                     externalId = externalId,
                     givenName = givenName,
                     familyName = familyName,
+                    subject = subject,
                 ),
             )
 
