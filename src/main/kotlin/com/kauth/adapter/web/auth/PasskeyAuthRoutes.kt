@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.AuthenticationFinishRequest
 import com.kauth.domain.service.OAuthService
@@ -112,8 +113,11 @@ internal fun Route.passkeyAuthRoutes(
                             tenant = tenant,
                             oauthParams = oauthParams,
                             ipAddress = ipAddress,
-                            // A passkey with user verification is already two factors (ADR-16).
-                            secondFactorDone = result.value.userVerified,
+                            firstFactor =
+                                AuthMethods.forPasskey(
+                                    synced = result.value.credential.backupEligible,
+                                    userVerified = result.value.userVerified,
+                                ),
                             ssoTtlSeconds = ssoTtlSeconds,
                             secure = secure,
                             oauthService = oauthService,

@@ -38,6 +38,33 @@ class SmtpEmailAdapterI18nTest {
     }
 
     @Test
+    fun `every factor change renders its own copy with the time and no link`() {
+        val adapter = SmtpEmailAdapter(EnglishOnlyTranslation())
+        val at = java.time.Instant.parse("2026-11-23T22:58:13Z")
+
+        com.kauth.domain.model.FactorChange.entries.forEach { change ->
+            val rendered = adapter.renderFactorChanged("Alice", change, 3, at, "Acme <Corp>", englishOnlyTenant)
+            listOf(rendered.subject, rendered.html, rendered.text).forEach { part ->
+                assertFalse(part.contains("EMAIL_"), "$change has an untranslated key")
+            }
+            assertTrue(rendered.text.contains("2026-11-23 22:58 UTC"), "$change")
+            assertTrue(rendered.html.contains("Acme &lt;Corp&gt;"), "$change escapes the workspace name")
+            assertFalse(rendered.html.contains("Acme <Corp>"), "$change")
+            assertFalse(rendered.html.contains("<a "), "$change carries no link")
+        }
+        val recovery =
+            adapter.renderFactorChanged(
+                "Alice",
+                com.kauth.domain.model.FactorChange.RECOVERY_CODE_USED,
+                3,
+                at,
+                "Acme",
+                englishOnlyTenant,
+            )
+        assertTrue(recovery.text.contains("You have 3 recovery codes left."))
+    }
+
+    @Test
     fun `tenant with es defaultLocale picks up Spanish bundle for subject and body`() {
         val translator =
             inMemoryTranslator(

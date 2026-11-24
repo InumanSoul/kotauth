@@ -1,7 +1,7 @@
 val ktorVersion = "3.6.1"
 val exposedVersion = "1.6.1"
 val logbackVersion = "1.6.7"
-val flywayVersion = "13.6.0"
+val flywayVersion = "13.13.0"
 val logstashEncoderVersion = "8.1"
 val lettuceVersion = "7.7.0.RELEASE"
 val testcontainersVersion = "1.21.4"
@@ -167,7 +167,7 @@ val e2eTestRuntimeOnly: Configuration by configurations.getting {
 }
 
 dependencies {
-    e2eTestImplementation("com.microsoft.playwright:playwright:1.44.0")
+    e2eTestImplementation("com.microsoft.playwright:playwright:1.65.1")
 }
 
 tasks.register<Test>("e2eTest") {

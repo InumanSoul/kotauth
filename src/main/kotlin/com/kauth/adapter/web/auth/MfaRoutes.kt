@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.MfaError
@@ -17,9 +18,10 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
-// The pending MFA challenge: `userId|slug|timestampMillis`.
-private const val MFA_PENDING_FIELD_COUNT = 3
+// The pending MFA challenge: `userId|slug|timestampMillis|firstFactorAmr` (amr comma-separated).
+private const val MFA_PENDING_FIELD_COUNT = 4
 private const val MFA_PENDING_SLUG = 1
+private const val MFA_PENDING_FIRST_FACTOR = 3
 
 internal fun Route.mfaRoutes(
     oauthService: OAuthService,
@@ -88,6 +90,7 @@ internal fun Route.mfaRoutes(
         }
         val userId = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/authorize")
         val timestamp = parts[2].toLongOrNull() ?: return@post call.respondRedirect("/t/$slug/authorize")
+        val firstFactor = parts[MFA_PENDING_FIRST_FACTOR].split(",").filter { it.isNotBlank() }
 
         if (System.currentTimeMillis() - timestamp > 300_000) {
             return@post call.respondHtml(
@@ -146,7 +149,7 @@ internal fun Route.mfaRoutes(
                         // Keycloak convention: auth_time tracks the moment MFA was completed,
                         // not the original first-factor (password) check.
                         authTime = java.time.Instant.now(),
-                        mfaCompleted = true,
+                        amr = AuthMethods.withSecondFactor(firstFactor),
                         ssoTtlSeconds = ssoTtlSeconds,
                         secure = secure,
                         oauthService = oauthService,

@@ -378,6 +378,14 @@ These are not environment variables — they are configured per workspace throug
 - From address and display name
 - TLS mode: `NONE`, `STARTTLS`, `SSL`
 
+With SMTP set up, users are emailed when their password changes and when one of their sign-in
+factors changes:
+- an authenticator app is added or removed (by the user or by an admin)
+- a recovery code is used, with how many are left
+- a passkey is added or removed (one by an admin, or all of them by an admin reset)
+
+These security emails carry no links and can't be turned off.
+
 ---
 
 ## Example `.env` — Local development

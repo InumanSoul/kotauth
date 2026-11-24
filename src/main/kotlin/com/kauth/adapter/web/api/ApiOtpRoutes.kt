@@ -193,7 +193,12 @@ private suspend fun ApplicationCall.verifySecondFactor(
             }
         is MfaResult.Success ->
             respondCode(
-                emailOtpService.issueAuthorizationCode(tenantSlug, token.challengeId, token.userId),
+                emailOtpService.issueAuthorizationCode(
+                    tenantSlug,
+                    token.challengeId,
+                    token.userId,
+                    secondFactorDone = true,
+                ),
             )
     }
 }

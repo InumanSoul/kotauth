@@ -989,7 +989,7 @@ class AuthRoutesTest {
 
             // Our signature, our format, another tenant's slug — the challenge page must not
             // render for a cookie this tenant never minted.
-            val cookieValue = encryptionService.signCookie("10|otherco|${System.currentTimeMillis()}")
+            val cookieValue = encryptionService.signCookie("10|otherco|${System.currentTimeMillis()}|pwd")
 
             val response =
                 createClient { followRedirects = false }.get("/t/acme/mfa-challenge") {
@@ -1022,10 +1022,10 @@ class AuthRoutesTest {
                 }
             }
 
-            // A fourth field means this is not the format this reader was written for. The POST
+            // A fifth field means this is not the format this reader was written for. The POST
             // refuses it on the field count; the GET must agree, or the next field added to the
             // payload is read as something else by one of the two.
-            val cookieValue = encryptionService.signCookie("10|acme|${System.currentTimeMillis()}|extra")
+            val cookieValue = encryptionService.signCookie("10|acme|${System.currentTimeMillis()}|pwd|extra")
 
             val response =
                 createClient { followRedirects = false }.get("/t/acme/mfa-challenge") {
@@ -1059,7 +1059,7 @@ class AuthRoutesTest {
             }
 
             // Build a properly signed cookie
-            val cookieValue = encryptionService.signCookie("10|acme|${System.currentTimeMillis()}")
+            val cookieValue = encryptionService.signCookie("10|acme|${System.currentTimeMillis()}|pwd")
 
             val response =
                 client.get("/t/acme/mfa-challenge") {

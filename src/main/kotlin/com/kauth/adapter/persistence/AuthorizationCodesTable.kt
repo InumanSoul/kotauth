@@ -24,6 +24,7 @@ object AuthorizationCodesTable : Table("authorization_codes") {
     val createdAt = timestampWithTimeZone("created_at")
     val authTime = timestampWithTimeZone("auth_time").nullable()
     val resources = jsonb("resources").default("[]")
+    val amr = jsonb("amr").default("[]")
 
     override val primaryKey = PrimaryKey(id)
 }

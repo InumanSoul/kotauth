@@ -1,9 +1,11 @@
 package com.kauth.adapter.token
 
 import com.auth0.jwt.JWT
+import com.auth0.jwt.JWTCreator
 import com.auth0.jwt.algorithms.Algorithm
 import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
@@ -71,7 +73,9 @@ class JwtTokenAdapter(
         authTime: java.time.Instant?,
         actingSubject: UserId?,
         audiences: List<String>,
+        amr: List<String>,
     ): TokenResponse {
+        val acr = AuthMethods.acrFor(amr)
         val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
         val clientAudience = client?.audience ?: client?.clientId ?: tenant.slug
@@ -135,6 +139,10 @@ class JwtTokenAdapter(
             }
         }
 
+        // RFC 9470: a resource server enforcing step-up reads these from the access token.
+        if (authTime != null) accessTokenBuilder.withClaim("auth_time", authTime.epochSecond)
+        if (acr != null) accessTokenBuilder.withClaim("acr", acr)
+
         // Stamp tenant-configured custom claims (see ClaimMapperService).
         for ((claimName, value) in customAccessClaims) {
             accessTokenBuilder.withClaim(claimName, value)
@@ -150,27 +158,12 @@ class JwtTokenAdapter(
 
         val idToken =
             if ("openid" in scopes) {
-                JWT
-                    .create()
+                idTokenClaims(user, nonce, authTime, amr, customIdClaims, actingSubject)
                     .withKeyId(activeKey.keyId)
                     .withIssuer(issuer)
                     .withAudience(clientAudience)
                     .withSubject(subject)
-                    .withClaim("email", user.email)
-                    .withClaim("email_verified", user.emailVerified)
-                    .withClaim("name", user.fullName)
-                    .withClaim("preferred_username", user.username)
-                    .apply { if (nonce != null) withClaim("nonce", nonce) }
-                    .apply { if (authTime != null) withClaim("auth_time", authTime.epochSecond) }
-                    .apply {
-                        for ((claimName, value) in customIdClaims) {
-                            withClaim(claimName, value)
-                        }
-                    }.apply {
-                        if (actingSubject != null) {
-                            withClaim("act", mapOf("sub" to actingSubject.value.toString()))
-                        }
-                    }.withIssuedAt(Date())
+                    .withIssuedAt(Date())
                     .withExpiresAt(expiresAt)
                     .sign(activeKey.algorithm)
             } else {
@@ -190,6 +183,28 @@ class JwtTokenAdapter(
             scope = scopes.joinToString(" "),
         )
     }
+
+    /** The ID token's claims about the user and the sign-in; the caller adds issuer, audience and expiry. */
+    private fun idTokenClaims(
+        user: User,
+        nonce: String?,
+        authTime: java.time.Instant?,
+        amr: List<String>,
+        customClaims: Map<String, String>,
+        actingSubject: UserId?,
+    ): JWTCreator.Builder =
+        JWT
+            .create()
+            .withClaim("email", user.email)
+            .withClaim("email_verified", user.emailVerified)
+            .withClaim("name", user.fullName)
+            .withClaim("preferred_username", user.username)
+            .apply { nonce?.let { withClaim("nonce", it) } }
+            .apply { authTime?.let { withClaim("auth_time", it.epochSecond) } }
+            .apply { if (amr.isNotEmpty()) withArrayClaim("amr", amr.toTypedArray()) }
+            .apply { AuthMethods.acrFor(amr)?.let { withClaim("acr", it) } }
+            .apply { customClaims.forEach { (claimName, value) -> withClaim(claimName, value) } }
+            .apply { actingSubject?.let { withClaim("act", mapOf("sub" to it.value.toString())) } }
 
     // -------------------------------------------------------------------------
     // TokenPort — client credentials (M2M)

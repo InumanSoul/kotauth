@@ -116,4 +116,36 @@ class SessionCodecTest {
 
         assertEquals(original, decoded)
     }
+
+    @Test
+    fun `round-trip preserves the resources a session's tokens are bound to`() {
+        val now = Instant.parse("2026-11-24T12:00:00Z")
+        val original =
+            Session(
+                id = SessionId(5),
+                tenantId = TenantId(1),
+                userId = UserId(10),
+                clientId = ApplicationId(3),
+                accessTokenHash = "a".repeat(64),
+                refreshTokenHash = "r".repeat(64),
+                createdAt = now,
+                expiresAt = now.plusSeconds(300),
+                refreshExpiresAt = now.plusSeconds(86400),
+                lastActivityAt = now,
+                resources = listOf("https://orders.example.com", "https://billing.example.com"),
+            )
+
+        assertEquals(original, SessionCodec.decode(SessionCodec.encode(original)))
+    }
+
+    @Test
+    fun `a session stored before resources were kept decodes with none`() {
+        val payload =
+            """{"id":5,"tenantId":1,"userId":10,"clientId":3,"accessTokenHash":"a","refreshTokenHash":"r",""" +
+                """"scopes":"openid","ipAddress":null,"userAgent":null,"createdAt":"2026-11-24T12:00:00Z",""" +
+                """"expiresAt":"2026-11-24T12:05:00Z","refreshExpiresAt":null,""" +
+                """"lastActivityAt":"2026-11-24T12:00:00Z","revokedAt":null}"""
+
+        assertEquals(emptyList(), SessionCodec.decode(payload).resources)
+    }
 }

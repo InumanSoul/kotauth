@@ -76,6 +76,7 @@ import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.FactorChangeNotifier
 import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.IdentityProviderProbeService
 import com.kauth.domain.service.IdentityProviderService
@@ -320,6 +321,13 @@ data class ServiceGraph(
                     ?: EnglishOnlyTranslation()
 
             val emailAdapter = SmtpEmailAdapter(translationPort)
+            val factorChangeNotifier =
+                FactorChangeNotifier(
+                    userRepository = userRepository,
+                    tenantRepository = tenantRepository,
+                    emailPort = emailAdapter,
+                    emailScope = applicationScope,
+                )
             val credentialFlowService =
                 CredentialFlowService(
                     userRepository = userRepository,
@@ -490,6 +498,7 @@ data class ServiceGraph(
                     tenantRepository = tenantRepository,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
+                    factorChangeNotifier = factorChangeNotifier,
                 )
             val apiKeyService =
                 ApiKeyService(
@@ -574,6 +583,7 @@ data class ServiceGraph(
                     relyingParty = relyingPartyAdapter,
                     secretKey = config.secretKey,
                     auditLog = auditLogAdapter,
+                    factorChangeNotifier = factorChangeNotifier,
                 )
 
             // -- Key rotation -------------------------------------------------

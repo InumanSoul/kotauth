@@ -1,9 +1,13 @@
 package com.kauth.adapter.email
 
+import com.kauth.domain.model.FactorChange
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.EmailPort
 import com.kauth.domain.port.TranslationPort
 import org.slf4j.LoggerFactory
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Properties
 import javax.mail.Authenticator
 import javax.mail.Message
@@ -67,6 +71,19 @@ class SmtpEmailAdapter(
         tenant: Tenant,
     ) {
         val r = renderPasswordChanged(toName, workspaceName, tenant)
+        send(to, toName, r.subject, r.html, r.text, tenant)
+    }
+
+    override fun sendFactorChangedEmail(
+        to: String,
+        toName: String,
+        change: FactorChange,
+        remainingRecoveryCodes: Int?,
+        occurredAt: Instant,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        val r = renderFactorChanged(toName, change, remainingRecoveryCodes, occurredAt, workspaceName, tenant)
         send(to, toName, r.subject, r.html, r.text, tenant)
     }
 
@@ -213,6 +230,45 @@ class SmtpEmailAdapter(
                             t("EMAIL_BODY_ACCOUNT_LOCKED", locale, workspaceName, lockoutDuration),
                     url = resetUrl,
                     footer = t("EMAIL_FOOTER_ACCOUNT_LOCKED", locale),
+                ),
+        )
+    }
+
+    internal fun renderFactorChanged(
+        toName: String,
+        change: FactorChange,
+        remainingRecoveryCodes: Int?,
+        occurredAt: Instant,
+        workspaceName: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        val key = change.name
+        val remaining = remainingRecoveryCodes?.toString() ?: ""
+        val heading = t("EMAIL_HEADING_FACTOR_$key", locale)
+        val footer = t("EMAIL_FOOTER_FACTOR_CHANGED", locale, FACTOR_CHANGE_TIME.format(occurredAt))
+        val notYou = t("EMAIL_BODY_FACTOR_NOT_YOU", locale, workspaceName)
+        val bodyText = t("EMAIL_BODY_FACTOR_$key", locale, workspaceName, remaining)
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_FACTOR_$key", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = heading,
+                    bodyHtml =
+                        greetingHtml(toName, locale) +
+                            t("EMAIL_BODY_FACTOR_$key", locale, htmlEscape(workspaceName), remaining) +
+                            " " + htmlEscape(notYou),
+                    footerHtml = htmlEscape(footer),
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = heading,
+                    body = greetingText(toName, locale) + bodyText + " " + notYou,
+                    url = null,
+                    footer = footer,
                 ),
         )
     }
@@ -621,3 +677,6 @@ class SmtpEmailAdapter(
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
 }
+
+private val FACTOR_CHANGE_TIME: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC)

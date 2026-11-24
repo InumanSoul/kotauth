@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RateLimiterPort
@@ -23,12 +24,12 @@ internal const val MFA_ENROLL_COOKIE = "KOTAUTH_MFA_ENROLL"
 
 // Long enough to install an authenticator app; each step must still land within the auth context's lifetime.
 private const val MFA_ENROLL_TTL_SECONDS = 900L
-private const val MFA_ENROLL_FIELD_COUNT = 5
+private const val MFA_ENROLL_FIELD_COUNT = 6
 
 /**
  * A sign-in whose first factor passed but whose workspace requires a second factor the user has
- * not set up: `userId|slug|startedAtMillis|enrollmentId|verified`. [enrollmentId] is 0 until the
- * setup starts, which pins the flow to the enrollment it created.
+ * not set up: `userId|slug|startedAtMillis|enrollmentId|verified|firstFactorAmr`. [enrollmentId]
+ * is 0 until the setup starts, which pins the flow to the enrollment it created.
  */
 private data class PendingEnrollment(
     val userId: UserId,
@@ -36,19 +37,31 @@ private data class PendingEnrollment(
     val startedAtMillis: Long,
     val enrollmentId: Int,
     val verified: Boolean,
+    val firstFactor: List<String>,
 ) {
-    fun encode(): String = "${userId.value}|$slug|$startedAtMillis|$enrollmentId|${if (verified) 1 else 0}"
+    fun encode(): String =
+        "${userId.value}|$slug|$startedAtMillis|$enrollmentId|${if (verified) 1 else 0}|${firstFactor.joinToString(
+            ",",
+        )}"
 }
 
 internal fun ApplicationCall.startMfaEnrollment(
     slug: String,
     userId: UserId,
+    firstFactor: List<String>,
     oauthParams: AuthView.OAuthParams,
     encryptionService: EncryptionService,
     secure: Boolean,
 ): String {
     writePendingEnrollment(
-        PendingEnrollment(userId, slug, System.currentTimeMillis(), enrollmentId = 0, verified = false),
+        PendingEnrollment(
+            userId,
+            slug,
+            System.currentTimeMillis(),
+            enrollmentId = 0,
+            verified = false,
+            firstFactor = firstFactor,
+        ),
         encryptionService,
         secure,
     )
@@ -101,6 +114,7 @@ private fun ApplicationCall.readPendingEnrollment(
             startedAtMillis = parts[2].toLongOrNull() ?: return null,
             enrollmentId = parts[3].toIntOrNull() ?: return null,
             verified = parts[4] == "1",
+            firstFactor = parts[5].split(",").filter { it.isNotBlank() },
         )
     val age = System.currentTimeMillis() - pending.startedAtMillis
     return pending.takeIf { age in 0..MFA_ENROLL_TTL_SECONDS * 1000 }
@@ -260,7 +274,7 @@ private class MfaEnrollmentSteps(
             oauthParams = step.oauthParams,
             ipAddress = call.request.origin.remoteAddress,
             authTime = Instant.now(),
-            mfaCompleted = true,
+            amr = AuthMethods.withSecondFactor(step.pending.firstFactor),
             ssoTtlSeconds = ssoTtlSeconds,
             secure = secure,
             oauthService = oauthService,

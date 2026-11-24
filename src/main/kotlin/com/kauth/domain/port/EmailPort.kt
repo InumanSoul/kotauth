@@ -1,6 +1,8 @@
 package com.kauth.domain.port
 
+import com.kauth.domain.model.FactorChange
 import com.kauth.domain.model.Tenant
+import java.time.Instant
 
 /**
  * Output port — transactional email delivery.
@@ -59,6 +61,21 @@ interface EmailPort {
     fun sendPasswordChangedEmail(
         to: String,
         toName: String,
+        workspaceName: String,
+        tenant: Tenant,
+    )
+
+    /**
+     * Tells a user that one of their sign-in factors changed at [occurredAt]. Like the
+     * password-changed email it has no action link, so it can't be used for phishing.
+     * [remainingRecoveryCodes] is set for [FactorChange.RECOVERY_CODE_USED].
+     */
+    fun sendFactorChangedEmail(
+        to: String,
+        toName: String,
+        change: FactorChange,
+        remainingRecoveryCodes: Int?,
+        occurredAt: Instant,
         workspaceName: String,
         tenant: Tenant,
     )

@@ -40,6 +40,8 @@ data class AuthorizationCode(
      */
     val authTime: Instant? = null,
     val resources: List<String> = emptyList(),
+    /** How the user signed in, as RFC 8176 `amr` values (see [AuthMethods]). Empty for codes issued before it was kept. */
+    val amr: List<String> = emptyList(),
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isUsed: Boolean get() = usedAt != null
