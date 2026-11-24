@@ -234,6 +234,6 @@ private fun OtpFlowContext.errorMessageFor(error: OtpError): String =
         OtpError.InvalidOtp -> "Wrong code. Try again or request a new one."
         OtpError.ChallengeExpired -> "That code has expired. Request a new one."
         OtpError.TooManyAttempts -> "Too many attempts. Try again later."
-        OtpError.InvalidClient -> "Sign-in is misconfigured. Contact support."
+        OtpError.InvalidClient, OtpError.InvalidScope -> "Sign-in is misconfigured. Contact support."
         OtpError.TenantNotFound -> "Workspace not found."
     }

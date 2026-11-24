@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An email-code sign-in can ask for API scopes.** `POST /auth/send-otp` accepts `scope`, like
+  the OAuth `scope` parameter. The authorization code issued after verification carries it,
+  narrowed as at the token endpoint: an API scope must be declared by a requested resource and
+  granted to the originating client on it, or verification answers `422` with `invalid_scope`.
+  Without `scope` the code carries `openid email profile`, as before. Comes with migration V69.
+  Closes #160.
+
 - **A sign-in that asks for `openid` and an API with declared scopes gets its tokens.** Since
   1.19.3, the token endpoint narrowed every requested scope to what the targeted APIs declare, and
   no API declares `openid`, `profile` or `email`. So an authorization code for

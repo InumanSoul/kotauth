@@ -96,6 +96,7 @@ internal fun Route.apiOtpRoutes(
                             originatingClientId = body.originatingClientId,
                             resources = body.resources,
                             ipAddress = ip,
+                            scope = body.scope,
                         )
                 ) {
                     is OtpSendResult.Success ->
@@ -313,6 +314,12 @@ private suspend fun ApplicationCall.respondOtpError(error: OtpError) {
                 "Invalid client",
                 "The originating client is unknown, disabled, or has no redirect URI registered.",
             )
+        OtpError.InvalidScope ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "Invalid scope",
+                "The requested scope is not one the originating client may receive for the requested resources.",
+            )
     }
 }
 
@@ -321,6 +328,7 @@ data class SendOtpRequest(
     val email: String,
     val originatingClientId: String? = null,
     val resources: List<String> = emptyList(),
+    val scope: String? = null,
 )
 
 @Serializable

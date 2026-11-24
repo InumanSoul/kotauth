@@ -219,6 +219,48 @@ class ApiOtpRoutesTest {
         }
 
     @Test
+    fun `verify-otp answers 422 invalid_scope for a scope the client was not granted`() =
+        testApplication {
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
+            val client = apps.findByClientId(tenants.findBySlug("acme")!!.id, "acme-bff")!!
+            val api =
+                resources.seedAuthorized(
+                    com.kauth.domain.model.ResourceServer(
+                        id = null,
+                        tenantId = client.tenantId,
+                        identifier = "orders-api",
+                        name = "Orders API",
+                        description = null,
+                        scopes = listOf("read:orders", "write:orders"),
+                    ),
+                    client.id,
+                    client.tenantId,
+                )
+            resources.setAllowedScopes(client.id, api.id!!, setOf("read:orders"))
+            this.client.post("/t/acme/api/v1/auth/send-otp") {
+                bearerAuth(sendKey)
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """{"email":"alice@acme.test","originatingClientId":"acme-bff","resources":["orders-api"],""" +
+                        """"scope":"openid write:orders"}""",
+                )
+            }
+            assertEquals("openid write:orders", challenges.all().single().scope)
+
+            val verify =
+                this.client.post("/t/acme/api/v1/auth/verify-otp") {
+                    bearerAuth(verifyKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"challengeId":"${challenges.all().single().challengeId}","otp":"${email.otps.single().code}"}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, verify.status)
+            assertTrue("Invalid scope" in verify.bodyAsText(), verify.bodyAsText())
+        }
+
+    @Test
     fun `verify-otp returns 410 Gone for an expired challenge`() =
         testApplication {
             application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
