@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.29.0"
+version = "1.30.0"
 
 // Pin the compile target explicitly rather than letting it follow whichever JDK
 // happens to build. `release`/`-Xjdk-release` also stop a newer build JDK from

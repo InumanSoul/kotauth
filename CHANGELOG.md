@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-11-24
+
 ### Added
 
 - **Tokens say how the user signed in, and clients can ask for multi-factor per request.**
@@ -85,6 +87,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   factor for that sign-in. Recovery codes are shown once, after the app is verified. The API
   email-code endpoint still answers `mfa_enrollment_required`; the user enrolls by signing in once
   through the hosted pages.
+
+### Chore
+
+- Dependency bumps: Flyway 13.13.0, webauthn-server-core 2.10.1, java-jwt 4.6.2, Playwright 1.65.1
+  (end-to-end tests only).
 
 ## [1.29.0] - 2026-11-23
 
