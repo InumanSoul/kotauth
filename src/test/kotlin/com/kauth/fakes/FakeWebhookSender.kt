@@ -28,7 +28,7 @@ class FakeWebhookSender(
 
     override fun refusalFor(url: String): String? = refusal
 
-    override fun post(request: WebhookRequest): WebhookSendResult {
+    override suspend fun post(request: WebhookRequest): WebhookSendResult {
         val index = sent.size
         sent += request
         return resultsByAttempt.getOrNull(index) ?: nextResult

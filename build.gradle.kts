@@ -72,6 +72,7 @@ dependencies {
     implementation("io.ktor:ktor-server-default-headers:$ktorVersion")
     implementation("io.ktor:ktor-server-compression:$ktorVersion")
     implementation("io.ktor:ktor-server-caching-headers:$ktorVersion")
+    implementation("io.ktor:ktor-client-apache5:$ktorVersion")
 
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
@@ -84,6 +85,12 @@ dependencies {
     implementation("com.auth0:java-jwt:4.6.2")
     implementation("at.favre.lib:bcrypt:0.10.2")
     implementation("com.yubico:webauthn-server-core:2.10.1")
+    constraints {
+        // webauthn-server-core declares an open range that otherwise resolves to a pre-release.
+        implementation("org.apache.httpcomponents.client5:httpclient5:5.6.4")
+        implementation("org.apache.httpcomponents.core5:httpcore5:5.4.3")
+        implementation("org.apache.httpcomponents.core5:httpcore5-h2:5.4.3")
+    }
 
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
     implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")

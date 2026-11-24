@@ -40,7 +40,7 @@ import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.adapter.webauthn.YubicoCredentialRepositoryBridge
 import com.kauth.adapter.webauthn.YubicoRelyingPartyAdapter
-import com.kauth.adapter.webhook.HttpUrlConnectionWebhookSender
+import com.kauth.adapter.webhook.KtorWebhookSender
 import com.kauth.adapter.webhook.WebhookAddressPolicy
 import com.kauth.domain.model.BrokeredReferenceHasher
 import com.kauth.domain.model.ProviderKey
@@ -302,7 +302,7 @@ data class ServiceGraph(
                     endpointRepository = webhookEndpointRepository,
                     deliveryRepository = webhookDeliveryRepository,
                     sender =
-                        HttpUrlConnectionWebhookSender(
+                        KtorWebhookSender(
                             WebhookAddressPolicy(allowPrivateNetworks = config.webhookAllowPrivateNetworks),
                         ),
                     scope = applicationScope,

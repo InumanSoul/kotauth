@@ -334,10 +334,6 @@ Recorded here because a roadmap that only lists future features overstates the p
 
 **The email-OTP back-channel issues fixed scopes** ([#160](https://github.com/InumanSoul/kotauth/issues/160)) and cannot honour a client's per-client allowlist the way the other grants do.
 
-**Webhook delivery has no SSRF guard.** Delivery sits behind a port as of v1.25.1, but the adapter is still a blocking `HttpURLConnection` that does not refuse loopback, link-local or private destinations on operator-supplied URLs.
-
-**Admin flash messages live in one replica's memory.** A one-time value shown after a redirect, such as a newly issued client secret, can be lost when the redirect lands on another replica, and a value that is never read is never expired.
-
 **There is no SMS second factor.** The second factor is an authenticator app, a recovery code or a passkey with user verification.
 
 **A linked identity cannot be unlinked** ([#131](https://github.com/InumanSoul/kotauth/issues/131)), by the user or by an administrator.
@@ -389,7 +385,6 @@ Authentication is broadly complete; authorization is where the gaps now are.
 - **Prometheus / Micrometer metrics** — login rates, error rates by type, token issuance volume, active sessions, webhook delivery success
 - **Helm chart** — Kubernetes manifests with configurable replicas, probes, and secret integration
 - **Structured JSON log output** — the encoder is already in the dependency tree; field normalization remains
-- **Non-blocking webhook delivery** — replace the blocking `HttpURLConnection` adapter behind the webhook port with Ktor's `HttpClient`, paired with SSRF hardening on operator-supplied URLs
 - **Audit log export** — scheduled export to object storage or a SIEM webhook
 
 ---
