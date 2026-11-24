@@ -9,6 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tokens say how the user signed in, and clients can ask for multi-factor per request.**
+  - **ID tokens carry `amr`** (RFC 8176): `pwd` for a password, `otp` for an authenticator,
+    recovery or email code or a magic link, `fed` for a social or OIDC provider, `hwk`/`swk` for
+    a device-bound or synced passkey, and `mfa` once two factors were used. A passkey with user
+    verification counts as two factors.
+  - **A multi-factor sign-in also carries `acr`**: the OpenID PAPE multi-factor URI, in the ID
+    token and, with `auth_time`, in the access token, so an API can enforce step-up (RFC 9470).
+  - **`acr_values` can require a second factor.** A client that sends
+    `acr_values=http://schemas.openid.net/pape/policies/2007/06/multi-factor` gets a sign-in with
+    a second factor whatever the workspace policy. A user already signed in with one factor is
+    asked only for the second, not for their password again. Discovery lists `amr`, `acr` and
+    `acr_values_supported`.
+  - **Refreshed ID tokens keep the original `auth_time`, `amr` and `acr`** (OIDC Core §12.2).
+    Before, a refresh dropped `auth_time`.
+  - **Silent sign-in asks the MFA gate what's owed**, the same as a fresh sign-in, so an enrolled
+    user whose session started before they enrolled is now challenged.
+
+  Comes with migration V68. Tokens from sessions that existed before the upgrade omit the new
+  claims until the user signs in again. See ADR-24.
+
+- **Users are emailed when their sign-in factors change.** With SMTP set up, Kotauth now emails
+  the user when:
+  - an authenticator app is added or removed
+  - an admin resets their MFA
+  - a recovery code is used, with the count left
+  - a passkey is added or removed, or an admin removes one or all of them
+
+  The email names the change and when it happened, says whether an administrator made it, and
+  tells the user what to do if it wasn't them. It carries no links, the same as the
+  password-changed email. Auth0 and Clerk don't send these; Okta sends similar notices for
+  authenticator enrollment and reset. They matter more now that a user can set up their first
+  factor during sign-in with only a password: if someone else does it, the owner hears about it.
+  Sending never blocks or fails the change, and nothing is sent when nothing changed (for
+  example, resetting MFA for a user who never finished enrolling).
+
+### Security
+
+- **A refresh token now works only in its own workspace, for its own enabled client.**
+  - **Workspace:** a refresh token sent to another workspace's token endpoint was accepted, and the
+    tokens came back signed by that workspace's issuer for a user who isn't in it. The refresh
+    grant now refuses a token from another workspace, as introspection and revocation already did.
+  - **Deleted client:** a session whose client was deleted kept refreshing, and since the deleted
+    client was missing, none of the client checks ran, so any `client_id` was accepted. Such a
+    refresh is now refused and the session ends. Auth0 and Keycloak do the same.
+  - **Disabled client:** a disabled client's refresh tokens and unredeemed authorization codes kept
+    working. Both are now refused with `invalid_client`. Re-enabling the client lets its sessions
+    refresh again.
+
+### Fixed
+
+- **With Redis as the session store, refreshed tokens kept their resource audiences.** The Redis
+  session record didn't store the resources (RFC 8707 `resource`) a session's tokens are bound to,
+  so from v1.19.3 on, a refresh against a Redis-backed install returned an access token without
+  the resource server's audience. A refresh that named a `resource` was refused with
+  `invalid_target`. Postgres-backed installs were not affected. Sessions written before this fix
+  still decode, but they stay without their resources until the user signs in again.
+- **A social sign-in kept the resources and state the client sent.** Going through Google, GitHub
+  or an OIDC provider dropped the RFC 8707 `resource` parameters, so the access token came back
+  without the resource server's audience. The client's `state` also came back cut short if it held
+  `&`, `+` or `=`. The social redirect now checks requested resources the same way `/authorize`
+  does and refuses one the client isn't authorized for with `invalid_target`.
+
 ### Changed
 
 - **A workspace that requires MFA now has users set it up during sign-in instead of refusing them.**

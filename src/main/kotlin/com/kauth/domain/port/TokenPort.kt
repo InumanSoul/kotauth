@@ -24,6 +24,8 @@ interface TokenPort {
         // Sets the RFC 8693 §4.1 nested `act` claim on access + id tokens; `sub` stays the impersonated user.
         actingSubject: UserId? = null,
         audiences: List<String> = emptyList(),
+        // RFC 8176 values; the ID token carries them as `amr`, and both tokens carry the `acr` they earn.
+        amr: List<String> = emptyList(),
     ): TokenResponse
 
     fun issueClientCredentialsToken(

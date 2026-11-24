@@ -681,7 +681,7 @@ fun Route.adminUserRoutes(
                         call.parameters["credId"]?.toLongOrNull()
                             ?: return@post call.respond(HttpStatusCode.BadRequest)
                     val actorId = UserId(ctx.session.userId)
-                    when (val revokeResult = webAuthnService.revoke(userId, credId, ctx.workspace.id)) {
+                    when (val revokeResult = webAuthnService.revoke(userId, credId, ctx.workspace.id, byAdmin = true)) {
                         is WebAuthnResult.Success -> {
                             auditLogPort.record(
                                 AuditEvent(
@@ -750,6 +750,7 @@ fun Route.adminUserRoutes(
                         userId = userId,
                         tenantId = ctx.workspace.id,
                         ipAddress = call.request.origin.remoteAddress,
+                        byAdmin = true,
                     )
                     auditLogPort.record(
                         AuditEvent(

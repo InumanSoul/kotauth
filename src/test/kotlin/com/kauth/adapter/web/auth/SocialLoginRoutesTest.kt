@@ -10,6 +10,7 @@ import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.ProviderKey
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -30,6 +31,7 @@ import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeIdentityProviderRepository
 import com.kauth.fakes.FakePasswordHasher
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeSocialAccountRepository
 import com.kauth.fakes.FakeSocialProviderPort
@@ -90,6 +92,7 @@ class SocialLoginRoutesTest {
     private val hasher = FakePasswordHasher()
     private val auditLog = FakeAuditLogPort()
     private val tokenPort = FakeTokenPort()
+    private val resourceServerRepo = FakeResourceServerRepository()
 
     private val loginLimiter = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60)
     private val registerLimiter = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60)
@@ -134,6 +137,7 @@ class SocialLoginRoutesTest {
             tokenPort = tokenPort,
             passwordHasher = hasher,
             auditLog = auditLog,
+            resourceServerRepository = resourceServerRepo,
         )
 
     private fun buildSocialLoginService() =
@@ -231,6 +235,7 @@ class SocialLoginRoutesTest {
         idpRepo.clear()
         auditLog.clear()
         tokenPort.reset()
+        resourceServerRepo.clear()
         googleAdapter.clear()
         orianaAdapter.clear()
         tenantRepo.add(tenant)
@@ -695,6 +700,112 @@ class SocialLoginRoutesTest {
                 authCodeRepo.findByCode(location.substringAfter("?code=").substringBefore("&"))?.codeChallenge,
                 "The client's own PKCE challenge must be the one stored, not the one we sent the IdP",
             )
+        }
+
+    private suspend fun ApplicationTestBuilder.signedInWithOrianaVia(query: String): String {
+        idpRepo.seed(TenantId(1), "oriana")
+        userRepo.add(alice)
+        appRepo.add(spaApp)
+        orianaAdapter.shouldFail = false
+        orianaAdapter.profileToReturn =
+            SocialUserProfile(
+                providerUserId = "oriana|42",
+                email = alice.email,
+                name = "Alice",
+                emailVerified = true,
+            )
+        installSocialRoutes()
+        val client =
+            createClient {
+                followRedirects = false
+                install(HttpCookies)
+            }
+        val redirect =
+            client.get(
+                "/t/acme/auth/social/oriana/redirect?$query&code_challenge=client-challenge&code_challenge_method=S256",
+            )
+        val callback =
+            client.get(
+                "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+            )
+        return callback.headers["Location"].orEmpty()
+    }
+
+    private fun seedOrdersApi() =
+        resourceServerRepo.seedAuthorized(
+            ResourceServer(
+                id = null,
+                tenantId = TenantId(1),
+                identifier = "https://orders.example.com",
+                name = "Orders API",
+                description = null,
+            ),
+            spaApp.id!!,
+            TenantId(1),
+        )
+
+    @Test
+    fun `a social sign-in binds the resources the client asked for to the code`() =
+        testApplication {
+            resetFixtures()
+            seedOrdersApi()
+
+            val location =
+                signedInWithOrianaVia(
+                    "response_type=code&client_id=spa-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback" +
+                        "&resource=https%3A%2F%2Forders.example.com",
+                )
+
+            assertTrue(location.startsWith("https://app.example.com/callback?code="), "Got: $location")
+            val code = authCodeRepo.findByCode(location.substringAfter("?code=").substringBefore("&"))
+            assertEquals(listOf("https://orders.example.com"), code?.resources)
+        }
+
+    @Test
+    fun `a social redirect naming a resource the client is not authorized for is refused`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "oriana")
+            appRepo.add(spaApp)
+            resourceServerRepo.seed(
+                ResourceServer(
+                    id = null,
+                    tenantId = TenantId(1),
+                    identifier = "https://billing.example.com",
+                    name = "Billing API",
+                    description = null,
+                ),
+            )
+            installSocialRoutes()
+            val client = createClient { followRedirects = false }
+
+            val response =
+                client.get(
+                    "/t/acme/auth/social/oriana/redirect?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback" +
+                        "&resource=https%3A%2F%2Fbilling.example.com",
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("invalid_target"))
+            assertEquals(null, response.headers["Location"])
+        }
+
+    @Test
+    fun `a client state with reserved characters comes back unchanged after a social sign-in`() =
+        testApplication {
+            resetFixtures()
+            val state = "a&b=c+d e"
+
+            val location =
+                signedInWithOrianaVia(
+                    "response_type=code&client_id=spa-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback" +
+                        "&state=" + java.net.URLEncoder.encode(state, "UTF-8"),
+                )
+
+            assertTrue(location.startsWith("https://app.example.com/callback?code="), "Got: $location")
+            val returned = java.net.URLDecoder.decode(location.substringAfter("state="), "UTF-8")
+            assertEquals(state, returned)
         }
 
     @Test

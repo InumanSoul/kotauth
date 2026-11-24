@@ -25,6 +25,8 @@ object SessionsTable : Table("sessions") {
     val revocationReason = varchar("revocation_reason", 32).nullable()
     val impersonatorSessionId = integer("impersonator_session_id").references(id).nullable()
     val resources = jsonb("resources").default("[]")
+    val authTime = timestampWithTimeZone("auth_time").nullable()
+    val amr = jsonb("amr").default("[]")
 
     override val primaryKey = PrimaryKey(id)
 }

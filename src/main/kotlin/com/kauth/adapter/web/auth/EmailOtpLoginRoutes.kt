@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.OAuthService
@@ -222,6 +223,7 @@ private suspend fun handleVerifyOtp(
                         ),
                     )
                 },
+                firstFactor = listOf(AuthMethods.ONE_TIME_CODE),
             )
         }
     }

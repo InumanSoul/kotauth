@@ -1038,6 +1038,49 @@ class OAuthServiceTest {
     }
 
     @Test
+    fun `the sign-in's methods and time survive the exchange and every refresh`() {
+        val authTime = Instant.parse("2026-11-24T10:00:00Z")
+        val amr = listOf("pwd", "otp", "mfa")
+        val code =
+            (
+                svc.issueAuthorizationCode(
+                    tenantSlug = "acme",
+                    userId = UserId(10),
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scopes = "openid",
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                    nonce = null,
+                    state = null,
+                    authTime = authTime,
+                    amr = amr,
+                ) as OAuthResult.Success<AuthorizationCode>
+            ).value.code
+        val exchanged =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            ) as OAuthResult.Success<com.kauth.domain.model.TokenResponse>
+        assertEquals(amr, tokens.lastAmr)
+
+        var refreshToken = exchanged.value.refresh_token!!
+        repeat(2) {
+            tokens.reset()
+            val refreshed =
+                svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+                    as OAuthResult.Success<com.kauth.domain.model.TokenResponse>
+            assertEquals(amr, tokens.lastAmr, "refresh ${it + 1}")
+            assertEquals(authTime, tokens.lastAuthTime, "refresh ${it + 1}")
+            refreshToken = refreshed.value.refresh_token!!
+        }
+    }
+
+    @Test
     fun `refreshTokens rotates token — old session is revoked, new session is created`() {
         // First, establish a session via code exchange
         val issueResult =
@@ -1086,6 +1129,85 @@ class OAuthServiceTest {
             )
         assertIs<OAuthResult.Failure>(replayResult)
         assertIs<OAuthError.InvalidGrant>(replayResult.error)
+    }
+
+    @Test
+    fun `a refresh for a client that was deleted is refused and ends the session`() {
+        val refreshToken = establishSession(publicClient)
+        apps.softDelete(publicClient.id)
+
+        val result = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+
+        assertIs<OAuthError.InvalidGrant>((result as OAuthResult.Failure).error)
+        assertTrue(sessions.all().none { it.isActive }, "The deleted client's session must end")
+    }
+
+    @Test
+    fun `a refresh whose session lost its client to a hard delete is refused`() {
+        val refreshToken = establishSession(publicClient)
+        sessions.detachClient(publicClient.id)
+
+        val result = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+
+        assertIs<OAuthError.InvalidGrant>((result as OAuthResult.Failure).error)
+        assertTrue(sessions.all().none { it.isActive })
+    }
+
+    @Test
+    fun `a refresh for a disabled client is refused until the client is enabled again`() {
+        val refreshToken = establishSession(publicClient)
+        apps.setEnabled(publicClient.id, false)
+
+        val refused = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+        assertIs<OAuthError.InvalidClient>((refused as OAuthResult.Failure).error)
+
+        apps.setEnabled(publicClient.id, true)
+        val refreshed = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+        assertIs<OAuthResult.Success<*>>(refreshed)
+    }
+
+    @Test
+    fun `a refresh token presented to another tenant mints nothing there`() {
+        val refreshToken = establishSession(publicClient)
+        tenants.add(Tenant(id = TenantId(2), slug = "other", displayName = "Other", issuerUrl = null))
+        val sessionsBefore = sessions.all().size
+
+        val result = svc.refreshTokens(tenantSlug = "other", refreshToken = refreshToken, clientId = "spa-app")
+
+        assertIs<OAuthError.InvalidGrant>((result as OAuthResult.Failure).error)
+        assertEquals(sessionsBefore, sessions.all().size)
+        assertTrue(sessions.all().none { it.tenantId == TenantId(2) })
+    }
+
+    @Test
+    fun `a code issued before its client was disabled cannot be exchanged`() {
+        val code =
+            (
+                svc.issueAuthorizationCode(
+                    tenantSlug = "acme",
+                    userId = UserId(10),
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scopes = "openid",
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                    nonce = null,
+                    state = null,
+                ) as OAuthResult.Success<AuthorizationCode>
+            ).value.code
+        apps.setEnabled(publicClient.id, false)
+
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
+
+        assertIs<OAuthError.InvalidClient>((result as OAuthResult.Failure).error)
     }
 
     @Test
