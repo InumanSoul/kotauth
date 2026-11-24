@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.adapter.web.badRequestsAsClientErrors
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Application
@@ -56,6 +57,7 @@ import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.response.respond
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
@@ -260,6 +262,42 @@ class ApiApplicationRoutesTest {
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
             assertEquals("new-app", body["application"]!!.jsonObject["clientId"]!!.jsonPrimitive.content)
             assertEquals(JsonNull, body["clientSecret"])
+        }
+
+    @Test
+    fun `POST applications sets the audience in the same call`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/applications") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"clientId":"spa","name":"SPA","accessType":"public",""" +
+                            """"redirectUris":["https://example.com/cb"],"audience":"my-api"}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("my-api", body["application"]!!.jsonObject["audience"]!!.jsonPrimitive.content)
+        }
+
+    @Test
+    fun `POST applications with a body that doesn't decode answers 400, not 500`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/applications") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"clientId":"spa","name":"SPA","redirectUris":["https://example.com/cb"],"bogus":1}""")
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("application/problem+json", response.contentType()?.withoutParameters()?.toString())
         }
 
     @Test
@@ -629,6 +667,9 @@ class ApiApplicationRoutesTest {
 
     private fun io.ktor.server.application.Application.installTestApp() {
         install(ContentNegotiation) { json() }
+        install(io.ktor.server.plugins.statuspages.StatusPages) {
+            badRequestsAsClientErrors { respond(it) }
+        }
         install(Authentication) {
             bearer("api-key") {
                 realm = "KotAuth REST API"

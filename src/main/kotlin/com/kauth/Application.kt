@@ -11,6 +11,7 @@ import com.kauth.adapter.web.admin.adminTenantRoutes
 import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.api.respondProblem
 import com.kauth.adapter.web.auth.authRoutes
+import com.kauth.adapter.web.badRequestsAsClientErrors
 import com.kauth.adapter.web.healthRoutes
 import com.kauth.adapter.web.loadAppInfo
 import com.kauth.adapter.web.plugin.buildCspPolicy
@@ -392,6 +393,7 @@ fun Application.module(
                     )
             }
         }
+        badRequestsAsClientErrors { respondAdminErrorPage(s, it) }
         exception<Throwable> { call, cause ->
             call.application.log.error(
                 "Unhandled exception at ${call.request.path()}",

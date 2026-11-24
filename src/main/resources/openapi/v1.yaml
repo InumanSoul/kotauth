@@ -323,7 +323,9 @@ components:
             confidential application, e.g. before demoting it to `public`.
         audience:
           type: string
-          description: The `aud` claim in this client's tokens. An empty string clears it.
+          description: |
+            The default `aud` of this client's access tokens when no `resource` is requested.
+            ID tokens are always addressed to the client id. An empty string clears it.
         tokenExpiryOverride:
           type: integer
           description: |
@@ -359,6 +361,12 @@ components:
             machine-to-machine capability by default. A confidential application that needs
             `client_credentials` must request it explicitly, or it will be refused
             (`unauthorized_client`) at the token endpoint.
+        audience:
+          type: string
+          nullable: true
+          description: |
+            The default `aud` of this client's access tokens when no `resource` is requested.
+            Defaults to the client id. ID tokens are always addressed to the client id.
 
     CreateApplicationResponse:
       type: object

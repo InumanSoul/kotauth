@@ -314,6 +314,7 @@ data class ProblemDetail(
     val accessType: String = "public",
     val redirectUris: List<String>,
     val grantTypes: List<String>? = null,
+    val audience: String? = null,
 )
 
 @Serializable data class UpdateApplicationRequest(
