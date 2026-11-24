@@ -86,7 +86,7 @@ class CredentialFlowService(
             ),
         )
 
-        val verifyUrl = "$baseUrl/t/${tenant.slug}/verify-email?token=$rawToken"
+        val verifyUrl = "${tenant.publicPrefix(baseUrl)}/verify-email?token=$rawToken"
         emailScope.launch {
             try {
                 emailPort.sendVerificationEmail(user.email, user.fullName, verifyUrl, tenant.displayName, tenant)
@@ -183,7 +183,7 @@ class CredentialFlowService(
             ),
         )
 
-        val resetUrl = "$baseUrl/t/${tenant.slug}/reset-password?token=$rawToken"
+        val resetUrl = "${tenant.publicPrefix(baseUrl)}/reset-password?token=$rawToken"
         emailScope.launch {
             try {
                 emailPort.sendPasswordResetEmail(user.email, user.fullName, resetUrl, tenant.displayName, tenant)
@@ -327,7 +327,7 @@ class CredentialFlowService(
             ),
         )
 
-        val resetUrl = "$baseUrl/t/${tenant.slug}/reset-password?token=$rawToken"
+        val resetUrl = "${tenant.publicPrefix(baseUrl)}/reset-password?token=$rawToken"
         val duration = formatLockoutDuration(tenant.securityConfig.lockoutDurationMinutes)
 
         emailScope.launch {
@@ -375,7 +375,7 @@ class CredentialFlowService(
             ),
         )
 
-        val inviteUrl = "$baseUrl/t/${tenant.slug}/accept-invite?token=$rawToken"
+        val inviteUrl = "${tenant.publicPrefix(baseUrl)}/accept-invite?token=$rawToken"
         emailScope.launch {
             try {
                 emailPort.sendInviteEmail(
@@ -634,7 +634,7 @@ class CredentialFlowService(
             ),
         )
 
-        val magicLinkUrl = "$baseUrl/t/${tenant.slug}/magic-link/consume?token=$rawToken"
+        val magicLinkUrl = "${tenant.publicPrefix(baseUrl)}/magic-link/consume?token=$rawToken"
         emailScope.launch {
             try {
                 emailPort.sendMagicLinkEmail(user.email, user.fullName, magicLinkUrl, tenant.displayName, tenant)

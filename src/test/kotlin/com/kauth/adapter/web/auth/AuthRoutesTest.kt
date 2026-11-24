@@ -2467,7 +2467,7 @@ class AuthRoutesTest {
         }
 
     @Test
-    fun `GET openid-configuration derives issuer from request when tenant issuerUrl is null`() =
+    fun `GET openid-configuration advertises the token issuer when tenant issuerUrl is null`() =
         testApplication {
             // Default tenant fixture already has issuerUrl = null
             resetFixtures()
@@ -2503,6 +2503,37 @@ class AuthRoutesTest {
                 body.contains("/t/acme/protocol/openid-connect/token"),
                 "token_endpoint must be derived from the fallback issuer",
             )
+        }
+
+    @Test
+    fun `discovery is on the workspace's public domain when it has one`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.update(tenantRepo.findBySlug("acme")!!.copy(publicBaseUrl = "https://auth.acme.test"))
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/.well-known/openid-configuration")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains(""""issuer":"https://auth.acme.test/t/acme""""), body)
+            assertTrue(body.contains("https://auth.acme.test/t/acme/protocol/openid-connect/token"), body)
         }
 
     @Test

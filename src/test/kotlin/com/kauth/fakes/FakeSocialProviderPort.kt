@@ -29,7 +29,11 @@ class FakeSocialProviderPort(
         authorizationUrl = "https://provider.example.com/auth"
         bindingAtRedirect = null
         bindingAtExchange = null
+        redirectUriAtExchange = null
     }
+
+    /** The redirect_uri the last code exchange sent; the provider checks it equals the authorize one. */
+    var redirectUriAtExchange: String? = null
 
     override fun exchangeCodeForProfile(
         code: String,
@@ -39,6 +43,7 @@ class FakeSocialProviderPort(
         binding: OidcRequestBinding?,
     ): SocialUserProfile {
         bindingAtExchange = binding
+        redirectUriAtExchange = redirectUri
         if (shouldFail) throw RuntimeException("Provider exchange failed")
         return profileToReturn ?: throw RuntimeException("No profile configured in fake")
     }

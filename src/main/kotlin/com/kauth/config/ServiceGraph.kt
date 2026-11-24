@@ -324,7 +324,7 @@ data class ServiceGraph(
                     }
                     ?: EnglishOnlyTranslation()
 
-            val emailAdapter = SmtpEmailAdapter(translationPort)
+            val emailAdapter = SmtpEmailAdapter(translationPort, instanceBaseUrl = config.baseUrl)
             val factorChangeNotifier =
                 FactorChangeNotifier(
                     userRepository = userRepository,
@@ -409,6 +409,7 @@ data class ServiceGraph(
                     resourceServerRepository = resourceServerRepository,
                     roleRepository = roleRepository,
                     emailScope = applicationScope,
+                    instanceBaseUrl = config.baseUrl,
                 )
             val apiKeyBootstrapService =
                 ApiKeyBootstrapService(apiKeyRepository, tenantRepository)
@@ -449,6 +450,7 @@ data class ServiceGraph(
                     portalConfigRepository = portalConfigRepository,
                     emailBrandingRepository = emailBrandingRepository,
                     corsPort = corsOriginCache,
+                    onPublicOriginChanged = portalClientProvisioning::provisionForTenant,
                 )
             val resourceServerService = ResourceServerService(resourceServerRepository)
             val roleGroupService =

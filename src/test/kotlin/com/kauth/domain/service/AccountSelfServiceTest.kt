@@ -378,6 +378,20 @@ class AccountSelfServiceTest {
     }
 
     @Test
+    fun `the reset link is on the workspace's public domain when it has one`() {
+        tenants.update(tenants.findBySlug("acme")!!.copy(publicBaseUrl = "https://auth.acme.test"))
+
+        credSvc.initiateForgotPassword("alice@example.com", "acme", "http://localhost", null)
+
+        assertTrue(
+            emailPort.sent
+                .single()
+                .url
+                .startsWith("https://auth.acme.test/t/acme/reset-password?token="),
+        )
+    }
+
+    @Test
     fun `initiateForgotPassword - smtp failure still returns success`() {
         emailPort.shouldFail = true
         val result = credSvc.initiateForgotPassword("alice@example.com", "acme", "http://localhost", null)

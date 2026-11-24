@@ -501,6 +501,21 @@ internal fun workspaceSettingsPageImpl(
                     }
                     div("edit-row") {
                         label("edit-row__label") {
+                            htmlFor = "field-publicBaseUrl"
+                            +EnglishStrings.WORKSPACE_PUBLIC_DOMAIN_LABEL
+                        }
+                        div {
+                            input(type = InputType.url, name = "publicBaseUrl") {
+                                this.id = "field-publicBaseUrl"
+                                classes = setOf("edit-row__field")
+                                placeholder = "https://auth.example.com"
+                                value = workspace.publicBaseUrl ?: ""
+                            }
+                            div("edit-row__hint") { +EnglishStrings.WORKSPACE_PUBLIC_DOMAIN_HINT }
+                        }
+                    }
+                    div("edit-row") {
+                        label("edit-row__label") {
                             htmlFor = "field-issuerUrl"
                             +"Issuer URL"
                         }

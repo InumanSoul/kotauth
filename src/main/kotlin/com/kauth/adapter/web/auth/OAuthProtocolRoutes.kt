@@ -90,8 +90,8 @@ internal fun Route.oauthProtocolRoutes(
             ctx.tenant
                 ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
 
-        val openidBaseUrl = call.resolvedBaseUrl()
-        val issuer = tenant.issuerUrl ?: "$openidBaseUrl/t/$slug"
+        // The same issuer the tokens carry, so a validator comparing the two never disagrees.
+        val issuer = oauthService.issuerFor(tenant)
 
         call.respond(
             buildJsonObject {
@@ -860,7 +860,15 @@ internal fun Route.oauthProtocolRoutes(
             // The configured base URL is trusted alongside the request's own origin: behind a proxy
             // chain the origin Ktor sees can differ from the public URL in scheme or port.
             val postLogoutUri = call.request.queryParameters["post_logout_redirect_uri"]
-            val trustedOrigins = listOfNotNull(call.resolvedBaseUrl(), baseUrl.takeIf { it.isNotBlank() })
+            val trustedOrigins =
+                listOfNotNull(
+                    call.resolvedBaseUrl(),
+                    baseUrl.takeIf { it.isNotBlank() },
+                    call.attributes
+                        .getOrNull(AuthTenantAttr)
+                        ?.tenant
+                        ?.publicBaseUrl,
+                )
             if (postLogoutUri.isNullOrBlank() || !isSafePostLogoutRedirect(postLogoutUri, trustedOrigins)) {
                 call.respondRedirect(postLogoutFallback(slug))
             } else {

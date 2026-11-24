@@ -71,6 +71,8 @@ internal fun Route.apiWorkspaceRoutes(
 internal data class UpdateWorkspaceRequest(
     val displayName: String? = null,
     val issuerUrl: String? = null,
+    /** The workspace's own origin, e.g. `https://auth.product.com`; an empty string clears it. */
+    val publicBaseUrl: String? = null,
     val tokenExpirySeconds: Long? = null,
     val refreshTokenExpirySeconds: Long? = null,
     val registrationEnabled: Boolean? = null,
@@ -97,6 +99,7 @@ internal data class UpdateWorkspaceRequest(
         return WorkspacePatch(
             displayName = displayName,
             issuerUrl = issuerUrl,
+            publicBaseUrl = publicBaseUrl,
             tokenExpirySeconds = tokenExpirySeconds,
             refreshTokenExpirySeconds = refreshTokenExpirySeconds,
             registrationEnabled = registrationEnabled,

@@ -28,7 +28,7 @@ class PortalClientProvisioning(
 
     /**
      * For each non-master tenant, ensure the portal client exists and its
-     * redirect URI is "{baseUrl}/t/{slug}/account/callback".
+     * redirect URI is "{public origin}/t/{slug}/account/callback".
      */
     fun provisionRedirectUris() {
         tenantRepository.findAll().forEach(::provisionForTenant)
@@ -38,7 +38,7 @@ class PortalClientProvisioning(
     fun provisionForTenant(tenant: Tenant) {
         if (tenant.isMaster) return
 
-        val callbackUri = "$baseUrl/t/${tenant.slug}/account/callback"
+        val callbackUri = "${tenant.publicPrefix(baseUrl)}/account/callback"
         val portalClient = applicationRepository.findByClientId(tenant.id, PORTAL_CLIENT_ID)
 
         if (portalClient == null) {

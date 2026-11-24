@@ -102,7 +102,7 @@ class FakeTokenPort : TokenPort {
         expectedIssuer: String,
     ): AccessTokenClaims? = claimsToReturn
 
-    override fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: "https://fake-issuer/${tenant.slug}"
+    override fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: tenant.publicPrefix("https://fake-issuer")
 
     override fun getTenantJwks(tenantId: TenantId): List<Map<String, Any>> = jwksToReturn
 

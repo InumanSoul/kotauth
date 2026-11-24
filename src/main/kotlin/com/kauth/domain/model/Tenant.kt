@@ -15,6 +15,8 @@ data class Tenant(
     val slug: String,
     val displayName: String,
     val issuerUrl: String?,
+    /** The workspace's own origin, e.g. `https://auth.product.com`; null serves it on the instance origin. */
+    val publicBaseUrl: String? = null,
     val tokenExpirySeconds: Long = 3600L,
     val refreshTokenExpirySeconds: Long = 86400L,
     val registrationEnabled: Boolean = true,
@@ -41,6 +43,12 @@ data class Tenant(
     val emailBranding: TenantEmailBranding? = null,
     val passkeysEnabled: Boolean = true,
 ) {
+    /** The origin end users and relying parties reach this workspace on. */
+    fun publicOrigin(instanceBaseUrl: String): String = publicBaseUrl ?: instanceBaseUrl.trimEnd('/')
+
+    /** `{origin}/t/{slug}`: the prefix of every workspace-facing URL. */
+    fun publicPrefix(instanceBaseUrl: String): String = "${publicOrigin(instanceBaseUrl)}/t/$slug"
+
     /** True for the built-in platform-admin tenant. */
     val isMaster: Boolean get() = slug == MASTER_SLUG
 
@@ -65,3 +73,17 @@ data class Tenant(
 
 /** Bounds for [Tenant.maxConcurrentSessions] when set. */
 val MAX_SESSIONS_PER_APP = 1..100
+
+/** An absolute link to a page of [tenant], or "" when no origin is known to build it on. */
+fun workspacePageUrl(
+    tenant: Tenant,
+    instanceBaseUrl: String,
+    path: String,
+): String =
+    if (tenant.publicBaseUrl == null &&
+        instanceBaseUrl.isBlank()
+    ) {
+        ""
+    } else {
+        tenant.publicPrefix(instanceBaseUrl) + path
+    }

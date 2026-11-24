@@ -272,6 +272,33 @@ class AdminSettingsTest {
             assertTrue(response.headers["Location"]?.contains("saved=true") == true)
         }
 
+    @Test
+    fun `the settings form saves a public domain and shows it back`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings",
+                formParameters =
+                    Parameters.build {
+                        append("displayName", "Acme")
+                        append("publicBaseUrl", "https://auth.acme.test")
+                        append("tokenExpirySeconds", "3600")
+                        append("refreshTokenExpirySeconds", "86400")
+                    },
+            )
+            val page = authed.get("/admin/workspaces/acme/settings").bodyAsText()
+
+            assertEquals("https://auth.acme.test", tenantRepo.findBySlug("acme")!!.publicBaseUrl)
+            assertTrue(page.contains("""value="https://auth.acme.test""""), "the field shows the saved domain")
+        }
+
     // =========================================================================
     // Create workspace
     // =========================================================================

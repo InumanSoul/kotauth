@@ -7,6 +7,7 @@ import com.kauth.domain.model.MAGIC_LINK_TTL_MINUTES
 import com.kauth.domain.model.MAX_SESSIONS_PER_APP
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
+import com.kauth.domain.model.PublicBaseUrl
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantEmailBranding
 import com.kauth.domain.model.TenantTheme
@@ -26,6 +27,8 @@ class WorkspaceSettingsService(
     private val portalConfigRepository: PortalConfigRepository? = null,
     private val emailBrandingRepository: TenantEmailBrandingRepository? = null,
     private val corsPort: CorsPort? = null,
+    // Re-registers redirect URIs (the portal client's) that live on the workspace's public origin.
+    private val onPublicOriginChanged: (Tenant) -> Unit = {},
 ) {
     fun createWorkspace(
         slug: String,
@@ -82,9 +85,12 @@ class WorkspaceSettingsService(
                 ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
 
         validateWorkspaceSettings(update, tenant)?.let { return AdminResult.Failure(it) }
+        (update.publicBaseUrl?.takeIf { it.isNotBlank() }?.let(PublicBaseUrl::parse) as? PublicBaseUrl.Result.Invalid)
+            ?.let { return AdminResult.Failure(AdminError.Validation(it.reason)) }
 
         val updated = applyWorkspaceSettings(tenant, update)
         val saved = tenantRepository.update(updated)
+        if (saved.publicBaseUrl != tenant.publicBaseUrl) onPublicOriginChanged(saved)
 
         corsPort?.invalidate(slug)
         recordWorkspaceSettingsAudit(tenant, update)
@@ -268,6 +274,10 @@ class WorkspaceSettingsService(
         tenant.copy(
             displayName = update.displayName.trim(),
             issuerUrl = update.issuerUrl?.trim()?.takeIf { it.isNotBlank() },
+            publicBaseUrl =
+                update.publicBaseUrl?.takeIf { it.isNotBlank() }?.let {
+                    (PublicBaseUrl.parse(it) as PublicBaseUrl.Result.Valid).origin
+                },
             tokenExpirySeconds = update.tokenExpirySeconds,
             refreshTokenExpirySeconds = update.refreshTokenExpirySeconds,
             registrationEnabled = update.registrationEnabled,

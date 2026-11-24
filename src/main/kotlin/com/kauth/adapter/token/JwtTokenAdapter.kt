@@ -378,7 +378,7 @@ class JwtTokenAdapter(
         )
     }
 
-    override fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: "$baseUrl/t/${tenant.slug}"
+    override fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: tenant.publicPrefix(baseUrl)
 
     private fun generateRefreshToken(): String = SecureTokens.randomBase64Url(32)
 

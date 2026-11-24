@@ -16,6 +16,7 @@ object TenantsTable : Table("tenants") {
     val slug = varchar("slug", 50)
     val displayName = varchar("display_name", 100)
     val issuerUrl = varchar("issuer_url", 255).nullable()
+    val publicBaseUrl = varchar("public_base_url", 255).nullable()
     val tokenExpirySeconds = integer("token_expiry_seconds").default(3600)
     val refreshTokenExpirySeconds = integer("refresh_token_expiry_seconds").default(86400)
     val registrationEnabled = bool("registration_enabled").default(true)

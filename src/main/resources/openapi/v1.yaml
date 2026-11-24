@@ -414,6 +414,10 @@ components:
         slug: { type: string }
         displayName: { type: string }
         issuerUrl: { type: string, nullable: true }
+        publicBaseUrl:
+          type: string
+          nullable: true
+          description: The workspace's own origin (e.g. `https://auth.example.com`). Null when it is served on the instance origin.
         tokenExpirySeconds: { type: integer, format: int64 }
         refreshTokenExpirySeconds: { type: integer, format: int64 }
         registrationEnabled: { type: boolean }
@@ -453,6 +457,12 @@ components:
       properties:
         displayName: { type: string }
         issuerUrl: { type: string }
+        publicBaseUrl:
+          type: string
+          description: |
+            The origin users sign in on, scheme and host only (`https://auth.example.com`). The
+            issuer, discovery document, sign-in and account pages, and emailed links move to it.
+            Must be https (http only for localhost). An empty string clears it.
         tokenExpirySeconds: { type: integer, format: int64, minimum: 60 }
         refreshTokenExpirySeconds:
           type: integer

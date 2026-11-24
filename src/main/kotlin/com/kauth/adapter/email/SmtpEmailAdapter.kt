@@ -2,6 +2,7 @@ package com.kauth.adapter.email
 
 import com.kauth.domain.model.FactorChange
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.workspacePageUrl
 import com.kauth.domain.port.EmailPort
 import com.kauth.domain.port.TranslationPort
 import org.slf4j.LoggerFactory
@@ -27,6 +28,8 @@ internal data class RenderedEmail(
 
 class SmtpEmailAdapter(
     private val translationPort: TranslationPort,
+    // KAUTH_BASE_URL, for links into a workspace that has no public domain of its own.
+    private val instanceBaseUrl: String = "",
 ) : EmailPort {
     private val log = LoggerFactory.getLogger(SmtpEmailAdapter::class.java)
 
@@ -279,7 +282,7 @@ class SmtpEmailAdapter(
         tenant: Tenant,
     ): RenderedEmail {
         val locale = emailLocale(tenant)
-        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/account/login") ?: ""
+        val loginUrl = workspacePageUrl(tenant, instanceBaseUrl, "/account/login")
 
         val baseBodyHtml =
             greetingHtml(toName, locale) +

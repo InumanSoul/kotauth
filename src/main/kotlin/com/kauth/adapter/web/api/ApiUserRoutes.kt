@@ -188,7 +188,8 @@ internal fun Route.apiUserRoutes(
                     is AdminResult.Success -> {
                         val slug = call.parameters["tenantSlug"] ?: ""
                         val baseUrl = call.resolvedBaseUrl()
-                        val changeUrl = "$baseUrl/t/$slug/change-password?token=${result.value}"
+                        val prefix = accountService.workspacePrefix(tenantId, baseUrl) ?: "$baseUrl/t/$slug"
+                        val changeUrl = "$prefix/change-password?token=${result.value}"
                         call.respond(
                             HttpStatusCode.Created,
                             TemporaryPasswordResponse(

@@ -120,6 +120,12 @@ class AdminAccountService(
         }
     }
 
+    /** `{origin}/t/{slug}` for [tenantId]: its public domain when it has one, else [instanceBaseUrl]. */
+    fun workspacePrefix(
+        tenantId: TenantId,
+        instanceBaseUrl: String,
+    ): String? = tenantRepository.findById(tenantId)?.publicPrefix(instanceBaseUrl)
+
     fun setTemporaryPassword(
         userId: UserId,
         tenantId: TenantId,

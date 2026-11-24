@@ -2,12 +2,13 @@ package com.kauth.domain.model
 
 /**
  * A partial change to a workspace's settings. A null field leaves the current value untouched.
- * For [issuerUrl] and [defaultLocale] an empty string clears the value; for
+ * For [issuerUrl], [publicBaseUrl] and [defaultLocale] an empty string clears the value; for
  * [maxConcurrentSessions] 0 removes the limit.
  */
 data class WorkspacePatch(
     val displayName: String? = null,
     val issuerUrl: String? = null,
+    val publicBaseUrl: String? = null,
     val tokenExpirySeconds: Long? = null,
     val refreshTokenExpirySeconds: Long? = null,
     val registrationEnabled: Boolean? = null,
@@ -46,6 +47,7 @@ data class WorkspacePatch(
         base.copy(
             displayName = displayName ?: base.displayName,
             issuerUrl = if (issuerUrl == null) base.issuerUrl else issuerUrl.ifBlank { null },
+            publicBaseUrl = if (publicBaseUrl == null) base.publicBaseUrl else publicBaseUrl.ifBlank { null },
             tokenExpirySeconds = tokenExpirySeconds ?: base.tokenExpirySeconds,
             refreshTokenExpirySeconds = refreshTokenExpirySeconds ?: base.refreshTokenExpirySeconds,
             registrationEnabled = registrationEnabled ?: base.registrationEnabled,

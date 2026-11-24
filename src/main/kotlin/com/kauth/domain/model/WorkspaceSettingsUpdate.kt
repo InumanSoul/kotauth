@@ -29,6 +29,8 @@ data class WorkspaceSettingsUpdate(
     val loginIdentifierMode: LoginIdentifierMode,
     /** Active sessions a user may hold in one application; null means no limit. */
     val maxConcurrentSessions: Int? = null,
+    /** See [Tenant.publicBaseUrl]; null or blank clears it, so every caller must pass the current value. */
+    val publicBaseUrl: String?,
 ) {
     companion object {
         fun from(tenant: Tenant): WorkspaceSettingsUpdate {
@@ -36,6 +38,7 @@ data class WorkspaceSettingsUpdate(
             return WorkspaceSettingsUpdate(
                 displayName = tenant.displayName,
                 issuerUrl = tenant.issuerUrl,
+                publicBaseUrl = tenant.publicBaseUrl,
                 tokenExpirySeconds = tenant.tokenExpirySeconds,
                 refreshTokenExpirySeconds = tenant.refreshTokenExpirySeconds,
                 registrationEnabled = tenant.registrationEnabled,
