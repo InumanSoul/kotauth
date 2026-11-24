@@ -180,6 +180,15 @@ tasks.register<Test>("e2eTest") {
     systemProperty("playwright.headless", System.getProperty("playwright.headless", "true"))
 }
 
+// CI installs only the browser the suite drives, with its system libraries, before e2eTest.
+tasks.register<JavaExec>("playwrightInstall") {
+    description = "Installs Chromium and its system dependencies for the E2E suite"
+    group = "verification"
+    classpath = sourceSets["e2eTest"].runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+    args("install", "--with-deps", "chromium")
+}
+
 // ── CSS compilation ───────────────────────────────────────────────────────
 val lightningCssBin = "frontend/node_modules/.bin/lightningcss"
 
