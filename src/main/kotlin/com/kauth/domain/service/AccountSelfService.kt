@@ -35,6 +35,12 @@ class AccountSelfService(
 ) {
     private val log = LoggerFactory.getLogger(AccountSelfService::class.java)
 
+    /** The user a token's `sub` names in [tenantId], or null. */
+    fun userIdForSubject(
+        tenantId: TenantId,
+        subject: String,
+    ): UserId? = userRepository.findBySubject(tenantId, subject)?.id
+
     fun getProfile(
         userId: UserId,
         tenantId: TenantId,

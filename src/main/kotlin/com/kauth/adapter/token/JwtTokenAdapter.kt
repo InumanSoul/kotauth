@@ -12,7 +12,6 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
-import com.kauth.domain.model.UserId
 import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.util.SecureTokens
@@ -71,7 +70,7 @@ class JwtTokenAdapter(
         customAccessClaims: Map<String, String>,
         customIdClaims: Map<String, String>,
         authTime: java.time.Instant?,
-        actingSubject: UserId?,
+        actingSubject: String?,
         audiences: List<String>,
         amr: List<String>,
     ): TokenResponse {
@@ -81,7 +80,7 @@ class JwtTokenAdapter(
         val clientId = client?.clientId ?: tenant.slug
         val clientAudience = client?.audience ?: clientId
         val accessTokenAudiences = audiences.ifEmpty { listOf(clientAudience) }
-        val subject = user.id!!.value.toString()
+        val subject = user.tokenSubject
         val expiryMs = (client?.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
         val expiresAt = Date(System.currentTimeMillis() + expiryMs)
 
@@ -152,7 +151,7 @@ class JwtTokenAdapter(
         // RFC 8693 §4.1: nested `act` claim identifies the acting party
         // during impersonation. `sub` remains the impersonated user.
         if (actingSubject != null) {
-            accessTokenBuilder.withClaim("act", mapOf("sub" to actingSubject.value.toString()))
+            accessTokenBuilder.withClaim("act", mapOf("sub" to actingSubject))
         }
 
         val accessToken = accessTokenBuilder.sign(activeKey.algorithm)
@@ -193,7 +192,7 @@ class JwtTokenAdapter(
         authTime: java.time.Instant?,
         amr: List<String>,
         customClaims: Map<String, String>,
-        actingSubject: UserId?,
+        actingSubject: String?,
     ): JWTCreator.Builder =
         JWT
             .create()
@@ -206,7 +205,7 @@ class JwtTokenAdapter(
             .apply { if (amr.isNotEmpty()) withArrayClaim("amr", amr.toTypedArray()) }
             .apply { AuthMethods.acrFor(amr)?.let { withClaim("acr", it) } }
             .apply { customClaims.forEach { (claimName, value) -> withClaim(claimName, value) } }
-            .apply { actingSubject?.let { withClaim("act", mapOf("sub" to it.value.toString())) } }
+            .apply { actingSubject?.let { withClaim("act", mapOf("sub" to it)) } }
 
     // -------------------------------------------------------------------------
     // TokenPort — client credentials (M2M)

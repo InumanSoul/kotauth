@@ -260,9 +260,10 @@ fun Route.adminRoutes(
             val accessToken = tokenValue.access_token
             val idToken = tokenValue.id_token ?: ""
             val claims = decodeJwtPayload(accessToken)
-            val userId = claims["sub"]?.toIntOrNull()
             val username = claims["preferred_username"] ?: ""
             val masterTenant = tenantRepository.findBySlug(Tenant.MASTER_SLUG)
+            val userId =
+                masterTenant?.let { t -> claims["sub"]?.let { userRepository.findBySubject(t.id, it) } }?.id?.value
 
             if (userId == null || masterTenant == null) {
                 call.respondHtml(
@@ -506,13 +507,10 @@ fun Route.adminRoutes(
                     val providers = identityProviderRepository?.findAllByTenant(workspace.id).orEmpty()
                     val toast =
                         if (call.request.queryParameters["saved"] == "imported") {
-                            val rewrites = call.request.queryParameters["rewrites"]?.toIntOrNull() ?: 0
-                            if (rewrites > 0) {
-                                com.kauth.adapter.web.EnglishStrings
-                                    .toastBackupImportedWithRewrites(rewrites)
-                            } else {
-                                com.kauth.adapter.web.EnglishStrings.TOAST_BACKUP_IMPORTED
-                            }
+                            com.kauth.adapter.web.EnglishStrings.toastBackupImported(
+                                rewrites = call.request.queryParameters["rewrites"]?.toIntOrNull() ?: 0,
+                                newSubjects = call.request.queryParameters["newsubjects"]?.toIntOrNull() ?: 0,
+                            )
                         } else {
                             null
                         }

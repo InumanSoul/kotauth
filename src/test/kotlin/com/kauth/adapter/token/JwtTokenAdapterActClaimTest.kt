@@ -79,7 +79,7 @@ class JwtTokenAdapterActClaimTest {
                 tenant = tenant,
                 client = null,
                 scopes = listOf("openid"),
-                actingSubject = adminId,
+                actingSubject = adminId.value.toString(),
             )
 
         val decoded =
@@ -99,7 +99,7 @@ class JwtTokenAdapterActClaimTest {
                 tenant = tenant,
                 client = null,
                 scopes = listOf("openid"),
-                actingSubject = adminId,
+                actingSubject = adminId.value.toString(),
             )
 
         assertNotNull(response.id_token)
@@ -119,7 +119,7 @@ class JwtTokenAdapterActClaimTest {
                 tenant = tenant,
                 client = null,
                 scopes = listOf("openid"),
-                actingSubject = adminId,
+                actingSubject = adminId.value.toString(),
             )
 
         val claims = adapter.decodeAccessToken(response.access_token, adapter.issuerFor(tenant))
@@ -135,5 +135,25 @@ class JwtTokenAdapterActClaimTest {
         val claims = adapter.decodeAccessToken(response.access_token, adapter.issuerFor(tenant))
         assertNotNull(claims)
         assertNull(claims.actingSubject)
+    }
+
+    @Test
+    fun `sub is the user's stored subject, not the row id`() {
+        val subject = "7d4a9f0e-1c2b-4e5f-8a9b-0c1d2e3f4a5b"
+
+        val response = adapter.issueUserTokens(target.copy(subject = subject), tenant, null, listOf("openid"))
+
+        assertEquals(
+            subject,
+            com.auth0.jwt.JWT
+                .decode(response.access_token)
+                .subject,
+        )
+        assertEquals(
+            subject,
+            com.auth0.jwt.JWT
+                .decode(response.id_token!!)
+                .subject,
+        )
     }
 }

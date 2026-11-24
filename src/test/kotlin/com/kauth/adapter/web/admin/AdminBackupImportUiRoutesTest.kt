@@ -190,7 +190,7 @@ class AdminBackupImportUiRoutesTest {
 
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers[HttpHeaders.Location]!!
-            assertEquals("/admin/workspaces/acme-staging?saved=imported&rewrites=0", location)
+            assertEquals("/admin/workspaces/acme-staging?saved=imported&rewrites=0&newsubjects=0", location)
             val imported = assertNotNull(tenantRepo.findBySlug("acme-staging"))
             assertEquals(1, tenantKeys.findAllKeys(imported.id).size)
             assertNotNull(tenantKeys.findActiveKey(imported.id))

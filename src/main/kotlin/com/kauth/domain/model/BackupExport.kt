@@ -261,6 +261,8 @@ data class UserBackup(
     val externalId: String? = null,
     val givenName: String? = null,
     val familyName: String? = null,
+    /** The user's OIDC `sub`, kept on import. Null for backups taken before v1.31.0. */
+    val subject: String? = null,
 )
 
 @Serializable

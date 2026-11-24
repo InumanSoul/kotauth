@@ -51,9 +51,17 @@ data class User(
     val lockedUntil: Instant? = null,
     val failedOtpChallenges: Int = 0,
     val createdAt: Instant? = null,
+    /**
+     * The OIDC `sub`. Null only before the first save, which assigns a random UUID; users that
+     * predate V71 carry their row id. Never derived from the id after that.
+     */
+    val subject: String? = null,
 ) {
     /** True when the account is currently locked out (lockout window has not yet expired). */
     val isLocked: Boolean get() = lockedUntil != null && lockedUntil.isAfter(Instant.now())
+
+    /** The `sub` to put in a token. A stored user always has [subject]; the fallback covers unsaved ones. */
+    val tokenSubject: String get() = subject ?: id!!.value.toString()
 
     companion object {
         /** Sentinel password hash for users who have not yet set a password (invite flow, social login). */

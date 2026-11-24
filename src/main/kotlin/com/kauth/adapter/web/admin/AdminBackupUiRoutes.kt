@@ -281,7 +281,7 @@ fun Route.adminBackupImportRoutes(
                 val summary = result.value
                 auditLogPort?.recordConsoleImport(call, summary, export.schemaVersion, currentSchemaVersion)
                 call.respondRedirect(
-                    "/admin/workspaces/${summary.newTenantSlug}?saved=imported&rewrites=${summary.usernameRewrites.size}",
+                    "/admin/workspaces/${summary.newTenantSlug}?saved=imported&rewrites=${summary.usernameRewrites.size}&newsubjects=${summary.usersWithNewSubject}",
                 )
             }
             is BackupResult.Failure ->
@@ -359,6 +359,7 @@ private fun AuditLogPort.recordConsoleImport(
                     "applications" to summary.applications.toString(),
                     "resourceServers" to summary.resourceServers.toString(),
                     "usernameRewrites" to summary.usernameRewrites.size.toString(),
+                    "usersWithNewSubject" to summary.usersWithNewSubject.toString(),
                     "usernameRewriteDetail" to
                         summary.usernameRewrites.joinToString("; ") { "${it.from} -> ${it.to}" },
                 ),

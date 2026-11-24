@@ -1620,6 +1620,26 @@ class OAuthServiceTest {
     // =========================================================================
 
     @Test
+    fun `getUserInfo returns the user's subject as sub`() {
+        val stored = users.findById(UserId(10), TenantId(1))!!
+        users.add(stored.copy(subject = "c0ffee00-0000-4000-8000-000000000010"))
+        sessions.save(
+            Session(
+                tenantId = TenantId(1),
+                userId = UserId(10),
+                clientId = publicClient.id,
+                accessTokenHash = sha256Hex("at-userinfo-subject"),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+                refreshExpiresAt = null,
+            ),
+        )
+
+        assertEquals("c0ffee00-0000-4000-8000-000000000010", svc.getUserInfo("at-userinfo-subject")?.sub)
+    }
+
+    @Test
     fun `getUserInfo - returns null for unknown token`() {
         assertNull(svc.getUserInfo("unknown-token"))
     }

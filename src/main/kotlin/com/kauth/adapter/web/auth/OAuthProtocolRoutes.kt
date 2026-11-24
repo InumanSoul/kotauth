@@ -392,7 +392,14 @@ internal fun Route.oauthProtocolRoutes(
                         else -> (Instant.now().epochSecond - sso.authTime.epochSecond) <= maxAge
                     }
                 val hintSub = q["id_token_hint"]?.let { decodeIdTokenSub(it) }
-                val hintMatches = hintSub == null || hintSub == sso.userId.toString()
+                val hintMatches =
+                    hintSub == null ||
+                        hintSub ==
+                        oauthService.subjectOf(
+                            com.kauth.domain.model
+                                .UserId(sso.userId),
+                            tenant.id,
+                        )
                 val ssoUser =
                     com.kauth.domain.model
                         .UserId(sso.userId)

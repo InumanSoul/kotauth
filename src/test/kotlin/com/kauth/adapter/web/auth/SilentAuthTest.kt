@@ -326,6 +326,36 @@ class SilentAuthTest {
         }
 
     @Test
+    fun `id_token_hint is compared with the user's subject, not the row id`() =
+        testApplication {
+            userRepo.clear()
+            userRepo.add(alice.copy(subject = "3f1c2a4e-9b7d-4c6e-8a1f-2d3c4b5a6e7f"))
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+
+            fun hint(sub: String) =
+                "eyJhbGciOiJSUzI1NiJ9." +
+                    java.util.Base64
+                        .getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString("""{"sub":"$sub"}""".toByteArray()) + ".SIGNATURE_NOT_CHECKED"
+
+            val byRowId =
+                noFollow.get("$authorizeUrl&prompt=none&id_token_hint=${hint("42")}") {
+                    header("Cookie", "KOTAUTH_SSO=${ssoCookie()}")
+                }
+            val bySubject =
+                noFollow.get(
+                    "$authorizeUrl&prompt=none&id_token_hint=${hint("3f1c2a4e-9b7d-4c6e-8a1f-2d3c4b5a6e7f")}",
+                ) {
+                    header("Cookie", "KOTAUTH_SSO=${ssoCookie()}")
+                }
+
+            assertTrue(byRowId.headers["Location"]!!.contains("error=login_required"))
+            assertTrue(bySubject.headers["Location"]!!.contains("code="))
+        }
+
+    @Test
     fun `id_token_hint with mismatched sub blocks silent auth`() =
         testApplication {
             application(appBlock())

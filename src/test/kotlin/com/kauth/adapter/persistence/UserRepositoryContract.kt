@@ -107,6 +107,27 @@ abstract class UserRepositoryContract {
     }
 
     @Test
+    fun `save gives a new user a random subject, findable by it, that update never changes`() {
+        val tid = tenantId()
+        val saved = repo.save(newUser(tid))
+        val subject = assertNotNull(saved.subject)
+
+        repo.update(saved.copy(fullName = "Renamed", subject = null))
+
+        assertTrue(Regex("^[0-9a-f-]{36}$").matches(subject), "a new user's subject is a UUID, not the row id")
+        assertEquals(saved.id, repo.findBySubject(tid, subject)?.id)
+        assertEquals(subject, repo.findById(saved.id!!, tid)?.subject)
+    }
+
+    @Test
+    fun `save keeps a subject the caller brings`() {
+        val tid = tenantId()
+        val saved = repo.save(newUser(tid).copy(subject = "imported-$seq"))
+
+        assertEquals("imported-$seq", repo.findById(saved.id!!, tid)?.subject)
+    }
+
+    @Test
     fun `update persists requiredActions`() {
         val tid = tenantId()
         val saved = repo.save(newUser(tid))

@@ -7,7 +7,6 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
-import com.kauth.domain.model.UserId
 import com.kauth.domain.port.TokenPort
 
 /**
@@ -33,7 +32,7 @@ class FakeTokenPort : TokenPort {
         private set
     var lastAuthTime: java.time.Instant? = null
         private set
-    var lastActingSubject: UserId? = null
+    var lastActingSubject: String? = null
         private set
     var lastUserTokenAudiences: List<String> = emptyList()
         private set
@@ -62,7 +61,7 @@ class FakeTokenPort : TokenPort {
         customAccessClaims: Map<String, String>,
         customIdClaims: Map<String, String>,
         authTime: java.time.Instant?,
-        actingSubject: UserId?,
+        actingSubject: String?,
         audiences: List<String>,
         amr: List<String>,
     ): TokenResponse {
@@ -73,7 +72,7 @@ class FakeTokenPort : TokenPort {
         lastAuthTime = authTime
         lastActingSubject = actingSubject
         lastUserTokenAudiences = audiences
-        val subjectMarker = if (actingSubject != null) "imp.${actingSubject.value}." else ""
+        val subjectMarker = if (actingSubject != null) "imp.$actingSubject." else ""
         return TokenResponse(
             access_token = "fake.access.$subjectMarker${user.username}.$n",
             token_type = "Bearer",
