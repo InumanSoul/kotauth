@@ -317,6 +317,40 @@ class ApiUserLifecycleRoutesTest {
         }
 
     @Test
+    fun `POST resend-invite sends a new invite to a user who has not accepted theirs`() =
+        testApplication {
+            application { installTestApp() }
+            client.post("/t/acme/api/v1/users/invite") {
+                bearerAuth(rawApiKey)
+                contentType(ContentType.Application.Json)
+                setBody("""{"username":"dana","email":"dana@acme.com","fullName":"Dana"}""")
+            }
+            val dana = userRepo.findByUsername(TenantId(1), "dana")!!
+            val firstInvite = prTokenRepo.all().single { it.purpose == TokenPurpose.INVITE && it.userId == dana.id }
+
+            val response =
+                client.post("/t/acme/api/v1/users/${dana.id!!.value}/resend-invite") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            val invites = prTokenRepo.all().filter { it.purpose == TokenPurpose.INVITE && it.userId == dana.id }
+            assertEquals(1, invites.size, "The old invite link is replaced, not kept alongside")
+            assertTrue(invites.single().tokenHash != firstInvite.tokenHash)
+        }
+
+    @Test
+    fun `POST resend-invite answers 422 for a user with no pending invite`() =
+        testApplication {
+            application { installTestApp() }
+            val response =
+                client.post("/t/acme/api/v1/users/10/resend-invite") {
+                    bearerAuth(rawApiKey)
+                }
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
     fun `POST send-reset-email returns 404 for unknown user`() =
         testApplication {
             application { installTestApp() }

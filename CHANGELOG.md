@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`POST /users/{userId}/resend-invite` in the admin API** (scope `users:write`). It sends a new
+  invite to a user who hasn't accepted theirs and invalidates the old link. It's the call to use
+  when an invite expired, which before was only possible from the console. It answers `204` when
+  sent, and `422` when the user has no pending invite or SMTP isn't configured.
+
+### Fixed
+
+- **An invited user who resets their password instead of accepting the invite can sign in.** The
+  reset set the password but left the pending invite in place, so every sign-in was refused and
+  the account was stuck. Completing a reset now does what accepting an invite does: it marks the
+  email verified and clears the pending set-password step. Like Keycloak, it also clears a forced
+  password change, since the user just chose a new password. Any outstanding invite link stops
+  working. Closes #227.
+
 ## [1.30.0] - 2026-11-24
 
 ### Added

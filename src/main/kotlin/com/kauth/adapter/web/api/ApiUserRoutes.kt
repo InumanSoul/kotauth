@@ -158,6 +158,17 @@ internal fun Route.apiUserRoutes(
                 }
             }
 
+            /** Sends a fresh invite to a user who hasn't accepted theirs, replacing the old link. */
+            post("/resend-invite") {
+                requireScope(call, ApiScope.USERS_WRITE) ?: return@post
+                val tenantId = call.attributes[TenantIdAttr]
+                val userId = call.parseUserIdOr { return@post } ?: return@post
+                when (val result = adminUserService.resendInvite(userId, tenantId, call.resolvedBaseUrl())) {
+                    is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                    is AdminResult.Failure -> call.respondAdminError(result.error)
+                }
+            }
+
             /**
              * Generates a one-time temporary-password link for the user and
              * returns it in the response. The user is stamped with

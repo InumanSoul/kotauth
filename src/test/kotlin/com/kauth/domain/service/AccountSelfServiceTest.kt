@@ -539,6 +539,44 @@ class AccountSelfServiceTest {
     }
 
     @Test
+    fun `confirmPasswordReset - an invited user who resets instead of accepting can sign in`() {
+        users.update(
+            alice.copy(
+                emailVerified = false,
+                requiredActions = setOf(RequiredAction.SET_PASSWORD, RequiredAction.CHANGE_PASSWORD),
+            ),
+        )
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                tokenHash = sha256("raw-invite"),
+                expiresAt = Instant.now().plusSeconds(3600),
+                purpose = TokenPurpose.INVITE,
+            ),
+        )
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                tokenHash = sha256("raw-reset"),
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        val result = credSvc.confirmPasswordReset("raw-reset", "new-secure-password", "new-secure-password")
+
+        assertIs<SelfServiceResult.Success<Unit>>(result)
+        val user = users.findById(UserId(10), TenantId(1))!!
+        assertTrue(user.requiredActions.isEmpty(), "Got ${user.requiredActions}")
+        assertTrue(user.emailVerified)
+        assertTrue(
+            prTokenRepo.all().none { it.purpose == TokenPurpose.INVITE },
+            "The invite link must not outlive a completed reset",
+        )
+    }
+
+    @Test
     fun `confirmPasswordReset - no policy port falls back to minLength check`() {
         val hash = sha256("raw-reset")
         prTokenRepo.create(
