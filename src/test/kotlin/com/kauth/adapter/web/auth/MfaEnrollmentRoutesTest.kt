@@ -135,10 +135,8 @@ class MfaEnrollmentRoutesTest {
                         AuthService(
                             userRepository = users,
                             tenantRepository = tenants,
-                            tokenPort = tokenPort,
                             passwordHasher = hasher,
                             auditLog = auditLog,
-                            sessionRepository = sessions,
                             identifierResolver = UserIdentifierResolver(users),
                             collisionCheck = IdentifierCollisionCheck(users),
                         ),

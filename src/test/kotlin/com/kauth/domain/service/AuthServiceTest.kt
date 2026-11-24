@@ -45,10 +45,8 @@ class AuthServiceTest {
         AuthService(
             userRepository = users,
             tenantRepository = tenants,
-            tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
-            sessionRepository = sessions,
             identifierResolver = UserIdentifierResolver(users),
             collisionCheck = IdentifierCollisionCheck(users),
         )

@@ -362,10 +362,8 @@ data class ServiceGraph(
                 AuthService(
                     userRepository = userRepository,
                     tenantRepository = tenantRepository,
-                    tokenPort = tokenAdapter,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
-                    sessionRepository = sessionRepository,
                     credentialFlowService = credentialFlowService,
                     passwordPolicy = passwordPolicyAdapter,
                     applicationRepository = applicationRepository,

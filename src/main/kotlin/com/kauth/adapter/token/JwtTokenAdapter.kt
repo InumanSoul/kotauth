@@ -78,7 +78,8 @@ class JwtTokenAdapter(
         val acr = AuthMethods.acrFor(amr)
         val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
-        val clientAudience = client?.audience ?: client?.clientId ?: tenant.slug
+        val clientId = client?.clientId ?: tenant.slug
+        val clientAudience = client?.audience ?: clientId
         val accessTokenAudiences = audiences.ifEmpty { listOf(clientAudience) }
         val subject = user.id!!.value.toString()
         val expiryMs = (client?.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
@@ -161,7 +162,8 @@ class JwtTokenAdapter(
                 idTokenClaims(user, nonce, authTime, amr, customIdClaims, actingSubject)
                     .withKeyId(activeKey.keyId)
                     .withIssuer(issuer)
-                    .withAudience(clientAudience)
+                    // OIDC Core §2: an ID token is addressed to the client that signed the user in.
+                    .withAudience(clientId)
                     .withSubject(subject)
                     .withIssuedAt(Date())
                     .withExpiresAt(expiresAt)
