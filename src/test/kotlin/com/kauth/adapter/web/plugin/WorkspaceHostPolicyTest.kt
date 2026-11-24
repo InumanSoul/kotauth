@@ -36,7 +36,7 @@ class WorkspaceHostPolicyTest {
         host: String,
         method: HttpMethod = HttpMethod.Get,
         hosts: Set<String> = setOf("auth.acme.test"),
-    ) = WorkspaceHostPolicy.decide(method, path, "$path?x=1", host, bySlug::get) { hosts }
+    ) = WorkspaceHostPolicy.decide(method, path, "$path?x=1", host, bySlug::get, workspaceHosts = { hosts })
 
     @Test
     fun `a workspace page on the instance address moves to the workspace's domain, path and query kept`() {
@@ -76,6 +76,48 @@ class WorkspaceHostPolicyTest {
     }
 
     @Test
+    fun `an admin's browser stays on the instance address, where impersonation's portal cookie lives`() {
+        val decision =
+            WorkspaceHostPolicy.decide(
+                HttpMethod.Get,
+                "/t/acme/launcher",
+                "/t/acme/launcher",
+                "sso.example.com",
+                bySlug::get,
+                { setOf("auth.acme.test") },
+                adminBrowser = true,
+            )
+        val onDomainForeign =
+            WorkspaceHostPolicy.decide(
+                HttpMethod.Get,
+                "/t/beta/authorize",
+                "/t/beta/authorize",
+                "auth.acme.test",
+                bySlug::get,
+                { setOf("auth.acme.test") },
+                adminBrowser = true,
+            )
+
+        assertEquals(Decision.Pass, decision)
+        assertEquals(Decision.NotFound, onDomainForeign)
+    }
+
+    @Test
+    fun `a domain change on this replica applies at once, without waiting for the cache to expire`() {
+        val tenants = FakeTenantRepository().apply { add(beta) }
+        val cache = WorkspaceHostCache(tenants)
+        val before = cache.hosts()
+
+        tenants.update(tenants.findBySlug("beta")!!.copy(publicBaseUrl = "https://id.beta.test"))
+        val stale = cache.hosts()
+        cache.invalidate()
+
+        assertEquals(emptySet(), before)
+        assertEquals(emptySet(), stale)
+        assertEquals(setOf("id.beta.test"), cache.hosts())
+    }
+
+    @Test
     fun `nothing is enforced while no workspace has a domain`() {
         assertEquals(Decision.Pass, decide("/t/acme/authorize", "sso.example.com", hosts = emptySet()))
     }
@@ -108,5 +150,11 @@ class WorkspaceHostPolicyTest {
             assertEquals("https://auth.acme.test/t/acme/authorize?client_id=x", wrongHost.headers["Location"])
             assertEquals(HttpStatusCode.OK, rightHost.status)
             assertEquals(HttpStatusCode.OK, token.status)
+            val asAdmin =
+                noFollow.get("/t/acme/authorize") {
+                    header("X-Forwarded-Host", "sso.example.com")
+                    header("Cookie", "KOTAUTH_ADMIN=session")
+                }
+            assertEquals(HttpStatusCode.OK, asAdmin.status)
         }
 }

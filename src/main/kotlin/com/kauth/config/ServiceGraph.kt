@@ -175,6 +175,7 @@ data class ServiceGraph(
     val workspaceCreationService: WorkspaceCreationService,
     val workspacePatchService: WorkspacePatchService,
     val portalClientProvisioning: PortalClientProvisioning,
+    val workspaceHostCache: com.kauth.adapter.web.plugin.WorkspaceHostCache,
     val adminClientProvisioning: AdminClientProvisioning,
     val adminSessionKey: ByteArray,
     val loginRateLimiter: RateLimiterPort,
@@ -279,6 +280,9 @@ data class ServiceGraph(
                     baseUrl = config.baseUrl,
                 )
             portalClientProvisioning.provisionRedirectUris()
+            val workspaceHostCache =
+                com.kauth.adapter.web.plugin
+                    .WorkspaceHostCache(tenantRepository)
 
             val adminClientProvisioning =
                 AdminClientProvisioning(
@@ -450,7 +454,10 @@ data class ServiceGraph(
                     portalConfigRepository = portalConfigRepository,
                     emailBrandingRepository = emailBrandingRepository,
                     corsPort = corsOriginCache,
-                    onPublicOriginChanged = portalClientProvisioning::provisionForTenant,
+                    onPublicOriginChanged = {
+                        portalClientProvisioning.provisionForTenant(it)
+                        workspaceHostCache.invalidate()
+                    },
                 )
             val resourceServerService = ResourceServerService(resourceServerRepository)
             val roleGroupService =
@@ -756,6 +763,7 @@ data class ServiceGraph(
                 workspaceCreationService = workspaceCreationService,
                 workspacePatchService = workspacePatchService,
                 portalClientProvisioning = portalClientProvisioning,
+                workspaceHostCache = workspaceHostCache,
                 adminClientProvisioning = adminClientProvisioning,
                 adminSessionKey = adminSessionKey,
                 loginRateLimiter = loginLimiter,

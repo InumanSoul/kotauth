@@ -53,6 +53,9 @@ object WorkspaceHostPolicy {
         requestHost: String,
         tenantFor: (String) -> Tenant?,
         workspaceHosts: () -> Set<String>,
+        // An admin's console session lives on the instance address, and so does impersonation:
+        // its portal cookie is set there. Moving that browser to the domain would drop both.
+        adminBrowser: Boolean = false,
     ): Decision {
         if (method == HttpMethod.Options) return Decision.Pass
         // No workspace has a domain: nothing to enforce, and no lookup per request.
@@ -69,7 +72,7 @@ object WorkspaceHostPolicy {
         val tenant = tenantFor(match.groupValues[1]) ?: return Decision.Pass
         val own = tenant.publicBaseUrl
         return when {
-            own != null && hostOf(own) != host -> Decision.Redirect(own + uri)
+            own != null && hostOf(own) != host && !adminBrowser -> Decision.Redirect(own + uri)
             own == null && host in known -> Decision.NotFound
             else -> Decision.Pass
         }
@@ -79,13 +82,13 @@ object WorkspaceHostPolicy {
 }
 
 /**
- * Which hosts belong to some workspace, reloaded every [ttlSeconds]. A domain set or cleared in the
- * console is enforced for other workspaces within that window.
+ * Which hosts belong to some workspace, reloaded every [ttlSeconds]. A domain change made on this
+ * replica calls [invalidate] and applies at once; other replicas pick it up within the window.
  */
-internal class WorkspaceHostCache(
+class WorkspaceHostCache(
     private val tenants: TenantRepository,
-    private val clock: Clock,
-    private val ttlSeconds: Long,
+    private val clock: Clock = Clock.systemUTC(),
+    private val ttlSeconds: Long = 30,
 ) {
     @Volatile private var hosts: Set<String> = emptySet()
 
@@ -104,21 +107,24 @@ internal class WorkspaceHostCache(
         }
         return hosts
     }
+
+    fun invalidate() {
+        loadedAt = Long.MIN_VALUE
+    }
 }
+
+// Presence only: skipping a redirect grants nothing, since pages answer on every host.
+private const val ADMIN_SESSION_COOKIE = "KOTAUTH_ADMIN"
 
 class WorkspaceHostPluginConfig {
     lateinit var tenantRepository: TenantRepository
-    var clock: Clock = Clock.systemUTC()
-    var hostsTtlSeconds: Long = 30
+    var cache: WorkspaceHostCache? = null
 }
 
 val WorkspaceHostPlugin =
     createApplicationPlugin("WorkspaceHostPlugin", ::WorkspaceHostPluginConfig) {
         val tenants = pluginConfig.tenantRepository
-        val clock = pluginConfig.clock
-        val ttl = pluginConfig.hostsTtlSeconds
-
-        val cache = WorkspaceHostCache(tenants, clock, ttl)
+        val cache = pluginConfig.cache ?: WorkspaceHostCache(tenants)
 
         onCall { call ->
             val decision =
@@ -129,6 +135,7 @@ val WorkspaceHostPlugin =
                     requestHost = call.request.origin.serverHost,
                     tenantFor = tenants::findBySlug,
                     workspaceHosts = cache::hosts,
+                    adminBrowser = call.request.cookies[ADMIN_SESSION_COOKIE] != null,
                 )
             when (decision) {
                 is WorkspaceHostPolicy.Decision.Redirect -> {

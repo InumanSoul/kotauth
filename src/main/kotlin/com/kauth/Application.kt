@@ -276,7 +276,10 @@ fun Application.module(
 ) {
     installForwardedHeaders(config)
     // After forwarded headers, so the host it compares is the one the user typed.
-    install(WorkspaceHostPlugin) { tenantRepository = s.tenantRepository }
+    install(WorkspaceHostPlugin) {
+        tenantRepository = s.tenantRepository
+        cache = s.workspaceHostCache
+    }
 
     // -- Security headers ----------------------------------------------------
     install(DefaultHeaders) {
