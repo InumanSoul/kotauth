@@ -46,6 +46,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Sending never blocks or fails the change, and nothing is sent when nothing changed (for
   example, resetting MFA for a user who never finished enrolling).
 
+### Security
+
+- **A refresh token now works only in its own workspace, for its own enabled client.**
+  - **Workspace:** a refresh token sent to another workspace's token endpoint was accepted, and the
+    tokens came back signed by that workspace's issuer for a user who isn't in it. The refresh
+    grant now refuses a token from another workspace, as introspection and revocation already did.
+  - **Deleted client:** a session whose client was deleted kept refreshing, and since the deleted
+    client was missing, none of the client checks ran, so any `client_id` was accepted. Such a
+    refresh is now refused and the session ends. Auth0 and Keycloak do the same.
+  - **Disabled client:** a disabled client's refresh tokens and unredeemed authorization codes kept
+    working. Both are now refused with `invalid_client`. Re-enabling the client lets its sessions
+    refresh again.
+
 ### Fixed
 
 - **With Redis as the session store, refreshed tokens kept their resource audiences.** The Redis
@@ -54,6 +67,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the resource server's audience. A refresh that named a `resource` was refused with
   `invalid_target`. Postgres-backed installs were not affected. Sessions written before this fix
   still decode, but they stay without their resources until the user signs in again.
+- **A social sign-in kept the resources and state the client sent.** Going through Google, GitHub
+  or an OIDC provider dropped the RFC 8707 `resource` parameters, so the access token came back
+  without the resource server's audience. The client's `state` also came back cut short if it held
+  `&`, `+` or `=`. The social redirect now checks requested resources the same way `/authorize`
+  does and refuses one the client isn't authorized for with `invalid_target`.
 
 ### Changed
 

@@ -108,15 +108,22 @@ object AuthView {
         /** Serializes non-null OAuth params to a query string (with leading '?'). */
         fun toQueryString(): String {
             val parts = mutableListOf<String>()
-            responseType?.let { parts += "response_type=$it" }
-            clientId?.let { parts += "oauth_client_id=$it" }
-            redirectUri?.let { parts += "redirect_uri=$it" }
-            scope?.let { parts += "scope=$it" }
-            state?.let { parts += "state=$it" }
-            codeChallenge?.let { parts += "code_challenge=$it" }
-            codeChallengeMethod?.let { parts += "code_challenge_method=$it" }
-            nonce?.let { parts += "nonce=$it" }
-            acrValues?.let { parts += "acr_values=" + java.net.URLEncoder.encode(it, "UTF-8") }
+            fun add(
+                name: String,
+                value: String?,
+            ) {
+                value?.let { parts += name + "=" + java.net.URLEncoder.encode(it, "UTF-8") }
+            }
+            add("response_type", responseType)
+            add("oauth_client_id", clientId)
+            add("redirect_uri", redirectUri)
+            add("scope", scope)
+            add("state", state)
+            add("code_challenge", codeChallenge)
+            add("code_challenge_method", codeChallengeMethod)
+            add("nonce", nonce)
+            resources.forEach { add("resource", it) }
+            add("acr_values", acrValues)
             return if (parts.isEmpty()) "" else "?" + parts.joinToString("&")
         }
     }

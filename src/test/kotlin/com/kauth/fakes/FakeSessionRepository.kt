@@ -23,6 +23,11 @@ class FakeSessionRepository : SessionRepository {
 
     fun all(): List<Session> = store.values.toList()
 
+    /** What `ON DELETE SET NULL` does to a hard-deleted client's sessions. */
+    fun detachClient(clientId: ApplicationId) {
+        store.replaceAll { _, s -> if (s.clientId == clientId) s.copy(clientId = null) else s }
+    }
+
     fun findByUserId(userId: UserId): List<Session> = store.values.filter { it.userId == userId }
 
     override fun save(session: Session): Session {

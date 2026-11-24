@@ -1132,6 +1132,85 @@ class OAuthServiceTest {
     }
 
     @Test
+    fun `a refresh for a client that was deleted is refused and ends the session`() {
+        val refreshToken = establishSession(publicClient)
+        apps.softDelete(publicClient.id)
+
+        val result = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+
+        assertIs<OAuthError.InvalidGrant>((result as OAuthResult.Failure).error)
+        assertTrue(sessions.all().none { it.isActive }, "The deleted client's session must end")
+    }
+
+    @Test
+    fun `a refresh whose session lost its client to a hard delete is refused`() {
+        val refreshToken = establishSession(publicClient)
+        sessions.detachClient(publicClient.id)
+
+        val result = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+
+        assertIs<OAuthError.InvalidGrant>((result as OAuthResult.Failure).error)
+        assertTrue(sessions.all().none { it.isActive })
+    }
+
+    @Test
+    fun `a refresh for a disabled client is refused until the client is enabled again`() {
+        val refreshToken = establishSession(publicClient)
+        apps.setEnabled(publicClient.id, false)
+
+        val refused = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+        assertIs<OAuthError.InvalidClient>((refused as OAuthResult.Failure).error)
+
+        apps.setEnabled(publicClient.id, true)
+        val refreshed = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = "spa-app")
+        assertIs<OAuthResult.Success<*>>(refreshed)
+    }
+
+    @Test
+    fun `a refresh token presented to another tenant mints nothing there`() {
+        val refreshToken = establishSession(publicClient)
+        tenants.add(Tenant(id = TenantId(2), slug = "other", displayName = "Other", issuerUrl = null))
+        val sessionsBefore = sessions.all().size
+
+        val result = svc.refreshTokens(tenantSlug = "other", refreshToken = refreshToken, clientId = "spa-app")
+
+        assertIs<OAuthError.InvalidGrant>((result as OAuthResult.Failure).error)
+        assertEquals(sessionsBefore, sessions.all().size)
+        assertTrue(sessions.all().none { it.tenantId == TenantId(2) })
+    }
+
+    @Test
+    fun `a code issued before its client was disabled cannot be exchanged`() {
+        val code =
+            (
+                svc.issueAuthorizationCode(
+                    tenantSlug = "acme",
+                    userId = UserId(10),
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scopes = "openid",
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                    nonce = null,
+                    state = null,
+                ) as OAuthResult.Success<AuthorizationCode>
+            ).value.code
+        apps.setEnabled(publicClient.id, false)
+
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
+
+        assertIs<OAuthError.InvalidClient>((result as OAuthResult.Failure).error)
+    }
+
+    @Test
     fun `refreshTokens replay of rotated token revokes all user sessions and audits`() {
         val firstRefreshToken = establishSession(client = publicClient)
 
