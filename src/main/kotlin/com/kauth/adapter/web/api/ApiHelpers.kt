@@ -277,6 +277,8 @@ data class ProblemDetail(
     val email: String,
     val fullName: String,
     val password: String,
+    /** The user's `sub`. Omit to have Kotauth assign a random UUID. Fixed once set. */
+    val subject: String? = null,
 )
 
 @Serializable data class UpdateUserRequest(
@@ -347,6 +349,8 @@ data class ProblemDetail(
     val username: String? = null,
     val email: String,
     val fullName: String,
+    /** The user's `sub`. Omit to have Kotauth assign a random UUID. Fixed once set. */
+    val subject: String? = null,
 )
 
 /**
@@ -409,6 +413,8 @@ data class ProblemDetail(
 
 @Serializable data class UserDto(
     val id: Int,
+    /** The `sub` in this user's tokens: what a relying party stores. [id] is Kotauth's own key. */
+    val subject: String,
     val username: String,
     val email: String,
     val fullName: String,
@@ -636,6 +642,7 @@ data class ProblemDetail(
 internal fun com.kauth.domain.model.User.toApiDto() =
     UserDto(
         id = id!!.value,
+        subject = tokenSubject,
         username = username,
         email = email,
         fullName = fullName,

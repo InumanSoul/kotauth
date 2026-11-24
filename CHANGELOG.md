@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The admin API speaks `sub`.** Every user it returns carries `subject`, the `sub` in that
+  user's tokens, next to `id`. `GET /users?subject=` finds a user by it. `POST /users` and
+  `POST /users/invite` accept an optional `subject` for seeds, fixtures and users migrated from
+  another identity provider. It must be unique in the workspace (409 otherwise) and can't be
+  changed afterwards. Closes #250.
+
 - **A public domain per workspace.** A workspace can be given its own origin, such as
   `https://auth.acme.com`, in the console (Workspace settings → General) or with
   `PATCH /workspace` (`publicBaseUrl`). Its issuer, discovery document, sign-in and account pages,
@@ -51,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Users that exist when you upgrade keep the `sub` they have (migration V71 copies it), so no
   token, link or integration changes for them. **If a relying party stores `sub` as an integer,
   change that column to text before upgrading:** the first user created afterwards has a UUID.
+  An integration that stored the admin API's `id` as the user's `sub` must read `subject`
+  instead: the two are no longer the same for new users, nor for any user after an export and
+  import.
   See ADR-25.
 
 ### Fixed
