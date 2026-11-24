@@ -66,6 +66,7 @@ fun Route.adminUserRoutes(
     mfaService: MfaService? = null,
     auditLogPort: AuditLogPort? = null,
     socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
+    flash: FlashCookies,
 ) {
     route("/users") {
         get {
@@ -218,7 +219,7 @@ fun Route.adminUserRoutes(
                     }
                 val tempPasswordLink =
                     if (savedParam == "temp_password_set") {
-                        FlashStore.take(call.request.queryParameters["flash"])
+                        flash.take(call, "temp-password:${ctx.slug}/${userId.value}", ctx.session.username)
                     } else {
                         null
                     }
@@ -485,17 +486,15 @@ fun Route.adminUserRoutes(
                 val userId =
                     call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val session = call.sessions.get<AdminSession>()!!
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.resolvedBaseUrl()
                 when (val result = accountService.setTemporaryPassword(userId, workspace.id)) {
                     is AdminResult.Success -> {
                         val changeUrl = "$baseUrl/t/$slug/change-password?token=${result.value}"
-                        val flashToken = FlashStore.put(changeUrl)
-                        call.respondRedirect(
-                            "/admin/workspaces/$slug/users/${userId.value}?" +
-                                "saved=temp_password_set&flash=$flashToken",
-                        )
+                        flash.put(call, "temp-password:$slug/${userId.value}", session.username, changeUrl)
+                        call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=temp_password_set")
                     }
                     is AdminResult.Failure ->
                         call.respondRedirect(

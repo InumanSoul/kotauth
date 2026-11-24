@@ -101,6 +101,7 @@ fun Route.adminRoutes(
     identityProviderProbeService: com.kauth.domain.service.IdentityProviderProbeService? = null,
     socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
 ) {
+    val flash = FlashCookies(encryptionService, secure = baseUrl.startsWith("https://", ignoreCase = true))
     AdminView.setShellAppInfo(appInfo)
     val workspaceCreation =
         workspaceCreationService
@@ -503,6 +504,18 @@ fun Route.adminRoutes(
                     val wsPairs = call.attributes[WsPairsAttr]
                     val apps = applicationRepository.findByTenantId(workspace.id)
                     val providers = identityProviderRepository?.findAllByTenant(workspace.id).orEmpty()
+                    val toast =
+                        if (call.request.queryParameters["saved"] == "imported") {
+                            val rewrites = call.request.queryParameters["rewrites"]?.toIntOrNull() ?: 0
+                            if (rewrites > 0) {
+                                com.kauth.adapter.web.EnglishStrings
+                                    .toastBackupImportedWithRewrites(rewrites)
+                            } else {
+                                com.kauth.adapter.web.EnglishStrings.TOAST_BACKUP_IMPORTED
+                            }
+                        } else {
+                            null
+                        }
                     call.respondHtml(
                         HttpStatusCode.OK,
                         AdminView.workspaceDetailPage(
@@ -511,6 +524,7 @@ fun Route.adminRoutes(
                             apps,
                             session.username,
                             identityProviders = providers,
+                            toastMessage = toast,
                         ),
                     )
                 }
@@ -537,6 +551,7 @@ fun Route.adminRoutes(
                     roleGroupService = roleGroupService,
                     corsPort = corsPort,
                     resourceServerService = resourceServerService,
+                    flash = flash,
                 )
 
                 adminUserRoutes(
@@ -553,6 +568,7 @@ fun Route.adminRoutes(
                     mfaService = mfaService,
                     auditLogPort = auditLogPort,
                     socialAccountRepository = socialAccountRepository,
+                    flash = flash,
                 )
 
                 adminSessionAuditRoutes(

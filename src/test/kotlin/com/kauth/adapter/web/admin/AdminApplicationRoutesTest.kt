@@ -32,6 +32,7 @@ import com.kauth.infrastructure.KeyProvisioningService
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
@@ -186,7 +187,7 @@ class AdminApplicationRoutesTest {
     // =========================================================================
 
     @Test
-    fun `creating a confidential application redirects with a flash token`() =
+    fun `a new client secret is shown once and never travels in the URL`() =
         testApplication {
             application { installTestApp() }
             val authed = createClient { install(HttpCookies) }
@@ -206,8 +207,50 @@ class AdminApplicationRoutesTest {
 
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"]!!
-            assertTrue(location.contains("flash="))
-            assertFalse(location.contains("erp-caller-secret"))
+            val app = appRepo.findByClientId(tenantId, "erp-caller")!!
+            val secret = appRepo.findClientSecretHash(app.id)!!.removePrefix("hashed:")
+            assertFalse(location.contains("?"), "Got: $location")
+
+            assertTrue(authed.get(location).bodyAsText().contains(secret))
+            assertFalse(authed.get(location).bodyAsText().contains(secret), "A reload must not show it again")
+        }
+
+    @Test
+    fun `a temporary password link is shown once and never travels in the URL`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            val user =
+                userRepo.add(
+                    com.kauth.domain.model.User(
+                        tenantId = tenantId,
+                        username = "temp-user",
+                        email = "temp-user@acme.test",
+                        fullName = "Temp User",
+                        passwordHash = "hashed:old",
+                    ),
+                )
+
+            val response = authed.post("/admin/workspaces/$tenantSlug/users/${user.id!!.value}/set-temporary-password")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"]!!
+            assertFalse(location.contains("token") || location.contains("flash"), "Got: $location")
+            assertTrue(authed.get(location).bodyAsText().contains("/t/$tenantSlug/change-password?token="))
+            assertFalse(authed.get(location).bodyAsText().contains("/t/$tenantSlug/change-password?token="))
+        }
+
+    @Test
+    fun `the workspace page confirms a backup import`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/$tenantSlug?saved=imported&rewrites=0").bodyAsText()
+
+            assertTrue(body.contains(com.kauth.adapter.web.EnglishStrings.TOAST_BACKUP_IMPORTED))
         }
 
     @Test
@@ -259,8 +302,12 @@ class AdminApplicationRoutesTest {
                 )
 
             assertEquals(HttpStatusCode.Found, response.status)
-            val location = response.headers["Location"]!!
-            assertFalse(location.contains("flash="))
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.startsWith("KOTAUTH_ADMIN_FLASH=") },
+            )
 
             val stored = appRepo.findByClientId(tenantId, "spa-client")
             assertEquals(

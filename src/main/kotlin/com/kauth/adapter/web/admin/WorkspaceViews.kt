@@ -32,11 +32,13 @@ internal fun workspaceDetailPageImpl(
     apps: List<Application> = emptyList(),
     loggedInAs: String,
     identityProviders: List<IdentityProvider> = emptyList(),
+    toastMessage: String? = null,
 ): HTML.() -> Unit =
     {
         val appPairs = apps.map { it.clientId to it.name }
         adminShell(
             pageTitle = workspace.displayName,
+            toastMessage = toastMessage,
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,

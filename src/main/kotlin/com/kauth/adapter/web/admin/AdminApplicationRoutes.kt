@@ -28,6 +28,7 @@ fun Route.adminApplicationRoutes(
     roleGroupService: RoleGroupService,
     corsPort: CorsPort? = null,
     resourceServerService: com.kauth.domain.service.ResourceServerService? = null,
+    flash: FlashCookies,
 ) {
     route("/applications") {
         get("/new") {
@@ -102,11 +103,11 @@ fun Route.adminApplicationRoutes(
                     )
                 }
                 is AdminResult.Success -> {
-                    val flashToken = result.value.plaintextSecret?.let { FlashStore.put(it) }
-                    val suffix = if (flashToken != null) "?flash=$flashToken" else ""
-                    call.respondRedirect(
-                        "/admin/workspaces/$slug/applications/${result.value.application.clientId}$suffix",
-                    )
+                    val createdClientId = result.value.application.clientId
+                    result.value.plaintextSecret?.let {
+                        flash.put(call, clientSecretFlash(slug, createdClientId), session.username, it)
+                    }
+                    call.respondRedirect("/admin/workspaces/$slug/applications/$createdClientId")
                 }
             }
         }
@@ -122,7 +123,7 @@ fun Route.adminApplicationRoutes(
                         ?: return@get call.respond(HttpStatusCode.NotFound)
                 val wsPairs = call.attributes[WsPairsAttr]
                 val allApps = applicationRepository.findByTenantId(workspace.id)
-                val newSecret = FlashStore.take(call.request.queryParameters["flash"])
+                val newSecret = flash.take(call, clientSecretFlash(workspace.slug, clientId), session.username)
 
                 val defaultRoles =
                     when (val r = roleGroupService.getClientDefaultRoles(workspace.id, app.id)) {
@@ -260,6 +261,7 @@ fun Route.adminApplicationRoutes(
             }
 
             post("/regenerate-secret") {
+                val session = call.sessions.get<AdminSession>()!!
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val clientId =
@@ -269,10 +271,8 @@ fun Route.adminApplicationRoutes(
                         ?: return@post call.respond(HttpStatusCode.NotFound)
                 when (val result = applicationManagementService.regenerateClientSecret(app.id, workspace.id)) {
                     is AdminResult.Success -> {
-                        val flashToken = FlashStore.put(result.value)
-                        call.respondRedirect(
-                            "/admin/workspaces/$slug/applications/$clientId?flash=$flashToken",
-                        )
+                        flash.put(call, clientSecretFlash(slug, clientId), session.username, result.value)
+                        call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
                     }
                     is AdminResult.Failure ->
                         call.respond(HttpStatusCode.BadRequest, result.error.message)
@@ -449,3 +449,8 @@ private fun updateDefaultRoles(
         }
     roleGroupService.setClientDefaultRoles(tenantId, appId, transform(current).distinct())
 }
+
+private fun clientSecretFlash(
+    slug: String,
+    clientId: String,
+) = "client-secret:$slug/$clientId"
