@@ -8,6 +8,7 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.ClaimTokenType
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.OidcScopes
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.ResourceServerId
 import com.kauth.domain.model.Session
@@ -643,7 +644,8 @@ class OAuthService(
      * Narrows a scope request to what the token may actually carry.
      *
      * Three-way intersection: what was **requested**, what the targeted resource servers
-     * **declare**, and what this **client** was granted on each of them.
+     * **declare**, and what this **client** was granted on each of them. The OIDC identity scopes
+     * ([OidcScopes.IDENTITY]) are about the user, not an API, and pass through unchanged.
      *
      * [clientAllowedScopes] is required rather than defaulted on purpose. Before v1.25.0 the
      * intersection stopped at what the resource server declared, so authorizing a client
@@ -672,7 +674,7 @@ class OAuthService(
                     val grantedToClient = rs.id?.let { clientAllowedScopes[it] } ?: emptySet()
                     declared intersect grantedToClient
                 }.toSet()
-        val rejected = requested.filterNot { it in allowed }
+        val rejected = requested.filterNot { it in allowed || it in OidcScopes.IDENTITY }
         return if (rejected.isEmpty()) {
             ScopeNarrowing.Ok(requested)
         } else {
@@ -851,7 +853,7 @@ class OAuthService(
                             .flatMap { rs ->
                                 rs.scopes.toSet() intersect (rs.id?.let { granted[it] } ?: emptySet())
                             }.toSet()
-                    sessionScopes.filter { it in allowed }
+                    sessionScopes.filter { it in allowed || it in OidcScopes.IDENTITY }
                 } else {
                     sessionScopes
                 }

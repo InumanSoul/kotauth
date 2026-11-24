@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A sign-in that asks for `openid` and an API with declared scopes gets its tokens.** Since
+  1.19.3, the token endpoint narrowed every requested scope to what the targeted APIs declare, and
+  no API declares `openid`, `profile` or `email`. So an authorization code for
+  `openid read:invoices` with a `resource` that declares scopes was refused with `invalid_scope`,
+  and a refresh narrowed to one API dropped `openid`. The OIDC identity scopes now pass through,
+  as they do in Auth0 and Keycloak, and API scopes are narrowed as before.
+
 ### Security
 
 - **A webhook connects only to the address that was checked.** 1.30.1 checked a webhook host's
