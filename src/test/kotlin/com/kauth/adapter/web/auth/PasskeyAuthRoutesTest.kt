@@ -153,10 +153,8 @@ class PasskeyAuthRoutesTest {
                         com.kauth.domain.service.AuthService(
                             userRepository = userRepo,
                             tenantRepository = tenantRepo,
-                            tokenPort = tokenPort,
                             passwordHasher = hasher,
                             auditLog = auditLog,
-                            sessionRepository = sessions,
                             identifierResolver = UserIdentifierResolver(userRepo),
                             collisionCheck =
                                 com.kauth.domain.service
