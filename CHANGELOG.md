@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the resource server's audience. A refresh that named a `resource` was refused with
   `invalid_target`. Postgres-backed installs were not affected. Sessions written before this fix
   still decode, but they stay without their resources until the user signs in again.
+- **A social sign-in kept the resources and state the client sent.** Going through Google, GitHub
+  or an OIDC provider dropped the RFC 8707 `resource` parameters, so the access token came back
+  without the resource server's audience. The client's `state` also came back cut short if it held
+  `&`, `+` or `=`. The social redirect now checks requested resources the same way `/authorize`
+  does and refuses one the client isn't authorized for with `invalid_target`.
 
 ### Changed
 

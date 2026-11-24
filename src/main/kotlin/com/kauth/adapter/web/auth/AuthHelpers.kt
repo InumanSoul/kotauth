@@ -82,6 +82,7 @@ internal fun Parameters.toOAuthParams() =
         codeChallenge = this["code_challenge"],
         codeChallengeMethod = this["code_challenge_method"],
         nonce = this["nonce"],
+        resources = getAll("resource").orEmpty().map { it.trim() }.filter { it.isNotBlank() },
         acrValues = this["acr_values"]?.takeIf { it.isNotBlank() },
     )
 
@@ -297,7 +298,7 @@ internal fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
     if (qs.isBlank()) return AuthView.OAuthParams()
     val normalized = if (qs.startsWith("?")) qs.substring(1) else qs
     if (normalized.isBlank()) return AuthView.OAuthParams()
-    val map =
+    val pairs =
         normalized
             .split("&")
             .mapNotNull {
@@ -309,7 +310,8 @@ internal fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
                     val v = java.net.URLDecoder.decode(it.substring(idx + 1), "UTF-8")
                     k to v
                 }
-            }.toMap()
+            }
+    val map = pairs.toMap()
     return AuthView.OAuthParams(
         responseType = map["response_type"],
         clientId = map["oauth_client_id"] ?: map["client_id"],
@@ -319,6 +321,7 @@ internal fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
         codeChallenge = map["code_challenge"],
         codeChallengeMethod = map["code_challenge_method"],
         nonce = map["nonce"],
+        resources = pairs.filter { it.first == "resource" && it.second.isNotBlank() }.map { it.second },
         acrValues = map["acr_values"]?.takeIf { it.isNotBlank() },
     )
 }

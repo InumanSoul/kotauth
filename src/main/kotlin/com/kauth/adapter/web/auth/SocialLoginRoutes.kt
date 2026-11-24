@@ -356,6 +356,16 @@ internal fun Route.socialLoginRoutes(
         }
 
         val oauthParams = call.request.queryParameters.toOAuthParams()
+        // The code carries these resources to the token exchange unchecked, so they get the same
+        // check /authorize runs. The redirect_uri isn't validated yet, so the error is not sent there.
+        if (oauthParams.resources.isNotEmpty()) {
+            val clientId = oauthParams.clientId
+            val resolution =
+                clientId?.let { oauthService.resolveAudiencesForClient(slug, it, oauthParams.resources) }
+            if (resolution !is OAuthService.AudienceResolution.Ok) {
+                return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "invalid_target"))
+            }
+        }
 
         val csrfNonce =
             java.util.UUID
