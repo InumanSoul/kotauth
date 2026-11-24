@@ -112,7 +112,7 @@ class AdminApplicationE2ETest : E2ETestBase() {
 
         val toggleForm = page.querySelector("form[action$='/toggle']")
         if (toggleForm != null) {
-            val action = toggleForm.getAttribute("action")
+            val action = toggleForm.getAttribute("action").orEmpty()
             assertTrue(
                 action.contains("/applications/toggle-app/toggle"),
                 "Toggle action must use string clientId, got: $action",
