@@ -167,7 +167,7 @@ val e2eTestRuntimeOnly: Configuration by configurations.getting {
 }
 
 dependencies {
-    e2eTestImplementation("com.microsoft.playwright:playwright:1.44.0")
+    e2eTestImplementation("com.microsoft.playwright:playwright:1.65.1")
 }
 
 tasks.register<Test>("e2eTest") {
