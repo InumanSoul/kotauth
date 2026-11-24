@@ -295,6 +295,10 @@ class OAuthService(
             applicationRepository.findByClientId(tenant.id, clientId)
                 ?: return OAuthResult.Failure(OAuthError.InvalidClient("Unknown client"))
 
+        if (!client.enabled) {
+            return OAuthResult.Failure(OAuthError.InvalidClient("Client is disabled"))
+        }
+
         // Authenticate confidential clients
         if (client.accessType == AccessType.CONFIDENTIAL) {
             if (clientSecret == null) {
@@ -759,6 +763,12 @@ class OAuthService(
             return handlePossibleRefreshReplay(tenant, hash, ipAddress, userAgent)
         }
 
+        // Introspection and revocation already refuse another tenant's token; refresh must as well,
+        // or one tenant's refresh token mints tokens under another tenant's issuer.
+        if (session.tenantId != tenant.id) {
+            return OAuthResult.Failure(OAuthError.InvalidGrant("Invalid or expired refresh token"))
+        }
+
         if (session.userId == null) {
             return OAuthResult.Failure(OAuthError.InvalidGrant("Refresh tokens not supported for M2M sessions"))
         }
@@ -772,16 +782,28 @@ class OAuthService(
             return OAuthResult.Failure(OAuthError.InvalidGrant("User is disabled"))
         }
 
-        val client = session.clientId?.let { applicationRepository.findById(it) }
+        // A refresh token is bound to the client it was issued to. Deleting the client nulls the
+        // session's client, and impersonation sessions never had one: neither can be refreshed.
+        val client =
+            session.clientId?.let { applicationRepository.findById(it) }?.takeIf { it.tenantId == tenant.id }
+        if (client == null) {
+            sessionRepository.revoke(session.id!!)
+            return OAuthResult.Failure(OAuthError.InvalidGrant("Refresh token is not bound to an existing client"))
+        }
 
         // RFC 6749 §10.4: verify the refresh token was issued to the requesting client
-        if (client != null && client.clientId != clientId) {
+        if (client.clientId != clientId) {
             sessionRepository.revoke(session.id!!)
             return OAuthResult.Failure(OAuthError.InvalidGrant("Refresh token was not issued to this client"))
         }
 
+        // Not revoked: re-enabling the client lets its sessions refresh again.
+        if (!client.enabled) {
+            return OAuthResult.Failure(OAuthError.InvalidClient("Client is disabled"))
+        }
+
         // RFC 6749 §6: confidential clients must authenticate on the refresh grant
-        if (client != null && client.accessType == AccessType.CONFIDENTIAL) {
+        if (client.accessType == AccessType.CONFIDENTIAL) {
             if (clientSecret == null) {
                 return OAuthResult.Failure(OAuthError.InvalidClient("client_secret required for confidential clients"))
             }
@@ -791,7 +813,7 @@ class OAuthService(
             }
         }
 
-        if (client != null && GrantType.REFRESH_TOKEN !in client.grantTypes) {
+        if (GrantType.REFRESH_TOKEN !in client.grantTypes) {
             return OAuthResult.Failure(
                 OAuthError.UnauthorizedClient("Client is not registered for the refresh_token grant"),
             )
@@ -823,12 +845,7 @@ class OAuthService(
                 val anyDeclares = resolvedResourceServers.any { it.scopes.isNotEmpty() }
                 if (anyDeclares) {
                     // Same three-way intersection as narrowScopes: declared ∩ granted-to-client.
-                    // `client` is null when the application was soft-deleted after the token was
-                    // issued. No client identity means no per-client grants to intersect against, so
-                    // narrowing removes every scope — fail closed rather than fall back to the
-                    // resource server's full declared set.
-                    val granted =
-                        client?.let { resourceServerRepository?.findAllowedScopes(it.id) } ?: emptyMap()
+                    val granted = resourceServerRepository?.findAllowedScopes(client.id) ?: emptyMap()
                     val allowed =
                         resolvedResourceServers
                             .flatMap { rs ->
@@ -847,7 +864,7 @@ class OAuthService(
                     narrowScopes(
                         effectiveScopes,
                         resolvedResourceServers,
-                        client?.let { resourceServerRepository?.findAllowedScopes(it.id) } ?: emptyMap(),
+                        resourceServerRepository?.findAllowedScopes(client.id) ?: emptyMap(),
                     )
             ) {
                 is ScopeNarrowing.Ok -> narrowing.narrowed

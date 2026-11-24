@@ -31,6 +31,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Comes with migration V68. Tokens from sessions that existed before the upgrade omit the new
   claims until the user signs in again. See ADR-24.
 
+### Security
+
+- **A refresh token now works only in its own workspace, for its own enabled client.**
+  - **Workspace:** a refresh token sent to another workspace's token endpoint was accepted, and the
+    tokens came back signed by that workspace's issuer for a user who isn't in it. The refresh
+    grant now refuses a token from another workspace, as introspection and revocation already did.
+  - **Deleted client:** a session whose client was deleted kept refreshing, and since the deleted
+    client was missing, none of the client checks ran, so any `client_id` was accepted. Such a
+    refresh is now refused and the session ends. Auth0 and Keycloak do the same.
+  - **Disabled client:** a disabled client's refresh tokens and unredeemed authorization codes kept
+    working. Both are now refused with `invalid_client`. Re-enabling the client lets its sessions
+    refresh again.
+
 ### Fixed
 
 - **With Redis as the session store, refreshed tokens kept their resource audiences.** The Redis
