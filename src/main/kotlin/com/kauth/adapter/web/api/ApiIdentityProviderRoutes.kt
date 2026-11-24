@@ -73,7 +73,9 @@ internal fun Route.apiIdentityProviderRoutes(identityProviderService: IdentityPr
                 }
 
             // The row is read first for two reasons: PUT reports 201 only when it created
-            // something, and a field the body says nothing about must survive the write.
+            // something, and the scopes, the JIT settings and trustEmailClaim survive a write that
+            // omits them. The other fields are a full replace: an omitted displayName, issuer or
+            // endpoint is cleared, and an omitted `enabled` means true.
             val existing = identityProviderService.get(tenantId, key)
 
             val result =
@@ -95,6 +97,7 @@ internal fun Route.apiIdentityProviderRoutes(identityProviderService: IdentityPr
                     // silently switch off automatic account creation for a whole domain list.
                     jitEnabled = body.jitEnabled ?: existing?.jitEnabled ?: false,
                     jitAllowedDomains = body.jitAllowedDomains ?: existing?.jitAllowedDomains ?: emptyList(),
+                    trustEmailClaim = body.trustEmailClaim ?: existing?.trustEmailClaim ?: false,
                 )
 
             when (result) {
@@ -160,6 +163,7 @@ private fun publish(provider: IdentityProvider): IdentityProviderDto =
         scopes = provider.scopes,
         jitEnabled = provider.jitEnabled,
         jitAllowedDomains = provider.jitAllowedDomains,
+        trustEmailClaim = provider.trustEmailClaim,
         createdAt = isoFormatter.format(provider.createdAt),
         updatedAt = isoFormatter.format(provider.updatedAt),
     )
@@ -171,10 +175,10 @@ private fun publish(provider: IdentityProvider): IdentityProviderDto =
  * secret on update and is rejected on create — there is no way to read a secret back, so a
  * caller that only wants to flip `enabled` must be able to omit it.
  *
- * The two JIT fields are nullable so that *absent* and *empty* stay different answers: absent
- * keeps what is stored, `"jitAllowedDomains": []` is the explicit "stop creating accounts
- * automatically". `enabled` is deliberately not like them — its documented default is `true`,
- * which is a stated contract rather than a silent one.
+ * The two JIT fields and `trustEmailClaim` are nullable so that *absent* and *empty* stay
+ * different answers: absent keeps what is stored, `"jitAllowedDomains": []` is the explicit "stop
+ * creating accounts automatically". `enabled` is deliberately not like them — its documented
+ * default is `true`, which is a stated contract rather than a silent one.
  */
 @Serializable
 data class UpsertIdentityProviderRequest(
@@ -190,6 +194,8 @@ data class UpsertIdentityProviderRequest(
     val scopes: String? = null,
     val jitEnabled: Boolean? = null,
     val jitAllowedDomains: List<String>? = null,
+    /** Treat the provider's `email` as verified when it sends no `email_verified` (Entra ID). */
+    val trustEmailClaim: Boolean? = null,
 )
 
 /**
@@ -218,6 +224,7 @@ class IdentityProviderDto(
     // secret, which is the property the descriptor test exists to keep true of every element here.
     val jitEnabled: Boolean,
     val jitAllowedDomains: List<String>,
+    val trustEmailClaim: Boolean,
     val createdAt: String,
     val updatedAt: String,
 )

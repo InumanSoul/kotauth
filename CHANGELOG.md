@@ -57,6 +57,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Updating an identity provider over the API no longer turns off "Trust email claim".**
+  `PUT /identity-providers/{key}` never passed the switch on, so it was saved as off. Any API
+  update to a provider that needs it, such as Microsoft Entra ID, which sends no
+  `email_verified`, made linking and automatic account creation refuse every sign-in from it.
+  An update that omits the field now keeps it. The API can also read and set it as
+  `trustEmailClaim`.
+
 - **Two emailed links work without an issuer URL.** The password-changed email's sign-in link and
   the email-code email's reset link were built from the workspace's issuer URL and came out empty
   when none was set. They're now built on the workspace's address.
