@@ -330,10 +330,6 @@ In protocol terms Kotauth is a compliant OAuth 2.0 / OIDC authorization server w
 
 Recorded here because a roadmap that only lists future features overstates the present.
 
-**Cross-namespace collision prevention is a read-before-write** ([#144](https://github.com/InumanSoul/kotauth/issues/144)). Two concurrent creates with mirrored identifiers can both pass the check, because no database constraint spans the username and email namespaces. The runtime refusal bounds the consequence to two users seeing a generic failure until an administrator intervenes.
-
-**The email-OTP back-channel issues fixed scopes** ([#160](https://github.com/InumanSoul/kotauth/issues/160)) and cannot honour a client's per-client allowlist the way the other grants do.
-
 **There is no SMS second factor.** The second factor is an authenticator app, a recovery code or a passkey with user verification.
 
 **A linked identity cannot be unlinked** ([#131](https://github.com/InumanSoul/kotauth/issues/131)), by the user or by an administrator.

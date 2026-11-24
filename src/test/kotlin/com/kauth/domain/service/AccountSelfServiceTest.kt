@@ -662,6 +662,31 @@ class AccountSelfServiceTest {
     }
 
     @Test
+    fun `updateProfile - an email that is another user's username is refused`() {
+        users.add(
+            User(
+                tenantId = TenantId(1),
+                username = "taken@example.com",
+                email = "someone-else@example.com",
+                fullName = "Someone",
+                passwordHash = "x",
+            ),
+        )
+
+        val result =
+            accountSvc.updateProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "taken@example.com",
+                fullName = "Alice",
+            )
+
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.Validation>(result.error)
+        assertTrue(result.error.message.contains("another user's username"))
+    }
+
+    @Test
     fun `updateProfile - email change resets emailVerified`() {
         // Start with verified user
         val result =
