@@ -124,6 +124,41 @@ jobs:
           path: build/reports/tests/${{ matrix.suite }}/
           retention-days: 7
 
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.4.1
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Install Chromium
+        run: ./gradlew playwrightInstall --no-daemon
+
+      - name: Run e2eTest
+        run: ./gradlew e2eTest --no-daemon --stacktrace
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: test-report-e2e
+          path: build/reports/tests/e2eTest/
+          retention-days: 7
+
   # Separate job — verifies the fat JAR compiles cleanly without running
   # the full Docker build. Catches build-time errors on every PR cheaply.
   build:

@@ -14,7 +14,9 @@ import com.kauth.domain.service.AdminUserService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.ApplicationManagementService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.UsernameGenerator
 import com.kauth.domain.service.WebhookService
 import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.fakes.FakeApiKeyRepository
@@ -33,6 +35,7 @@ import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebhookDeliveryRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
+import com.kauth.fakes.FakeWebhookSender
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.microsoft.playwright.Browser
@@ -58,6 +61,8 @@ import io.ktor.server.sessions.cookie
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
@@ -148,6 +153,8 @@ abstract class E2ETestBase {
                 passwordHasher = hasher,
                 auditLog = auditLogPort,
                 credentialFlowService = buildCredentialFlowService(),
+                collisionCheck = IdentifierCollisionCheck(userRepo),
+                usernameGenerator = UsernameGenerator(userRepo),
             )
 
         private fun buildWorkspaceSettingsService() =
@@ -184,6 +191,8 @@ abstract class E2ETestBase {
             WebhookService(
                 endpointRepository = webhookEndpointRepo,
                 deliveryRepository = webhookDeliveryRepo,
+                sender = FakeWebhookSender(),
+                scope = CoroutineScope(Dispatchers.Unconfined),
             )
 
         private fun findFreePort(): Int = ServerSocket(0).use { it.localPort }
