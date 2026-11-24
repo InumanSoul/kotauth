@@ -302,7 +302,7 @@ KAUTH_SSO_SESSION_MAX_TTL_SECONDS=2592000
 ### `KAUTH_WEBHOOK_ALLOW_PRIVATE_NETWORKS`
 **Optional.** Default: `false`
 
-Webhook URLs come from workspace admins and API keys, so Kotauth checks where they point before saving an endpoint and again before every delivery. By default a webhook may only reach public addresses. Loopback (`127.0.0.0/8`, `::1`), private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) and carrier-grade NAT (`100.64.0.0/10`) addresses are refused. Every address a host name resolves to must pass.
+Webhook URLs come from workspace admins and API keys, so Kotauth checks where they point before saving an endpoint and again before every delivery. By default a webhook may only reach public addresses. Loopback (`127.0.0.0/8`, `::1`), private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) and carrier-grade NAT (`100.64.0.0/10`) addresses are refused. Every address a host name resolves to must pass, and the delivery connects only to the addresses that were checked, so a DNS answer that changes in between cannot send it elsewhere. Redirects are never followed.
 
 Set it to `true` when webhooks go to services on your own network, for example `http://app:8080/webhooks` on a Docker network.
 

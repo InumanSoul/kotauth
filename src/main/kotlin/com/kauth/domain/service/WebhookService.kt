@@ -247,7 +247,7 @@ class WebhookService(
      * The signature and event headers are computed here because they are domain concerns; the
      * port only carries them.
      */
-    private fun sendRequest(
+    private suspend fun sendRequest(
         endpoint: WebhookEndpoint,
         payload: String,
         eventType: String,

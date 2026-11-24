@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **A webhook connects only to the address that was checked.** 1.30.1 checked a webhook host's
+  addresses before each delivery, but the connection then looked the host up again, so a DNS
+  answer that changed in between could still reach an internal address. Delivery now runs on a
+  non-blocking HTTP client whose DNS lookup is the check itself: the connection goes to exactly
+  the addresses that passed. Redirects are still never followed.
+
+### Chore
+
+- Apache HttpClient is pinned to its stable 5.6.4 (httpcore 5.4.3). The passkey library's open
+  version range had resolved it to a pre-release at runtime.
+
 ## [1.30.1] - 2026-11-24
 
 ### Added
