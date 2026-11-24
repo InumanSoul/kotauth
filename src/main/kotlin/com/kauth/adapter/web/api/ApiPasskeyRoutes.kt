@@ -58,7 +58,7 @@ internal fun Route.apiPasskeyRoutes(
             if (credential.tenantId != tenantId) {
                 return@delete call.respondProblem(HttpStatusCode.NotFound, "Not Found", "Passkey not found.")
             }
-            when (val result = webAuthnService.revoke(credential.userId, credentialPk, tenantId)) {
+            when (val result = webAuthnService.revoke(credential.userId, credentialPk, tenantId, byAdmin = true)) {
                 is WebAuthnResult.Success -> call.respond(HttpStatusCode.NoContent, "")
                 is WebAuthnResult.Failure -> call.respondWebAuthnError(result.error)
             }

@@ -1,7 +1,9 @@
 package com.kauth.fakes
 
+import com.kauth.domain.model.FactorChange
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.EmailPort
+import java.time.Instant
 
 /**
  * In-memory EmailPort for unit tests.
@@ -15,6 +17,8 @@ class FakeEmailPort : EmailPort {
         val url: String = "",
         val workspaceName: String,
         val type: String,
+        val change: FactorChange? = null,
+        val remainingRecoveryCodes: Int? = null,
     )
 
     private val _sent = mutableListOf<SentEmail>()
@@ -69,6 +73,28 @@ class FakeEmailPort : EmailPort {
     ) {
         if (shouldFail) throw RuntimeException("SMTP delivery failed")
         _sent.add(SentEmail(to = to, toName = toName, workspaceName = workspaceName, type = "password_changed"))
+    }
+
+    override fun sendFactorChangedEmail(
+        to: String,
+        toName: String,
+        change: FactorChange,
+        remainingRecoveryCodes: Int?,
+        occurredAt: Instant,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        if (shouldFail) throw RuntimeException("SMTP delivery failed")
+        _sent.add(
+            SentEmail(
+                to = to,
+                toName = toName,
+                workspaceName = workspaceName,
+                type = "factor_changed",
+                change = change,
+                remainingRecoveryCodes = remainingRecoveryCodes,
+            ),
+        )
     }
 
     override fun sendTestEmail(
