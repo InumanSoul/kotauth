@@ -905,6 +905,16 @@ components:
             Optional RFC 8707 resource indicators to bind to the challenge and
             resulting authorization code. Each resource must be enabled in the
             workspace and authorized for originatingClientId.
+        scope:
+          type: string
+          example: openid read:orders
+          description: |
+            Space-delimited scopes for the authorization code, as in the OAuth
+            `scope` parameter. Defaults to `openid email profile`. When the code
+            is issued, API scopes are narrowed as at the token endpoint: each must
+            be declared by a requested resource and granted to
+            originatingClientId on it, or verification answers `422` with
+            `invalid_scope`. `openid`, `profile` and `email` always pass.
 
     SendOtpResponse:
       type: object
@@ -2789,7 +2799,7 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/ProblemDetail" }
         "422":
-          description: Invalid code, too many attempts, or originating client misconfigured
+          description: Invalid code, too many attempts, originating client misconfigured, or a requested scope the client may not receive (`invalid_scope`)
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/ProblemDetail" }
@@ -2834,7 +2844,7 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/ProblemDetail" }
         "422":
-          description: Wrong TOTP or recovery code (`invalid_mfa_code`), or originating client misconfigured
+          description: Wrong TOTP or recovery code (`invalid_mfa_code`), originating client misconfigured, or a requested scope the client may not receive (`invalid_scope`)
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/ProblemDetail" }

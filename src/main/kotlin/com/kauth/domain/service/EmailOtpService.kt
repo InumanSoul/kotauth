@@ -7,6 +7,7 @@ import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.EmailOtpChallenge
 import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
@@ -70,6 +71,9 @@ class EmailOtpService(
         const val MAX_ATTEMPTS_PER_CHALLENGE: Int = 5
         const val AUTH_CODE_TTL_SECONDS: Long = 60
 
+        /** The scope a code carries when the client sent none: what every code carried before #160. */
+        const val DEFAULT_SCOPE = "openid email profile"
+
         /** How long after the email code is verified the second factor may still complete. */
         const val VERIFIED_CHALLENGE_TTL_SECONDS: Long = 300
         private val SECURE_RANDOM = SecureRandom()
@@ -81,6 +85,7 @@ class EmailOtpService(
         originatingClientId: String? = null,
         resources: List<String> = emptyList(),
         ipAddress: String? = null,
+        scope: String? = null,
     ): OtpSendResult {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -128,6 +133,7 @@ class EmailOtpService(
                     codeHash = sha256Hex(rawCode),
                     originatingClientId = originatingClientId,
                     resources = resources.normalizedResources(),
+                    scope = scope?.normalizedScope(),
                     resendCount = if (invalidated > 0) 1 else 0,
                     expiresAt = expiresAt,
                     createdAt = now,
@@ -276,10 +282,7 @@ class EmailOtpService(
         if (clock.instant().isAfter(verifiedAt.plusSeconds(VERIFIED_CHALLENGE_TTL_SECONDS))) {
             return OtpCodeResult.Failure(OtpError.ChallengeExpired)
         }
-        val authCode =
-            issueAuthorizationCodeFor(tenant, userId, challenge, secondFactorDone)
-                ?: return OtpCodeResult.Failure(OtpError.InvalidClient)
-        return OtpCodeResult.Success(authCode.code, authCode.expiresAt, authCode.redirectUri)
+        return issueAuthorizationCodeFor(tenant, userId, challenge, secondFactorDone)
     }
 
     private fun trackCrossChallengeFailure(
@@ -329,49 +332,60 @@ class EmailOtpService(
         )
     }
 
-    // Back-channel issuance — PKCE not required (ADR-15). Scopes are fixed: the challenge has no
-    // scope field to intersect the client's allowlist against, so honouring ADR-23 here needs a
-    // requested-scope parameter first. See #160. Fixed OIDC scopes are strictly narrower than any
-    // allowlist, so this under-grants rather than over-grants.
+    // Back-channel issuance — PKCE not required (ADR-15). The scope is narrowed exactly as the token
+    // endpoint narrows it (ADR-23), so a code is never issued for a scope its exchange would refuse.
     private fun issueAuthorizationCodeFor(
         tenant: Tenant,
         userId: UserId,
         challenge: EmailOtpChallenge,
         secondFactorDone: Boolean,
-    ): AuthorizationCode? {
+    ): OtpCodeResult {
+        val invalidClient = OtpCodeResult.Failure(OtpError.InvalidClient)
         val clientIdString = challenge.originatingClientId
-        if (clientIdString.isNullOrBlank()) return null
-        val client = applicationRepository.findByClientId(tenant.id, clientIdString) ?: return null
-        if (!client.enabled) return null
-        val redirectUri = client.redirectUris.firstOrNull() ?: return null
-        val resources = challengeResourcesFor(tenant, client.id, challenge.resources) ?: return null
+        if (clientIdString.isNullOrBlank()) return invalidClient
+        val client = applicationRepository.findByClientId(tenant.id, clientIdString) ?: return invalidClient
+        if (!client.enabled) return invalidClient
+        val redirectUri = client.redirectUris.firstOrNull() ?: return invalidClient
+        val resources = challengeResourcesFor(tenant, client.id, challenge.resources) ?: return invalidClient
+        val requestedScopes = (challenge.scope ?: DEFAULT_SCOPE).split(' ').filter { it.isNotBlank() }
+        val narrowing =
+            ScopeNarrower.narrow(
+                requestedScopes,
+                resources,
+                resourceServerRepository.findAllowedScopes(client.id),
+            )
+        if (narrowing is OAuthService.ScopeNarrowing.InvalidScope) {
+            return OtpCodeResult.Failure(OtpError.InvalidScope)
+        }
 
         val now = clock.instant()
-        return authorizationCodeRepository.save(
-            AuthorizationCode(
-                code = generateAuthCode(),
-                tenantId = tenant.id,
-                clientId = client.id,
-                userId = userId,
-                redirectUri = redirectUri,
-                scopes = "openid email profile",
-                expiresAt = now.plusSeconds(AUTH_CODE_TTL_SECONDS),
-                createdAt = now,
-                authTime = now,
-                resources = resources,
-                amr =
-                    listOf(AuthMethods.ONE_TIME_CODE).let {
-                        if (secondFactorDone) AuthMethods.withSecondFactor(it) else it
-                    },
-            ),
-        )
+        val authCode =
+            authorizationCodeRepository.save(
+                AuthorizationCode(
+                    code = generateAuthCode(),
+                    tenantId = tenant.id,
+                    clientId = client.id,
+                    userId = userId,
+                    redirectUri = redirectUri,
+                    scopes = requestedScopes.joinToString(" "),
+                    expiresAt = now.plusSeconds(AUTH_CODE_TTL_SECONDS),
+                    createdAt = now,
+                    authTime = now,
+                    resources = resources.map { it.identifier },
+                    amr =
+                        listOf(AuthMethods.ONE_TIME_CODE).let {
+                            if (secondFactorDone) AuthMethods.withSecondFactor(it) else it
+                        },
+                ),
+            )
+        return OtpCodeResult.Success(authCode.code, authCode.expiresAt, authCode.redirectUri)
     }
 
     private fun challengeResourcesFor(
         tenant: Tenant,
         clientPk: ApplicationId,
         requestedResources: List<String>,
-    ): List<String>? {
+    ): List<ResourceServer>? {
         val challengeResources = requestedResources.normalizedResources()
         if (challengeResources.isEmpty()) return emptyList()
         val authorized = resourceServerRepository.listAuthorizedFor(clientPk).map { it.identifier }.toSet()
@@ -379,16 +393,20 @@ class EmailOtpService(
             resourceServerRepository
                 .findByIdentifiers(tenant.id, challengeResources.toSet())
                 .associateBy { it.identifier }
-        return challengeResources.takeIf {
-            it.all { identifier ->
-                val resource = resourcesByIdentifier[identifier]
-                resource != null && resource.enabled && identifier in authorized
-            }
+        return challengeResources.map { identifier ->
+            resourcesByIdentifier[identifier]?.takeIf { it.enabled && identifier in authorized } ?: return null
         }
     }
 
     private fun List<String>.normalizedResources(): List<String> =
         map { it.trim() }.filter { it.isNotBlank() }.distinct()
+
+    private fun String.normalizedScope(): String? =
+        split(' ')
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" ")
+            .ifBlank { null }
 
     private fun reject(
         tenantId: TenantId,
@@ -478,4 +496,5 @@ enum class OtpError(
     ChallengeExpired("challenge_expired"),
     TooManyAttempts("too_many_attempts"),
     InvalidClient("invalid_client"),
+    InvalidScope("invalid_scope"),
 }

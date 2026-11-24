@@ -15,6 +15,7 @@ data class EmailOtpChallenge(
     val codeHash: String,
     val originatingClientId: String? = null,
     val resources: List<String> = emptyList(),
+    val scope: String? = null,
     val attemptCount: Int = 0,
     val resendCount: Int = 0,
     val expiresAt: Instant,

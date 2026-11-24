@@ -319,6 +319,7 @@ class EmailOtpServiceTest {
         codeRaw: String = "123456",
         clientId: String? = null,
         resources: List<String> = emptyList(),
+        scope: String? = null,
     ): Pair<User, com.kauth.domain.model.EmailOtpChallenge> {
         val user =
             users.add(
@@ -339,6 +340,7 @@ class EmailOtpServiceTest {
                     codeHash = sha256Hex(codeRaw),
                     originatingClientId = clientId,
                     resources = resources,
+                    scope = scope,
                     expiresAt = fixedClock.instant().plusSeconds(600),
                 ),
             )
@@ -429,6 +431,103 @@ class EmailOtpServiceTest {
         assertTrue(result is OtpCodeResult.Failure)
         assertEquals(OtpError.InvalidClient, result.error)
         assertTrue(authCodes.all().isEmpty())
+    }
+
+    @Test
+    fun `sendOtp stores the requested scope normalized, and none as null`() {
+        users.add(
+            User(
+                tenantId = tenant.id,
+                username = "alice",
+                email = "alice@acme.test",
+                fullName = "Alice",
+                passwordHash = "x",
+            ),
+        )
+        val service = newService()
+
+        val scoped =
+            service.sendOtp(
+                tenant.slug,
+                "alice@acme.test",
+                clientApp.clientId,
+                scope = "  openid read:orders  openid ",
+            )
+        val scopedChallenge = challenges.findByChallengeId((scoped as OtpSendResult.Success).challengeId)!!
+        val blank = service.sendOtp(tenant.slug, "alice@acme.test", clientApp.clientId, scope = "   ")
+        val blankChallenge = challenges.findByChallengeId((blank as OtpSendResult.Success).challengeId)!!
+
+        assertEquals("openid read:orders", scopedChallenge.scope)
+        assertEquals(null, blankChallenge.scope)
+    }
+
+    @Test
+    fun `a challenge with no scope issues the code for openid email profile`() {
+        val (user, _) = seedChallenge(clientId = clientApp.clientId)
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
+
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
+
+        assertTrue(result is OtpCodeResult.Success)
+        assertEquals("openid email profile", authCodes.findByCode(result.authorizationCode)!!.scopes)
+    }
+
+    @Test
+    fun `the code carries the requested API scope the client was granted`() {
+        val user = scopedOrdersChallenge(scope = "openid read:orders")
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
+
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
+
+        assertTrue(result is OtpCodeResult.Success)
+        val stored = authCodes.findByCode(result.authorizationCode)!!
+        assertEquals("openid read:orders", stored.scopes)
+        assertEquals(listOf("orders-api"), stored.resources)
+    }
+
+    @Test
+    fun `a scope the API declares but the client was not granted issues no code`() {
+        val user = scopedOrdersChallenge(scope = "openid write:orders")
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
+
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
+
+        assertTrue(result is OtpCodeResult.Failure)
+        assertEquals(OtpError.InvalidScope, result.error)
+        assertTrue(authCodes.all().isEmpty())
+    }
+
+    @Test
+    fun `a challenge with no scope still issues a code for a resource that declares scopes`() {
+        val user = scopedOrdersChallenge(scope = null)
+        val service = newService()
+        service.verifyOtp(tenant.slug, "handle-1", "123456")
+
+        val result = service.issueAuthorizationCode(tenant.slug, "handle-1", user.id!!)
+
+        assertTrue(result is OtpCodeResult.Success)
+        assertEquals("openid email profile", authCodes.findByCode(result.authorizationCode)!!.scopes)
+    }
+
+    /** `orders-api` declares read and write; the client is authorized for it and granted read only. */
+    private fun scopedOrdersChallenge(scope: String?): User {
+        val resource =
+            resources.seed(
+                ResourceServer(
+                    id = null,
+                    tenantId = tenant.id,
+                    identifier = "orders-api",
+                    name = "Orders API",
+                    description = null,
+                    scopes = listOf("read:orders", "write:orders"),
+                ),
+            )
+        resources.setAuthorizedResources(clientApp.id, listOf(resource.id!!))
+        resources.setAllowedScopes(clientApp.id, resource.id!!, setOf("read:orders"))
+        return seedChallenge(clientId = clientApp.clientId, resources = listOf("orders-api"), scope = scope).first
     }
 
     @Test

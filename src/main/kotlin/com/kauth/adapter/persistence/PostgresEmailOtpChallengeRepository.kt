@@ -22,6 +22,7 @@ object EmailOtpChallengesTable : Table("email_otp_challenges") {
     val codeHash = varchar("code_hash", 64)
     val originatingClientId = varchar("originating_client_id", 255).nullable()
     val resources = jsonb("resources").default("[]")
+    val scope = text("scope").nullable()
     val attemptCount = integer("attempt_count").default(0)
     val resendCount = integer("resend_count").default(0)
     val expiresAt = timestampWithTimeZone("expires_at")
@@ -42,6 +43,7 @@ class PostgresEmailOtpChallengeRepository : EmailOtpChallengeRepository {
                     it[codeHash] = challenge.codeHash
                     it[originatingClientId] = challenge.originatingClientId
                     it[resources] = Json.encodeToString(challenge.resources)
+                    it[scope] = challenge.scope
                     it[attemptCount] = challenge.attemptCount
                     it[resendCount] = challenge.resendCount
                     it[expiresAt] = challenge.expiresAt.toOffsetDateTime()
@@ -105,6 +107,7 @@ class PostgresEmailOtpChallengeRepository : EmailOtpChallengeRepository {
             codeHash = this[EmailOtpChallengesTable.codeHash],
             originatingClientId = this[EmailOtpChallengesTable.originatingClientId],
             resources = Json.decodeFromString(this[EmailOtpChallengesTable.resources]),
+            scope = this[EmailOtpChallengesTable.scope],
             attemptCount = this[EmailOtpChallengesTable.attemptCount],
             resendCount = this[EmailOtpChallengesTable.resendCount],
             expiresAt = this[EmailOtpChallengesTable.expiresAt].toInstant(),
