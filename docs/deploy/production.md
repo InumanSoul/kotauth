@@ -201,7 +201,21 @@ Front-ends differ in how they write the header:
 - **Replacing** — the bundled `docker/Caddyfile` (`header_up X-Forwarded-For {remote_host}`) and the nginx example above (`proxy_set_header X-Forwarded-For $remote_addr`) discard whatever the client sent. First and last entry are then the same value.
 - **Appending** — nginx's `$proxy_add_x_forwarded_for`, most cloud load balancers, and Cloudflare keep the client's value and append their own. Only the last entry is trustworthy.
 
-If you run **more than one** proxy in front of Kotauth (for example a CDN in front of a load balancer), the last entry is the *inner* proxy's address rather than the client's, so every rate limit and every audit-log IP collapses onto that one address. There is no setting for that topology yet. Terminate on a single trusted hop, or have the outermost trusted proxy overwrite `X-Forwarded-For` with the client address it observed.
+If you run **more than one** proxy in front of Kotauth, the last entry is the *inner* proxy's address rather than the client's. Every rate limit and every audit-log IP would collapse onto that one address. See the next section.
+
+#### Behind more than one proxy
+
+A common setup is Cloudflare in front of Traefik (Dokploy, Coolify). List every proxy's addresses in `KAUTH_TRUSTED_PROXY_CIDRS`: Cloudflare's published ranges (https://www.cloudflare.com/ips/) and the Docker network Traefik runs on.
+
+```
+KAUTH_TRUSTED_PROXY_CIDRS=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,...,172.16.0.0/12
+```
+
+Kotauth then honors forwarded headers only from those addresses and reads `X-Forwarded-For` from the right, skipping trusted entries. The first address outside the ranges is the client. Anything a client wrote further left is ignored.
+
+To read Cloudflare's own header instead, also set `KAUTH_CLIENT_IP_HEADER=CF-Connecting-IP`. Do this only when Traefik accepts traffic from Cloudflare alone, or strips `CF-Connecting-IP`; otherwise a client that reaches Traefik directly could set it. The `X-Forwarded-For` walk does not need that precaution.
+
+A backend that calls Kotauth for its users (for example `send-otp`) and puts the user's address in `X-Forwarded-For` should be listed too. Otherwise the backend's own address is the client.
 
 ### Traefik
 
@@ -238,7 +252,7 @@ For periodic reset (hourly is typical for public demos):
 - [ ] Master workspace admin password rotated after first login
 - [ ] Backups scheduled for the `kotauth_db_data` volume
 - [ ] If using `KAUTH_TRUSTED_PROXY=true`, the proxy in front overwrites client-supplied `X-Forwarded-*` headers
-- [ ] If using `KAUTH_TRUSTED_PROXY=true`, exactly one trusted proxy sits in front (see [One trusted hop only](#one-trusted-hop-only))
+- [ ] If using `KAUTH_TRUSTED_PROXY=true`, exactly one trusted proxy sits in front (see [One trusted hop only](#one-trusted-hop-only)); with more, set `KAUTH_TRUSTED_PROXY_CIDRS` instead
 
 ## CLI tools
 

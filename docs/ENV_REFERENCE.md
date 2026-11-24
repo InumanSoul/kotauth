@@ -184,10 +184,32 @@ DB_PASSWORD=changeme
 
 When `true`, Kotauth trusts `X-Forwarded-For` / `X-Forwarded-Proto` headers for client-IP resolution. **Only enable behind a reverse proxy that overwrites these headers** — on a directly-exposed instance, this lets clients spoof their IP to bypass per-IP rate limits on login, token, MFA, and OTP endpoints. The bundled Caddy production setup sets it automatically.
 
-The **last** `X-Forwarded-For` entry is taken as the client address — the one the proxy directly in front observed. Exactly one trusted hop is supported; see [One trusted hop only](deploy/production.md#one-trusted-hop-only).
+The **last** `X-Forwarded-For` entry is taken as the client address — the one the proxy directly in front observed. For more than one proxy (a CDN in front of Traefik, for example), use `KAUTH_TRUSTED_PROXY_CIDRS` instead; see [Behind more than one proxy](deploy/production.md#behind-more-than-one-proxy).
 
 ```
 KAUTH_TRUSTED_PROXY=true
+```
+
+### `KAUTH_TRUSTED_PROXY_CIDRS`
+**Optional.** Default: unset
+
+Comma-separated address ranges (CIDR) or single addresses of every proxy in front of Kotauth, such as your CDN's published ranges and the Docker network your reverse proxy runs on. When set, Kotauth honors forwarded headers only when the connection comes from one of these ranges. It reads `X-Forwarded-For` from the right, skips every trusted entry, and takes the first address outside the ranges as the client, as nginx's `real_ip_recursive` and Traefik's `forwardedHeaders.trustedIPs` do. `KAUTH_TRUSTED_PROXY` is then not needed.
+
+A backend that calls Kotauth on behalf of its users and puts their address in `X-Forwarded-For` belongs in this list too; otherwise its own address is taken as the client.
+
+Kotauth refuses to start when an entry is not an IP address or range.
+
+```
+KAUTH_TRUSTED_PROXY_CIDRS=173.245.48.0/20,103.21.244.0/22,172.16.0.0/12
+```
+
+### `KAUTH_CLIENT_IP_HEADER`
+**Optional.** Default: unset. Requires `KAUTH_TRUSTED_PROXY_CIDRS`.
+
+A header that carries the client address, such as Cloudflare's `CF-Connecting-IP`. It is read only when the connection comes from a trusted range, and only when present; otherwise `X-Forwarded-For` is used. Your inner proxy must accept traffic only from the CDN, or strip this header, because a client that reaches it directly could send any value. Kotauth refuses to start when this is set without `KAUTH_TRUSTED_PROXY_CIDRS`.
+
+```
+KAUTH_CLIENT_IP_HEADER=CF-Connecting-IP
 ```
 
 ---

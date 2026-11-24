@@ -91,6 +91,10 @@ data class EnvironmentConfig(
     val bootstrapApiKeysJson: String?,
     val bootstrapAdminPassword: String?,
     val trustedProxy: Boolean,
+    /** Ranges whose forwarded headers are honored; null keeps the single-hop [trustedProxy] behaviour. */
+    val trustedProxyCidrs: com.kauth.infrastructure.TrustedProxies? = null,
+    /** A header carrying the client IP (e.g. CF-Connecting-IP), read only from a trusted proxy. */
+    val clientIpHeader: String? = null,
     /** Lets webhooks reach loopback and private addresses. Link-local and metadata stay refused. */
     val webhookAllowPrivateNetworks: Boolean = false,
     val maxRequestBodyBytes: Long,
@@ -159,6 +163,12 @@ data class EnvironmentConfig(
                 bootstrapApiKeysJson = envOrFile("KAUTH_BOOTSTRAP_API_KEYS")?.takeIf { it.isNotBlank() },
                 bootstrapAdminPassword = bootstrapAdminPassword,
                 trustedProxy = System.getenv("KAUTH_TRUSTED_PROXY")?.lowercase() == "true",
+                trustedProxyCidrs = parseTrustedProxyCidrs(System.getenv("KAUTH_TRUSTED_PROXY_CIDRS")),
+                clientIpHeader =
+                    requireClientIpHeader(
+                        System.getenv("KAUTH_CLIENT_IP_HEADER"),
+                        System.getenv("KAUTH_TRUSTED_PROXY_CIDRS"),
+                    ),
                 webhookAllowPrivateNetworks =
                     System.getenv("KAUTH_WEBHOOK_ALLOW_PRIVATE_NETWORKS")?.lowercase() == "true",
                 maxRequestBodyBytes = maxRequestBodyBytes,
@@ -422,6 +432,35 @@ data class EnvironmentConfig(
                 )
                 exitProcess(1)
             }
+        }
+
+        private fun parseTrustedProxyCidrs(raw: String?): com.kauth.infrastructure.TrustedProxies? {
+            if (raw.isNullOrBlank()) return null
+            return try {
+                com.kauth.infrastructure.TrustedProxies
+                    .parse(raw)
+            } catch (e: IllegalArgumentException) {
+                System.err.println(
+                    "FATAL: KAUTH_TRUSTED_PROXY_CIDRS: ${e.message}. Expected e.g. 173.245.48.0/20, 10.0.0.0/8, ::1",
+                )
+                exitProcess(1)
+            }
+        }
+
+        // A client-IP header is only as trustworthy as the peer that sent it, so it needs the ranges.
+        private fun requireClientIpHeader(
+            header: String?,
+            cidrs: String?,
+        ): String? {
+            val name = header?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            if (cidrs.isNullOrBlank()) {
+                System.err.println(
+                    "FATAL: KAUTH_CLIENT_IP_HEADER is set without KAUTH_TRUSTED_PROXY_CIDRS. Any client could " +
+                        "send $name, so it is read only from proxies inside KAUTH_TRUSTED_PROXY_CIDRS.",
+                )
+                exitProcess(1)
+            }
+            return name
         }
 
         private fun requireRedisUrl(raw: String?): String? {
