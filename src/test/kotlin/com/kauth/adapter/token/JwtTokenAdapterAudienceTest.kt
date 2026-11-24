@@ -80,6 +80,44 @@ class JwtTokenAdapterAudienceTest {
     }
 
     @Test
+    fun `an ID token is addressed to the client id even when the application has an audience`() {
+        val response =
+            adapter.issueUserTokens(user, tenant, app(audience = "acme-resource-api"), listOf("openid"))
+
+        assertEquals(
+            listOf("acme-spa"),
+            com.auth0.jwt.JWT
+                .decode(response.id_token!!)
+                .audience,
+        )
+    }
+
+    @Test
+    fun `an ID token is addressed to the client id when resources were requested`() {
+        val response =
+            adapter.issueUserTokens(
+                user,
+                tenant,
+                app(audience = null),
+                listOf("openid"),
+                audiences = listOf("https://orders.example.com"),
+            )
+
+        assertEquals(
+            listOf("https://orders.example.com"),
+            com.auth0.jwt.JWT
+                .decode(response.access_token)
+                .audience,
+        )
+        assertEquals(
+            listOf("acme-spa"),
+            com.auth0.jwt.JWT
+                .decode(response.id_token!!)
+                .audience,
+        )
+    }
+
+    @Test
     fun `aud falls back to client_id when audience is null`() {
         val response =
             adapter.issueUserTokens(user, tenant, app(audience = null), listOf("openid"))

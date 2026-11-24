@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **ID tokens are addressed to the client again when the application has an audience.** With an
+  `audience` set on the application, the ID token's `aud` carried that audience instead of the
+  client id. OIDC Core requires the client id, so standard validators refused the token. The
+  access token is unchanged: it still carries the requested resources, else the application's
+  audience, else the client id.
+
 ## [1.30.0] - 2026-11-24
 
 ### Added
