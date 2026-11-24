@@ -16,6 +16,9 @@ package com.kauth.domain.port
  */
 interface WebhookSenderPort {
     fun post(request: WebhookRequest): WebhookSendResult
+
+    /** Null when the transport may call [url], otherwise a reason fit to show the operator. */
+    fun refusalFor(url: String): String? = null
 }
 
 /**

@@ -125,6 +125,7 @@ class WebhookService(
             return WebhookResult.Failure("URL must start with http:// or https://.")
         }
         if (url.length > 2048) return WebhookResult.Failure("URL must be 2048 characters or fewer.")
+        sender.refusalFor(url)?.let { return WebhookResult.Failure(it) }
 
         val secret = generateSecret()
         val saved =

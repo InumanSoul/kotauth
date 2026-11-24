@@ -23,6 +23,11 @@ class FakeWebhookSender(
     /** Outcome chosen per call, by attempt index (0-based); falls back to [nextResult]. */
     var resultsByAttempt: List<WebhookSendResult> = emptyList()
 
+    /** Reason returned by [refusalFor]; null accepts every URL. */
+    var refusal: String? = null
+
+    override fun refusalFor(url: String): String? = refusal
+
     override fun post(request: WebhookRequest): WebhookSendResult {
         val index = sent.size
         sent += request
@@ -32,6 +37,7 @@ class FakeWebhookSender(
     fun clear() {
         sent.clear()
         resultsByAttempt = emptyList()
+        refusal = null
         nextResult = WebhookSendResult(200, true)
     }
 }

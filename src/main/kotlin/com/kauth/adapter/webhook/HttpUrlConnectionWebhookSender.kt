@@ -19,14 +19,25 @@ import java.net.URI
  * client is tracked separately; doing it here would have hidden a behaviour change inside a move.
  */
 class HttpUrlConnectionWebhookSender(
+    private val addressPolicy: WebhookAddressPolicy,
     private val connectTimeoutMs: Int = 5_000,
     private val readTimeoutMs: Int = 10_000,
 ) : WebhookSenderPort {
     private val log = LoggerFactory.getLogger(HttpUrlConnectionWebhookSender::class.java)
 
-    override fun post(request: WebhookRequest): WebhookSendResult =
-        try {
+    override fun refusalFor(url: String): String? = addressPolicy.refusalFor(url)
+
+    override fun post(request: WebhookRequest): WebhookSendResult {
+        // Checked again at send time: DNS may have changed since the endpoint was saved. The JVM's
+        // positive DNS cache makes the connection below see the addresses this check approved.
+        addressPolicy.refusalFor(request.url)?.let { reason ->
+            log.warn("Webhook refused: url=${request.url}: $reason")
+            return WebhookSendResult(null, false)
+        }
+        return try {
             val conn = URI(request.url).toURL().openConnection() as HttpURLConnection
+            // A redirect could lead anywhere, past the address check above.
+            conn.instanceFollowRedirects = false
             conn.requestMethod = "POST"
             conn.doOutput = true
             conn.connectTimeout = connectTimeoutMs
@@ -43,4 +54,5 @@ class HttpUrlConnectionWebhookSender(
             log.warn("Webhook HTTP error: url=${request.url}: ${e.message}")
             WebhookSendResult(null, false)
         }
+    }
 }
