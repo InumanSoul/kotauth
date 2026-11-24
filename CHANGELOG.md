@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Removing a key from `KAUTH_BOOTSTRAP_API_KEYS` now revokes it.** Before, a bootstrapped key
+  whose entry was removed stayed active, and the console and admin routes refused to revoke it
+  because it was env-managed. The key that matters most is a short-lived `tenants:write` key used
+  to create workspaces once. At startup, a bootstrapped key that is no longer listed is now
+  disabled, logged as `revoked`, and handed back to the console, which can then delete it. Leaving
+  the variable unset counts as an empty list. Putting the entry back enables the key again. Closes
+  #221.
+
 ## [1.30.0] - 2026-11-24
 
 ### Added

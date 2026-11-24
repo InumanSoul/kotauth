@@ -49,10 +49,14 @@ interface ApiKeyRepository {
         scimDialect: String,
     )
 
-    /** Soft-revokes a key (sets enabled = false). */
+    /**
+     * Soft-revokes a key (sets enabled = false). [releaseBootstrap] also drops a bootstrapped key's
+     * env lock, so the console can manage it again.
+     */
     fun revoke(
         id: Int,
         tenantId: TenantId,
+        releaseBootstrap: Boolean = false,
     )
 
     /** Updates last_used_at. Best-effort — called after successful auth, outside main transaction. */
