@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Removing a key from `KAUTH_BOOTSTRAP_API_KEYS` now revokes it.** Before, a bootstrapped key
+  whose entry was removed stayed active, and the console and admin routes refused to revoke it
+  because it was env-managed. The key that matters most is a short-lived `tenants:write` key used
+  to create workspaces once. At startup, a bootstrapped key that is no longer listed is now
+  disabled, logged as `revoked`, and handed back to the console, which can then delete it. Leaving
+  the variable unset counts as an empty list. Putting the entry back enables the key again. Closes
+  #221.
+
 - **Webhooks can no longer reach internal addresses (SSRF).** A webhook URL is set by a workspace
   admin or an API key, and Kotauth called whatever it pointed to, including cloud metadata at
   `169.254.169.254`, loopback and private-network services, and wherever a redirect led. Kotauth
