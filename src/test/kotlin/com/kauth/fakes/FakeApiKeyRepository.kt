@@ -41,9 +41,10 @@ class FakeApiKeyRepository : ApiKeyRepository {
     override fun revoke(
         id: Int,
         tenantId: TenantId,
+        releaseBootstrap: Boolean,
     ) {
         store[id]?.takeIf { it.tenantId == tenantId }?.let {
-            store[id] = it.copy(enabled = false)
+            store[id] = it.copy(enabled = false, bootstrapName = if (releaseBootstrap) null else it.bootstrapName)
         }
     }
 

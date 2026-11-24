@@ -89,11 +89,13 @@ class PostgresApiKeyRepository : ApiKeyRepository {
     override fun revoke(
         id: Int,
         tenantId: TenantId,
+        releaseBootstrap: Boolean,
     ) = transaction {
         ApiKeysTable.update({
             (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId.value)
         }) {
             it[enabled] = false
+            if (releaseBootstrap) it[bootstrapName] = null
         }
         Unit
     }
