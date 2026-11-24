@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A new client secret or temporary-password link shows up on any replica.** The console held
+  these one-time values in one server's memory and put a lookup token in the redirect URL. With
+  more than one replica, the page after the redirect could land on another server and show
+  nothing, so the secret was lost. An unread value also stayed in memory for good. They now travel
+  in an encrypted cookie in the admin's own browser. The cookie lasts two minutes, is bound to the
+  admin and to the page it's for, and is read once. Nothing about the value appears in the URL
+  any more.
+- **The "Workspace imported" confirmation is shown after a console import.** The message went
+  into the same store but no page ever read it.
+
 ## [1.30.0] - 2026-11-24
 
 ### Added

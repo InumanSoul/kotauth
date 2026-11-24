@@ -30,6 +30,7 @@ import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitForm
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -188,6 +189,8 @@ class AdminBackupImportUiRoutesTest {
                 }
 
             assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers[HttpHeaders.Location]!!
+            assertEquals("/admin/workspaces/acme-staging?saved=imported&rewrites=0", location)
             val imported = assertNotNull(tenantRepo.findBySlug("acme-staging"))
             assertEquals(1, tenantKeys.findAllKeys(imported.id).size)
             assertNotNull(tenantKeys.findActiveKey(imported.id))

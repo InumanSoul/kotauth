@@ -72,8 +72,9 @@ object AdminView {
         apps: List<Application> = emptyList(),
         loggedInAs: String,
         identityProviders: List<IdentityProvider> = emptyList(),
+        toastMessage: String? = null,
     ): HTML.() -> Unit =
-        workspaceDetailPageImpl(workspace, allWorkspaces, apps, loggedInAs, identityProviders)
+        workspaceDetailPageImpl(workspace, allWorkspaces, apps, loggedInAs, identityProviders, toastMessage)
 
     fun workspaceSettingsPage(
         workspace: Tenant,

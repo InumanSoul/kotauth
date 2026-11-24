@@ -280,18 +280,8 @@ fun Route.adminBackupImportRoutes(
             is BackupResult.Success -> {
                 val summary = result.value
                 auditLogPort?.recordConsoleImport(call, summary, export.schemaVersion, currentSchemaVersion)
-                val flashToken =
-                    com.kauth.adapter.web.admin.FlashStore.put(
-                        if (summary.usernameRewrites.isEmpty()) {
-                            com.kauth.adapter.web.EnglishStrings.TOAST_BACKUP_IMPORTED
-                        } else {
-                            com.kauth.adapter.web.EnglishStrings.toastBackupImportedWithRewrites(
-                                summary.usernameRewrites.size,
-                            )
-                        },
-                    )
                 call.respondRedirect(
-                    "/admin/workspaces/${summary.newTenantSlug}?flash=$flashToken",
+                    "/admin/workspaces/${summary.newTenantSlug}?saved=imported&rewrites=${summary.usernameRewrites.size}",
                 )
             }
             is BackupResult.Failure ->
