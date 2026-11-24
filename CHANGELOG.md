@@ -17,7 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emailed links and broker callbacks are then built on it, keeping their `/t/{slug}` paths. The
   admin console stays on `KAUTH_BASE_URL`. The workspace's pages on the instance address redirect
   to the domain, and the domain serves no other workspace and not the console; the API, SCIM and
-  token endpoints answer on both. Backups carry the domain. Comes with migration V72. See
+  token endpoints answer on both. Passkeys keep the instance as relying party, so existing ones
+  keep working on the domain: the instance serves `/.well-known/webauthn` listing every workspace
+  domain (WebAuthn Related Origin Requests). Backups carry the domain. Comes with migration V72. See
   `docs/operations/custom-domains.md`. Refs #239.
 
 - **A workspace keeps its users' `sub` when it moves to another instance.** Backups now carry each

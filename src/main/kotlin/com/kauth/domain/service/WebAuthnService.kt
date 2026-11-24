@@ -68,7 +68,7 @@ class WebAuthnService(
         val userId = requireNotNull(user.id) { "user must be persisted before passkey operations" }
         val parsed =
             try {
-                relyingParty.finishRegistration(creationOptionsJson, request.credentialJson)
+                relyingParty.finishRegistration(creationOptionsJson, request.credentialJson, tenant.publicBaseUrl)
             } catch (e: Exception) {
                 return WebAuthnResult.Failure(WebAuthnError.VerificationFailed(e.message ?: "verification failed"))
             }
@@ -125,7 +125,7 @@ class WebAuthnService(
 
         val assertion =
             try {
-                relyingParty.finishAssertion(assertionRequestJson, request.credentialJson)
+                relyingParty.finishAssertion(assertionRequestJson, request.credentialJson, tenant.publicBaseUrl)
             } catch (e: Exception) {
                 auditLog.record(
                     AuditEvent(

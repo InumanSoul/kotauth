@@ -11,6 +11,7 @@ import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import com.yubico.webauthn.data.ByteArray as YubiByteArray
 
 /**
@@ -84,5 +85,22 @@ class YubicoRelyingPartyAdapterTest {
         val inner = tree.get("publicKey") ?: tree
         assertNotNull(inner.get("challenge"))
         assertEquals("localhost", inner.get("rpId").asText())
+    }
+
+    @Test
+    fun `a workspace's own domain is accepted alongside the instance origin, under the same RP ID`() {
+        val forWorkspace = adapter.verifierFor("https://auth.acme.test")
+
+        assertEquals(setOf("http://localhost:8080", "https://auth.acme.test"), forWorkspace.origins)
+        assertEquals(relyingParty.identity.id, forWorkspace.identity.id)
+        assertEquals(setOf("http://localhost:8080"), adapter.verifierFor(null).origins)
+        assertTrue(adapter.verifierFor("https://auth.acme.test") === forWorkspace, "built once per origin")
+    }
+
+    @Test
+    fun `assertion options name the instance RP ID, so a browser on a workspace domain asks for it`() {
+        val (json, _) = adapter.startAssertion()
+
+        assertTrue(json.contains("\"rpId\":\"${relyingParty.identity.id}\""), json)
     }
 }

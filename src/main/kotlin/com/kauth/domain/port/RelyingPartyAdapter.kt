@@ -27,10 +27,12 @@ interface RelyingPartyAdapter {
      * stored in the session and echoed back here so the adapter can reconstruct
      * the original request for cryptographic verification.
      * Returns parsed credential fields on success, throws [IllegalStateException] on failure.
+     * [workspaceOrigin] is accepted alongside the instance origin: the workspace's own domain.
      */
     fun finishRegistration(
         creationOptionsJson: String,
         credentialResponseJson: String,
+        workspaceOrigin: String? = null,
     ): RegisteredCredentialData
 
     /**
@@ -51,6 +53,7 @@ interface RelyingPartyAdapter {
     fun finishAssertion(
         assertionRequestJson: String,
         credentialResponseJson: String,
+        workspaceOrigin: String? = null,
     ): AssertionResultData
 }
 

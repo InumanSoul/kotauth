@@ -52,6 +52,23 @@ issuer, as before.
 
 The workspace's built-in account portal client is re-registered on the new domain automatically.
 
+## Passkeys
+
+Passkeys stay bound to the instance host: its name is the relying party ID, so passkeys users
+already registered keep working after the switch, and nobody has to register again. A browser on
+`auth.acme.com` asks for passkeys of `sso.example.com`, and checks that it may by fetching
+`https://sso.example.com/.well-known/webauthn`, which Kotauth serves with every workspace domain
+listed (WebAuthn Related Origin Requests).
+
+- **The instance address must stay reachable over https** at the relying party ID, even if users
+  never visit it.
+- **Browser support:** Chrome and Edge 128+, Safari 18+. Check Firefox support for your users'
+  versions before relying on it. A browser without support refuses passkeys on the workspace
+  domain, and users sign in another way.
+- **At most five distinct site names.** Browsers honour five registrable-domain labels in that
+  list (`acme` in `auth.acme.com` and `acme.de` count once). Beyond five, passkeys stop working on
+  the extra domains.
+
 ## Moving a workspace to another instance
 
 The domain is part of the workspace backup, and import keeps it, so a workspace restored on another
