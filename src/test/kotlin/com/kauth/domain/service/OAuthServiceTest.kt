@@ -1929,4 +1929,85 @@ class OAuthServiceTest {
             enabled = enabled,
             scopes = scopes,
         )
+
+    @Test
+    fun `a code for openid and a scoped API exchanges, keeping both`() {
+        resourceServers.seedAuthorized(
+            resourceServerOf(identifier = "https://api-p.example.com", scopes = listOf("read:p")),
+            publicClient.id,
+            TenantId(1),
+        )
+        val issue =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid profile email read:p",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+                resources = listOf("https://api-p.example.com"),
+            )
+        val code = (issue as OAuthResult.Success<AuthorizationCode>).value.code
+
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
+
+        assertIs<OAuthResult.Success<*>>(result)
+        val tokenResponse = result.value as com.kauth.domain.model.TokenResponse
+        assertEquals("openid profile email read:p", tokenResponse.scope)
+    }
+
+    @Test
+    fun `narrowScopes passes the OIDC identity scopes and still rejects an undeclared API scope`() {
+        val api = resourceServerOf(scopes = listOf("read:invoices"))
+
+        val ok = svc.narrowScopes(listOf("openid", "email", "read:invoices"), listOf(api), grantingAll(api))
+        val rejected = svc.narrowScopes(listOf("openid", "delete:invoices"), listOf(api), grantingAll(api))
+
+        assertEquals(OAuthService.ScopeNarrowing.Ok(listOf("openid", "email", "read:invoices")), ok)
+        assertEquals(OAuthService.ScopeNarrowing.InvalidScope(listOf("delete:invoices")), rejected)
+    }
+
+    @Test
+    fun `a refresh narrowed to one API keeps openid`() {
+        val apiA = resourceServerOf(identifier = "https://api-a.example.com", scopes = listOf("read:a"))
+        val apiB = resourceServerOf(identifier = "https://api-b.example.com", scopes = listOf("read:b"))
+        val seededA = resourceServers.seed(apiA)
+        resourceServers.seed(apiB)
+        resourceServers.setAuthorizedResources(publicClient.id, listOf(seededA.id!!))
+        sessions.save(
+            Session(
+                tenantId = TenantId(1),
+                userId = UserId(10),
+                clientId = publicClient.id,
+                accessTokenHash = sha256Hex("at-oidc-two-apis"),
+                refreshTokenHash = sha256Hex("rt-oidc-two-apis"),
+                scopes = "openid read:a read:b",
+                expiresAt = Instant.now().plusSeconds(3600),
+                refreshExpiresAt = Instant.now().plusSeconds(86400),
+                resources = listOf("https://api-a.example.com", "https://api-b.example.com"),
+            ),
+        )
+
+        val result =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = "rt-oidc-two-apis",
+                clientId = "spa-app",
+                requestedResources = listOf("https://api-a.example.com"),
+            )
+
+        assertIs<OAuthResult.Success<*>>(result)
+        assertEquals("openid read:a", (result.value as com.kauth.domain.model.TokenResponse).scope)
+    }
 }

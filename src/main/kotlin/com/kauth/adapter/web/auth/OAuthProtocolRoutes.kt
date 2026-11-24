@@ -4,6 +4,7 @@ import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.AuthMethods
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.LoginIdentifierMode
+import com.kauth.domain.model.OidcScopes
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
@@ -124,7 +125,7 @@ internal fun Route.oauthProtocolRoutes(
                         add("none")
                     },
                 )
-                val baselineScopes = listOf("openid", "profile", "email")
+                val baselineScopes = OidcScopes.IDENTITY.toList()
                 val apiScopes =
                     resourceServerRepository
                         ?.findByTenantId(tenant.id)
