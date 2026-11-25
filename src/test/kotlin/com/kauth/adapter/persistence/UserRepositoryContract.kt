@@ -128,6 +128,17 @@ abstract class UserRepositoryContract {
     }
 
     @Test
+    fun `search matches a whole subject, never part of one`() {
+        val tid = tenantId()
+        val saved = repo.save(newUser(tid).copy(subject = "Sub-Search-$seq-x"))
+        val subject = saved.subject!!
+
+        assertEquals(listOf(saved.id), repo.findByTenantId(tid, subject, 10, 0).map { it.id })
+        assertEquals(1L, repo.countByTenantId(tid, subject))
+        assertTrue(repo.findByTenantId(tid, subject.dropLast(2), 10, 0).isEmpty())
+    }
+
+    @Test
     fun `update persists requiredActions`() {
         val tid = tenantId()
         val saved = repo.save(newUser(tid))

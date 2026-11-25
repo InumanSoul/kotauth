@@ -153,7 +153,8 @@ class FakeUserRepository :
                 all.filter {
                     it.username.lowercase().contains(q) ||
                         it.email.lowercase().contains(q) ||
-                        it.fullName.lowercase().contains(q)
+                        it.fullName.lowercase().contains(q) ||
+                        it.tokenSubject == search.trim()
                 }
             }
         return filtered.drop(offset).take(limit)
