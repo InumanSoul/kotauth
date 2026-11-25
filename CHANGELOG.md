@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   another identity provider. It must be unique in the workspace (409 otherwise) and can't be
   changed afterwards. Closes #250.
 
+- **The console shows a user's `sub`.** The user page lists **Subject (sub)** under the username,
+  with a copy button: it is the value a relying party links the user by, and for users created on
+  1.31.0 or imported from another instance it differs from the id in the page's URL. Searching the
+  user list, or `GET /users?search=` in the API, also matches a whole subject. Closes #253.
+
 - **A public domain per workspace.** A workspace can be given its own origin, such as
   `https://auth.acme.com`, in the console (Workspace settings → General) or with
   `PATCH /workspace` (`publicBaseUrl`). Its issuer, discovery document, sign-in and account pages,

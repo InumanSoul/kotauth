@@ -1090,7 +1090,7 @@ paths:
         - in: query
           name: search
           schema: { type: string }
-          description: Filter by username, email, or full name prefix
+          description: Filter by part of a username, email or full name, or by a whole subject
         - in: query
           name: limit
           schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
