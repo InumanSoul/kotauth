@@ -28,6 +28,8 @@ class AdminUserService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailPort: EmailPort? = null,
 ) {
+    private val usernameRules = UsernameRules(userRepository, collisionCheck)
+
     /** The user whose `sub` is exactly [subject] in [tenantId], or null. */
     fun findBySubject(
         tenantId: TenantId,
@@ -508,33 +510,11 @@ class AdminUserService(
             return AdminResult.Success(user.username)
         }
 
-        val resolvedUsername = normalized
-
-        if (resolvedUsername.isBlank()) {
-            return AdminResult.Failure(AdminError.Validation("Username is required."))
+        return when (val check = usernameRules.checkRename(tenantId, userId, normalized, resolvedEmail)) {
+            is UsernameRules.Check.Ok -> AdminResult.Success(check.username)
+            is UsernameRules.Check.Invalid -> AdminResult.Failure(AdminError.Validation(check.message))
+            is UsernameRules.Check.Taken -> AdminResult.Failure(AdminError.Conflict(check.message))
         }
-        when (UsernamePolicy.validate(resolvedUsername)) {
-            UsernamePolicy.Violation.INVALID_FORMAT ->
-                return AdminResult.Failure(
-                    AdminError.Validation(
-                        "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
-                    ),
-                )
-            UsernamePolicy.Violation.TOO_LONG ->
-                return AdminResult.Failure(
-                    AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
-                )
-            null -> Unit
-        }
-        if (userRepository.existsByUsername(tenantId, resolvedUsername)) {
-            return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))
-        }
-
-        collisionCheck
-            .check(tenantId, resolvedUsername, resolvedEmail, excludingUserId = userId)
-            ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
-
-        return AdminResult.Success(resolvedUsername)
     }
 
     /**

@@ -430,7 +430,7 @@ components:
          signInMethods, passwordPolicy, mfaPolicy, lockoutMaxAttempts,
          lockoutDurationMinutes, magicLinkTtlMinutes, emailOtpSignupEnabled,
          emailOtpLockoutThreshold, corsAllowCredentials, portalLayout,
-         loginIdentifierMode, emailDeliveryReady]
+         loginIdentifierMode, usernameChangeEnabled, emailDeliveryReady]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -460,6 +460,9 @@ components:
         corsAllowCredentials: { type: boolean }
         portalLayout: { type: string, enum: [SIDEBAR, CENTERED] }
         loginIdentifierMode: { type: string, enum: [USERNAME, EMAIL, EITHER] }
+        usernameChangeEnabled:
+          type: boolean
+          description: Users can change their own username in the account portal, once every 30 days.
         defaultLocale:
           type: string
           nullable: true
@@ -528,6 +531,9 @@ components:
         emailOtpLockoutThreshold: { type: integer, minimum: 0, maximum: 50 }
         corsAllowCredentials: { type: boolean }
         loginIdentifierMode: { type: string, enum: [USERNAME, EMAIL, EITHER] }
+        usernameChangeEnabled:
+          type: boolean
+          description: Lets users change their own username in the account portal. Off by default.
         defaultLocale:
           type: string
           description: One of the locales the server ships or has mounted, e.g. `es`.

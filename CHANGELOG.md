@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Users can change their own username.** A new workspace setting (Security → Sign-In
+  Identifier, or `usernameChangeEnabled` with `PATCH /workspace`) adds a username field to the
+  account portal. It is off by default. A rename follows the administrator's rules, and a
+  user can rename themselves once every 30 days. Attempts are limited to ten an hour, so
+  "already taken" can't be used to list usernames. Sessions stay signed in, and `sub` doesn't
+  change. The audit log records it as `USER_USERNAME_CHANGED`, apart from an administrator's
+  `ADMIN_USER_UPDATED`. Backups carry the setting. Comes with migration V73. See
+  `docs/guides/sign-in-identifier.md`. Closes #139.
+
 ## [1.31.0] - 2026-11-24
 
 ### Added

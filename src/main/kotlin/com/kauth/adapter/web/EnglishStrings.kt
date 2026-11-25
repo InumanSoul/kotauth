@@ -83,7 +83,14 @@ object EnglishStrings {
     const val PORTAL_PROFILE_TITLE = "Profile"
     const val PORTAL_PROFILE_SUBTITLE = "Manage your personal information"
     const val PORTAL_PROFILE_USERNAME = "Username"
-    const val PORTAL_PROFILE_USERNAME_HINT = "Username cannot be changed after account creation."
+    const val PORTAL_PROFILE_USERNAME_HINT = "Only an administrator can change your username."
+    const val PORTAL_USERNAME_HINT = "You sign in with it. You can change it once every 30 days."
+    const val PORTAL_USERNAME_COOLDOWN = "You can change your username again on {0}."
+    const val PORTAL_USERNAME_SAVE = "Change username"
+    const val PORTAL_USERNAME_CONFIRM =
+        "Change your username? You'll sign in with the new one, and you can't change it again for 30 days."
+    const val PORTAL_USERNAME_CHANGED = "Username changed."
+    const val PORTAL_USERNAME_TOO_MANY = "Too many attempts. Try again in an hour."
     const val PORTAL_PROFILE_EMAIL = "Email address"
     const val PORTAL_PROFILE_FULL_NAME = "Full name"
     const val PORTAL_PROFILE_SAVE = "Save changes"
@@ -526,6 +533,10 @@ object EnglishStrings {
             "Lockout duration above. 0 turns this off. Maximum 50."
 
     // Admin — sign-in identifier (workspace security policy)
+    const val ADMIN_USERNAME_CHANGE_LABEL = "Users can change their own username"
+    const val ADMIN_USERNAME_CHANGE_DESC =
+        "Adds a username field to the account portal. A user can rename themselves once every 30 days. " +
+            "Their sessions stay signed in, and tokens issued afterwards carry the new preferred_username."
     const val ADMIN_SIGNIN_IDENTIFIER_SECTION = "Sign-In Identifier"
     const val ADMIN_SIGNIN_IDENTIFIER_USERNAME_LABEL = "Username only"
     const val ADMIN_SIGNIN_IDENTIFIER_USERNAME_DESC =

@@ -325,6 +325,7 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.EMAIL_VERIFIED,
         AuditEventType.PASSWORD_RESET_COMPLETED,
         AuditEventType.USER_PROFILE_UPDATED,
+        AuditEventType.USER_USERNAME_CHANGED,
         AuditEventType.USER_PASSWORD_CHANGED,
         AuditEventType.MFA_ENROLLMENT_VERIFIED,
         AuditEventType.MFA_CHALLENGE_SUCCESS,

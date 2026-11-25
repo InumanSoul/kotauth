@@ -636,6 +636,25 @@ class AdminSettingsTest {
         }
 
     @Test
+    fun `POST security settings turns self-service username change on, and an unticked box turns it off`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val url = "/admin/workspaces/acme/settings/security"
+
+            authed.submitForm(url = url, formParameters = Parameters.build { append("usernameChangeEnabled", "true") })
+            assertTrue(tenantRepo.findBySlug("acme")!!.securityConfig.usernameChangeEnabled)
+
+            authed.submitForm(url = url, formParameters = Parameters.build { append("loginIdentifierMode", "EMAIL") })
+            assertFalse(tenantRepo.findBySlug("acme")!!.securityConfig.usernameChangeEnabled)
+        }
+
+    @Test
     fun `POST security settings persists sign-in identifier mode EMAIL`() =
         testApplication {
             application { installTestApp() }

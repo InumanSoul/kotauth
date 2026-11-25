@@ -358,7 +358,7 @@ class ApiWorkspaceRoutesTest {
                     {"registrationEnabled": false, "mfaPolicy": "optional", "tokenExpirySeconds": 600,
                      "signInMethods": {"password": false},
                      "passwordPolicy": {"minLength": 16},
-                     "lockoutMaxAttempts": 3, "loginIdentifierMode": "email"}
+                     "lockoutMaxAttempts": 3, "loginIdentifierMode": "email", "usernameChangeEnabled": true}
                     """.trimIndent(),
                 )
             assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
@@ -382,6 +382,7 @@ class ApiWorkspaceRoutesTest {
             )
             assertEquals(3, body["lockoutMaxAttempts"]!!.jsonPrimitive.content.toInt())
             assertEquals("EMAIL", body["loginIdentifierMode"]!!.jsonPrimitive.content)
+            assertTrue(body["usernameChangeEnabled"]!!.jsonPrimitive.boolean)
             // Untouched fields keep their values.
             assertEquals("Acme Corp", body["displayName"]!!.jsonPrimitive.content)
             assertTrue(body["passwordPolicy"]!!.jsonObject["requireSpecial"]!!.jsonPrimitive.boolean)

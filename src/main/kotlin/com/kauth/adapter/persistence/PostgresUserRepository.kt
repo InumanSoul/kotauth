@@ -173,6 +173,23 @@ class PostgresUserRepository : UserRepository {
             user
         }
 
+    override fun renameBySelf(
+        userId: UserId,
+        username: String,
+        changedAt: Instant,
+    ): User =
+        transaction {
+            UsersTable.update({ UsersTable.id eq userId.value }) {
+                it[UsersTable.username] = username
+                it[UsersTable.usernameSelfChangedAt] = changedAt.toOffsetDateTime()
+            }
+            UsersTable
+                .selectAll()
+                .where { UsersTable.id eq userId.value }
+                .single()
+                .toUser()
+        }
+
     override fun updatePassword(
         userId: UserId,
         passwordHash: String,
@@ -305,6 +322,7 @@ class PostgresUserRepository : UserRepository {
             failedOtpChallenges = this[UsersTable.failedOtpChallenges],
             createdAt = this[UsersTable.createdAt].toInstant(),
             subject = this[UsersTable.subject],
+            usernameSelfChangedAt = this[UsersTable.usernameSelfChangedAt]?.toInstant(),
         )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)

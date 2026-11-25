@@ -87,6 +87,13 @@ interface UserRepository {
      */
     fun update(user: User): User
 
+    /** A user's rename of their own account: the new username and when, in one write. */
+    fun renameBySelf(
+        userId: UserId,
+        username: String,
+        changedAt: Instant,
+    ): User
+
     /**
      * Updates a user's password hash and records the change timestamp.
      * Intentionally separate from [update] to keep the change explicit and auditable.

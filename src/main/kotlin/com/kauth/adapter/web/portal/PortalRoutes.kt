@@ -24,6 +24,7 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
+import com.kauth.domain.service.UsernameChangeResult
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
@@ -78,6 +79,7 @@ fun Route.portalRoutes(
     mfaService: MfaService? = null,
     oauthService: OAuthService? = null,
     socialAccountRepository: SocialAccountRepository? = null,
+    usernameChangeService: com.kauth.domain.service.UsernameChangeService? = null,
     baseUrl: String = "",
     encryptionService: EncryptionService,
     translationPort: TranslationPort,
@@ -397,6 +399,12 @@ fun Route.portalRoutes(
                     email = user?.email ?: "",
                     fullName = user?.fullName ?: "",
                     connectedAccounts = connectedAccounts,
+                    usernameChange =
+                        usernameChangeService?.let { service ->
+                            user
+                                ?.takeIf { service.isEnabled(tenant.id) }
+                                ?.let { UsernameChangeState(nextAllowedAt = service.nextAllowedAt(it)) }
+                        },
                 ),
             )
         }
@@ -422,6 +430,40 @@ fun Route.portalRoutes(
                 is SelfServiceResult.Failure ->
                     call.respondRedirect("/t/$slug/account/profile?error=${encodeParam(result.error.message)}")
             }
+        }
+
+        post("/username") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            if (session.isImpersonation || usernameChangeService == null) {
+                return@post call.respond(HttpStatusCode.Forbidden)
+            }
+            val tenant = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+            val requested = call.receiveParameters()["username"].orEmpty()
+            val result =
+                usernameChangeService.changeOwn(
+                    tenantId = TenantId(session.tenantId),
+                    userId = UserId(session.userId),
+                    requested = requested,
+                    ipAddress = call.request.origin.remoteAddress,
+                )
+            val ctx = call.portalViewContext(tenant)
+            val error =
+                when (result) {
+                    is UsernameChangeResult.Changed -> {
+                        call.sessions.set(session.copy(username = result.user.username))
+                        return@post call.respondRedirect("/t/$slug/account/profile?saved=username")
+                    }
+                    UsernameChangeResult.Unchanged -> return@post call.respondRedirect("/t/$slug/account/profile")
+                    UsernameChangeResult.Disabled -> return@post call.respond(HttpStatusCode.Forbidden)
+                    UsernameChangeResult.NotFound -> return@post call.respond(HttpStatusCode.NotFound)
+                    UsernameChangeResult.TooManyAttempts -> ctx.t("PORTAL_USERNAME_TOO_MANY")
+                    is UsernameChangeResult.CoolingDown ->
+                        ctx.t("PORTAL_USERNAME_COOLDOWN", UsernameChangeState.dayOf(result.nextAllowedAt))
+                    is UsernameChangeResult.Invalid -> result.message
+                    is UsernameChangeResult.Taken -> result.message
+                }
+            call.respondRedirect("/t/$slug/account/profile?error=${encodeParam(error)}")
         }
 
         post("/delete") {

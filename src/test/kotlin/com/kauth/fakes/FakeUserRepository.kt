@@ -185,9 +185,22 @@ class FakeUserRepository :
     override fun update(user: User): User {
         requireNormalizedUsername(user.username)
         requireUniquePerTenant(user)
-        // Production's update never writes the subject column.
-        store[user.id!!.value] = user.copy(subject = store[user.id.value]?.subject)
+        // Production's update never writes the subject column, nor the self-rename time.
+        val stored = store[user.id!!.value]
+        store[user.id.value] =
+            user.copy(subject = stored?.subject, usernameSelfChangedAt = stored?.usernameSelfChangedAt)
         return user
+    }
+
+    override fun renameBySelf(
+        userId: UserId,
+        username: String,
+        changedAt: Instant,
+    ): User {
+        val renamed = store[userId.value]!!.copy(username = username, usernameSelfChangedAt = changedAt)
+        requireUniquePerTenant(renamed)
+        store[userId.value] = renamed
+        return renamed
     }
 
     override fun updatePassword(

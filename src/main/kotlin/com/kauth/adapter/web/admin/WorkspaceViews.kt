@@ -843,6 +843,16 @@ internal fun securityPolicyPageImpl(
                             EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EITHER_DESC,
                         )
                     }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "usernameChangeEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.securityConfig.usernameChangeEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.ADMIN_USERNAME_CHANGE_LABEL }
+                            span("check-row__desc") { +EnglishStrings.ADMIN_USERNAME_CHANGE_DESC }
+                        }
+                    }
                 }
 
                 // ── Account Lockout ──────────────────────────────────

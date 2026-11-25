@@ -77,10 +77,31 @@ predates this validation (or predates any format checking at all, as with
 self-registration and backup-imported accounts) does not block unrelated
 edits to the same user, such as updating their email or name.
 
+### Users renaming themselves
+
+A workspace can let users change their own username in the account portal:
+**Security → Sign-In Identifier → Users can change their own username**, or
+`usernameChangeEnabled` with `PATCH /workspace`. It is off by default, so
+usernames stay with administrators until an operator turns it on.
+
+- The rules are the administrator's: the same format, uniqueness, and
+  collision with another user's email.
+- A user can rename themselves once every 30 days. An administrator rename
+  doesn't start or reset that wait.
+- Ten attempts an hour per user, successful or not, so the "already taken"
+  answer can't be used to list a workspace's usernames.
+- Sessions stay signed in. Tokens issued afterwards carry the new
+  `preferred_username`; `sub` never changes, so relying parties that key on
+  it are unaffected.
+- The audit log records `USER_USERNAME_CHANGED` with the old and new
+  username. An administrator rename stays `ADMIN_USER_UPDATED`.
+- A released username isn't reserved: another user can take it at once.
+- Not available while an administrator is impersonating the user.
+
 ## Username normalization
 
 Every path that can create or rename a username — admin create, admin
-rename, self-registration, social login, JIT provisioning, email-OTP
+rename, self-service rename, self-registration, social login, JIT provisioning, email-OTP
 sign-up, and backup import — now normalizes it the same way before writing:
 trimmed of surrounding whitespace, lowercased, then required to match
 `[a-zA-Z0-9._@+-]+`. A value that fails to normalize into something valid

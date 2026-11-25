@@ -544,6 +544,7 @@ data class ProblemDetail(
     val corsAllowCredentials: Boolean,
     val portalLayout: String,
     val loginIdentifierMode: String,
+    val usernameChangeEnabled: Boolean,
     val defaultLocale: String? = null,
     // Whether the workspace can send email (delivery switched on and configured). Never the credentials.
     val emailDeliveryReady: Boolean,
@@ -803,6 +804,7 @@ internal fun com.kauth.domain.model.Tenant.toWorkspaceApiDto(): WorkspaceDto {
         corsAllowCredentials = sc.corsAllowCredentials,
         portalLayout = portalConfig.layout.name,
         loginIdentifierMode = sc.loginIdentifierMode.name,
+        usernameChangeEnabled = sc.usernameChangeEnabled,
         defaultLocale = theme.defaultLocale,
         emailDeliveryReady = isSmtpReady,
     )
