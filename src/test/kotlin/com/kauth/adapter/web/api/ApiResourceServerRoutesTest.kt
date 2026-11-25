@@ -335,6 +335,43 @@ class ApiResourceServerRoutesTest {
         }
 
     @Test
+    fun `scope descriptions are kept for declared scopes only, and an update without them keeps them`() =
+        testApplication {
+            application { installTestApp() }
+
+            val created =
+                client.post("/t/acme/api/v1/resource-servers") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"identifier":"https://api.acme.dev","name":"Acme API",""" +
+                            """"scopes":["read:orders","write:orders"],""" +
+                            """"scopeDescriptions":{"read:orders":"See your orders","admin":"Not declared"}}""",
+                    )
+                }
+            assertEquals(HttpStatusCode.Created, created.status)
+            val id =
+                jsonCodec
+                    .parseToJsonElement(created.bodyAsText())
+                    .jsonObject["id"]!!
+                    .jsonPrimitive.content
+            assertEquals(
+                mapOf("read:orders" to "See your orders"),
+                resourceServerRepo.findByTenantId(TenantId(1)).single().scopeDescriptions,
+            )
+
+            client.put("/t/acme/api/v1/resource-servers/$id") {
+                bearerAuth(rawApiKey)
+                contentType(ContentType.Application.Json)
+                setBody(updateBody(scopes = """["read:orders"]"""))
+            }
+            assertEquals(
+                mapOf("read:orders" to "See your orders"),
+                resourceServerRepo.findByTenantId(TenantId(1)).single().scopeDescriptions,
+            )
+        }
+
+    @Test
     fun `POST resource-servers returns 422 for invalid identifier with spaces and uppercase`() =
         testApplication {
             application { installTestApp() }

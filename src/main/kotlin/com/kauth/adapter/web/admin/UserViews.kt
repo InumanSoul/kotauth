@@ -11,6 +11,7 @@ import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import com.kauth.domain.model.WebAuthnCredential
+import com.kauth.domain.service.ConsentedApplication
 import io.ktor.http.encodeURLParameter
 import kotlinx.html.*
 import java.time.Instant
@@ -77,6 +78,8 @@ internal fun userDetailPageImpl(
      */
     brokeredOrigin: Boolean = false,
     linkedIdentities: List<SocialAccount> = emptyList(),
+    /** Null when consent isn't wired; the card is left out. */
+    appAccess: List<ConsentedApplication>? = null,
     activeImpersonation: ActiveImpersonation? = null,
 ): HTML.() -> Unit =
     {
@@ -247,6 +250,9 @@ internal fun userDetailPageImpl(
 
             // ── Linked identities ────────────────────────────────────
             linkedIdentitiesCard(linkedIdentities)
+
+            // ── Application access (consent) ─────────────────────────
+            appAccess?.let { appAccessCard(workspace.slug, user, it) }
 
             // ── Profile (read mode — swapped via htmx) ──────────────
             userProfileReadFragment(user, roles = roles, groups = groups)
@@ -1359,6 +1365,58 @@ private fun encodeUriComponent(input: String): String =
  * The end user could already see this on their own portal; the administrator supporting them
  * could not, so "why can this person not sign in with SSO" had no answer on this page.
  */
+private fun FlowContent.appAccessCard(
+    slug: String,
+    user: User,
+    grants: List<ConsentedApplication>,
+) {
+    div("ov-card") {
+        h2("ov-card__section-label") { +EnglishStrings.APP_ACCESS_HEADING }
+        if (grants.isEmpty()) {
+            div("ov-card__row--stacked") {
+                span("ov-card__value--muted") { +EnglishStrings.APP_ACCESS_EMPTY }
+            }
+            return@div
+        }
+        table("data-table") {
+            thead {
+                tr {
+                    th { +EnglishStrings.APP_ACCESS_COL_APP }
+                    th { +EnglishStrings.APP_ACCESS_COL_SCOPES }
+                    th { +EnglishStrings.APP_ACCESS_COL_UPDATED }
+                    th { }
+                }
+            }
+            tbody {
+                grants.forEach { grant ->
+                    tr {
+                        td { span("data-table__name") { +grant.application.name } }
+                        td {
+                            span("data-table__meta") { +grant.consent.scopes.sorted().joinToString(" ") }
+                        }
+                        td { span("data-table__meta") { +grant.consent.updatedAt.toDisplayString() } }
+                        td {
+                            div("data-table__actions") {
+                                postButton(
+                                    action =
+                                        "/admin/workspaces/$slug/users/${user.id?.value}/app-access/" +
+                                            "${grant.application.id.value}/revoke",
+                                    label = EnglishStrings.APP_ACCESS_REVOKE,
+                                    btnClass = "btn btn--ghost btn--sm",
+                                    confirmMessage = EnglishStrings.APP_ACCESS_REVOKE_CONFIRM,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        div("ov-card__row--stacked") {
+            span("ov-card__value--muted") { +EnglishStrings.APP_ACCESS_HINT }
+        }
+    }
+}
+
 private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
     div("ov-card") {
         h2("ov-card__section-label") { +EnglishStrings.LINKED_IDENTITIES_HEADING }

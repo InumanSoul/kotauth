@@ -12,6 +12,7 @@ import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.IntrospectionResult
+import com.kauth.domain.service.OAuthError
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.EncryptionService
@@ -298,7 +299,8 @@ internal fun Route.oauthProtocolRoutes(
                 ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
 
         val isSilentOnly = "none" in promptValues
-        val forceReauth = promptValues.any { it == "login" || it == "consent" || it == "select_account" }
+        // `consent` asks for the consent screen again, not for a new sign-in (OIDC Core §3.1.2.1).
+        val forceReauth = promptValues.any { it == "login" || it == "select_account" }
 
         // RFC 6749 §3.1.2.4 / §4.1.2.1: an unknown or disabled client, or a redirect_uri the client
         // never registered, is reported to the user and never redirected to. Refusing here, before
@@ -371,6 +373,7 @@ internal fun Route.oauthProtocolRoutes(
                 nonce = nonce,
                 resources = resolvedResources,
                 acrValues = acrValues,
+                forceConsent = "consent" in promptValues,
             )
 
         // ---- Silent auth attempt -------------------------------------------
@@ -426,7 +429,36 @@ internal fun Route.oauthProtocolRoutes(
                             authTime = sso.authTime,
                             resources = resolvedResources,
                             amr = sso.amr,
+                            forceConsent = oauthParams.forceConsent,
                         )
+                    val consentOwed =
+                        codeResult is OAuthResult.Failure && codeResult.error is OAuthError.ConsentRequired
+                    if (consentOwed && isSilentOnly) {
+                        call.respondRedirect(
+                            buildString {
+                                append(redirectUri)
+                                append("?error=consent_required")
+                                append("&error_description=")
+                                    .append(encodeParam("The user has not approved this application"))
+                                if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+                            },
+                        )
+                        return@get
+                    }
+                    if (consentOwed) {
+                        val consentUrl =
+                            call.startConsent(
+                                slug = slug,
+                                userId = ssoUser,
+                                oauthParams = oauthParams,
+                                authTime = sso.authTime,
+                                amr = sso.amr,
+                                encryptionService = encryptionService,
+                                secure = baseUrl.startsWith("https://", ignoreCase = true),
+                            )
+                        call.respondRedirect(consentUrl)
+                        return@get
+                    }
                     if (codeResult is OAuthResult.Success) {
                         val redirect =
                             buildString {

@@ -37,6 +37,12 @@ enum class AuditEventType {
     TOKEN_INTROSPECTED,
 
     AUTHORIZATION_CODE_ISSUED,
+
+    /** A user allowed an application the scopes it asked for, on the consent screen. */
+    CONSENT_GRANTED,
+    CONSENT_DENIED,
+    CONSENT_REVOKED,
+    ADMIN_CONSENT_REVOKED,
     AUTHORIZATION_CODE_USED,
     AUTHORIZATION_CODE_EXPIRED,
 

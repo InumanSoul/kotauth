@@ -206,6 +206,7 @@ object AdminView {
         passkeys: List<com.kauth.domain.model.WebAuthnCredential> = emptyList(),
         brokeredOrigin: Boolean = false,
         linkedIdentities: List<com.kauth.domain.model.SocialAccount> = emptyList(),
+        appAccess: List<com.kauth.domain.service.ConsentedApplication>? = null,
         activeImpersonation: ActiveImpersonation? = null,
     ): HTML.() -> Unit =
         userDetailPageImpl(
@@ -227,6 +228,7 @@ object AdminView {
             passkeys,
             brokeredOrigin,
             linkedIdentities = linkedIdentities,
+            appAccess = appAccess,
             activeImpersonation = activeImpersonation,
         )
 

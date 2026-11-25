@@ -271,6 +271,7 @@ class BackupImporterService(
                         name = rsb.name,
                         description = rsb.description,
                         scopes = rsb.scopes,
+                        scopeDescriptions = rsb.scopeDescriptions,
                     )
                 if (!rsb.enabled) {
                     created.id?.let { resourceServerRepository.setEnabled(createdTenant.id, it, false) }
@@ -310,6 +311,7 @@ class BackupImporterService(
                     grantTypes = grants,
                     clientSecretHash = null,
                     audience = ab.audience,
+                    consentRequired = ab.consentRequired,
                 )
             val finalApp =
                 if (!ab.enabled) {
@@ -685,6 +687,7 @@ class BackupImporterService(
             launcherDisplayOrder = ab.launcherDisplayOrder,
             audience = ab.audience,
             tokenExpiryOverride = ab.tokenExpiryOverride,
+            consentRequired = app.consentRequired,
         )
     }
 

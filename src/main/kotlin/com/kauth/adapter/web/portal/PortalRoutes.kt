@@ -8,6 +8,7 @@ import com.kauth.adapter.web.auth.resolveLocale
 import com.kauth.adapter.web.decodeJwtPayload
 import com.kauth.adapter.web.generatePkceChallenge
 import com.kauth.adapter.web.generatePkceVerifier
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -80,6 +81,7 @@ fun Route.portalRoutes(
     oauthService: OAuthService? = null,
     socialAccountRepository: SocialAccountRepository? = null,
     usernameChangeService: com.kauth.domain.service.UsernameChangeService? = null,
+    consentService: com.kauth.domain.service.ConsentService? = null,
     baseUrl: String = "",
     encryptionService: EncryptionService,
     translationPort: TranslationPort,
@@ -585,6 +587,51 @@ fun Route.portalRoutes(
                 is SelfServiceResult.Failure ->
                     call.respondRedirect("/t/$slug/account/change-password?error=${encodeParam(result.error.message)}")
             }
+        }
+
+        get("/apps") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val entries =
+                consentService
+                    ?.grantsFor(tenant.id, UserId(session.userId))
+                    ?.map { grant ->
+                        AppAccessEntry(
+                            grant,
+                            consentService.describe(grant.application, grant.consent.scopes.joinToString(" ")),
+                        )
+                    }.orEmpty()
+            call.respondHtml(HttpStatusCode.OK) {
+                portalAppAccessPage(
+                    tenant,
+                    session,
+                    entries,
+                    call.portalViewContext(tenant),
+                    tenant.portalConfig.layout,
+                    revoked = call.request.queryParameters["saved"] == "revoked",
+                )
+            }
+        }
+
+        post("/apps/{appId}/revoke") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            if (session.isImpersonation || consentService == null) {
+                return@post call.respond(HttpStatusCode.Forbidden)
+            }
+            val appId =
+                call.parameters["appId"]?.toIntOrNull()?.let(::ApplicationId)
+                    ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val revoked =
+                consentService.revokeOwn(
+                    tenantId = TenantId(session.tenantId),
+                    userId = UserId(session.userId),
+                    applicationId = appId,
+                    ipAddress = call.request.origin.remoteAddress,
+                )
+            if (!revoked) return@post call.respond(HttpStatusCode.NotFound)
+            call.respondRedirect("/t/$slug/account/apps?saved=revoked")
         }
 
         post("/sessions/{sessionId}/revoke") {

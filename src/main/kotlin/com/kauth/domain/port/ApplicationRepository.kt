@@ -42,6 +42,7 @@ interface ApplicationRepository {
         grantTypes: Set<GrantType>,
         clientSecretHash: String?,
         audience: String?,
+        consentRequired: Boolean = false,
     ): Application
 
     /** Updates mutable fields. clientId is immutable. */
@@ -59,6 +60,7 @@ interface ApplicationRepository {
         audience: String? = null,
         // No default: this is a full replace, so a caller that forgot it would reset the override.
         tokenExpiryOverride: Int?,
+        consentRequired: Boolean,
     ): Application
 
     /** Enables or disables the application. */

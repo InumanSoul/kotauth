@@ -48,6 +48,7 @@ internal fun Route.apiResourceServerRoutes(
                         name = body.name,
                         description = body.description,
                         scopes = body.scopes,
+                        scopeDescriptions = body.scopeDescriptions,
                     )
             ) {
                 is ResourceServerResult.Success -> call.respond(HttpStatusCode.Created, result.value.toApiDto())
@@ -91,6 +92,7 @@ internal fun Route.apiResourceServerRoutes(
                             name = body.name,
                             description = body.description,
                             scopes = body.scopes,
+                            scopeDescriptions = body.scopeDescriptions,
                         )
                 ) {
                     is ResourceServerResult.Success -> call.respond(HttpStatusCode.OK, result.value.toApiDto())

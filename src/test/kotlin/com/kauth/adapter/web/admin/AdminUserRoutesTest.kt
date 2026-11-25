@@ -37,6 +37,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
@@ -81,6 +82,10 @@ class AdminUserRoutesTest {
     private val auditLogPort = FakeAuditLogPort()
     private val apiKeyRepo = FakeApiKeyRepository()
     private val hasher = FakePasswordHasher()
+    private val consents = com.kauth.fakes.FakeConsentRepository()
+    private val consentService =
+        com.kauth.domain.service
+            .ConsentService(consents, appRepo, sessionRepo, userRepo, auditLogPort)
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
     private val encryptionService = EncryptionService("test-secret-key")
@@ -159,6 +164,51 @@ class AdminUserRoutesTest {
             // The warning is the point of the badge: without it an operator edits a name, the next
             // sync reverts it, and nothing on screen explains why.
             assertTrue(body.contains(EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN))
+        }
+
+    @Test
+    fun `an administrator sees what a user allowed an application and can revoke it`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada")
+            val partner =
+                appRepo.add(
+                    com.kauth.domain.model.Application(
+                        id =
+                            com.kauth.domain.model
+                                .ApplicationId(31),
+                        tenantId = workspace.id,
+                        clientId = "partner-app",
+                        name = "Partner Reports",
+                        description = null,
+                        accessType = com.kauth.domain.model.AccessType.PUBLIC,
+                        enabled = true,
+                        consentRequired = true,
+                    ),
+                )
+            consents.save(workspace.id, user.id!!, partner.id, setOf("openid", "email"), java.time.Instant.now())
+
+            val page = authed.get("/admin/workspaces/acme/users/${user.id!!.value}").bodyAsText()
+            assertTrue(page.contains(EnglishStrings.APP_ACCESS_HEADING))
+            assertTrue(page.contains("Partner Reports"))
+            assertTrue(page.contains("email openid"))
+
+            val revoked = authed.post("/admin/workspaces/acme/users/${user.id!!.value}/app-access/31/revoke")
+
+            assertEquals(HttpStatusCode.Found, revoked.status)
+            assertNull(consents.find(workspace.id, user.id!!, partner.id))
+            assertEquals(
+                com.kauth.domain.model.AuditEventType.ADMIN_CONSENT_REVOKED,
+                auditLogPort.events.last().eventType,
+            )
+            val again = authed.post("/admin/workspaces/acme/users/${user.id!!.value}/app-access/31/revoke")
+            assertEquals(HttpStatusCode.NotFound, again.status)
         }
 
     @Test
@@ -645,6 +695,7 @@ class AdminUserRoutesTest {
                     ),
                 claimMapperService =
                     CachingClaimMapperService(mapperRepository = FakeTenantClaimMapperRepository()),
+                consentService = consentService,
             )
         }
     }

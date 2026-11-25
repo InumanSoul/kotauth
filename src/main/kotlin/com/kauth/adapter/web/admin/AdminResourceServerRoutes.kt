@@ -49,15 +49,9 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         val identifier = params["identifier"].orEmpty()
         val name = params["name"].orEmpty()
         val description = params["description"]?.takeIf { it.isNotBlank() }
-        val scopes =
-            params["scopes"]
-                ?.lines()
-                ?.map { it.trim() }
-                ?.filter { it.isNotBlank() }
-                ?.distinct()
-                .orEmpty()
+        val (scopes, scopeDescriptions) = parseScopeLines(params["scopes"])
 
-        when (val result = service.create(ctx.workspace.id, identifier, name, description, scopes)) {
+        when (val result = service.create(ctx.workspace.id, identifier, name, description, scopes, scopeDescriptions)) {
             is ResourceServerResult.Success ->
                 call.respondRedirect("/admin/workspaces/${ctx.slug}/apis?saved=created")
             is ResourceServerResult.Failure -> {
@@ -68,6 +62,7 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
                         name = name,
                         description = description,
                         scopes = scopes,
+                        scopeDescriptions = scopeDescriptions,
                     )
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
@@ -106,15 +101,19 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         val params = call.receiveParameters()
         val name = params["name"].orEmpty()
         val description = params["description"]?.takeIf { it.isNotBlank() }
-        val scopes =
-            params["scopes"]
-                ?.lines()
-                ?.map { it.trim() }
-                ?.filter { it.isNotBlank() }
-                ?.distinct()
-                .orEmpty()
+        val (scopes, scopeDescriptions) = parseScopeLines(params["scopes"])
 
-        when (val result = service.update(ctx.workspace.id, ResourceServerId(id), name, description, scopes)) {
+        when (
+            val result =
+                service.update(
+                    ctx.workspace.id,
+                    ResourceServerId(id),
+                    name,
+                    description,
+                    scopes,
+                    scopeDescriptions,
+                )
+        ) {
             is ResourceServerResult.Success ->
                 call.respondRedirect("/admin/workspaces/${ctx.slug}/apis?saved=updated")
             is ResourceServerResult.Failure -> {
@@ -125,7 +124,13 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
                         workspace = ctx.workspace,
                         allWorkspaces = ctx.wsPairs,
                         loggedInAs = ctx.session.username,
-                        prefill = current?.copy(name = name, description = description, scopes = scopes),
+                        prefill =
+                            current?.copy(
+                                name = name,
+                                description = description,
+                                scopes = scopes,
+                                scopeDescriptions = scopeDescriptions,
+                            ),
                         error = errorMessage(result.error),
                     ),
                 )
@@ -190,3 +195,21 @@ private fun errorMessage(error: ResourceServerError): String =
         is ResourceServerError.UndeclaredScope ->
             "This API does not declare: ${error.scopes.sorted().joinToString(", ")}."
     }
+
+/**
+ * One scope per line, optionally followed by the text the consent screen shows for it. A scope
+ * never contains a space (RFC 6749 §3.3), so the first space ends it.
+ */
+internal fun parseScopeLines(raw: String?): Pair<List<String>, Map<String, String>> {
+    val entries =
+        raw
+            ?.lines()
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?.map { line ->
+                val scope = line.substringBefore(' ').substringBefore('\t')
+                scope to line.removePrefix(scope).trim()
+            }.orEmpty()
+            .distinctBy { it.first }
+    return entries.map { it.first } to entries.filter { it.second.isNotEmpty() }.toMap()
+}

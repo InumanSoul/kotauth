@@ -183,6 +183,7 @@ class BackupExporterService(
                     description = rs.description,
                     enabled = rs.enabled,
                     scopes = rs.scopes,
+                    scopeDescriptions = rs.scopeDescriptions,
                 )
             }
         val resourceIdentifiersByPk = resourceServers.mapNotNull { rs -> rs.id?.let { it to rs.identifier } }.toMap()
@@ -203,6 +204,7 @@ class BackupExporterService(
                     iconUrl = app.iconUrl,
                     launcherVisible = app.launcherVisible,
                     launcherDisplayOrder = app.launcherDisplayOrder,
+                    consentRequired = app.consentRequired,
                     authorizedResources = authorizedResourcesFor(app.id, resourceIdentifiersByPk),
                 )
             }

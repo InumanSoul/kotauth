@@ -52,6 +52,7 @@ fun Route.authRoutes(
     passkeyRateLimiter: RateLimiterPort? = null,
     socialRateLimiter: RateLimiterPort = InMemoryRateLimiter(maxRequests = 10, windowSeconds = 60),
     auditLogPort: com.kauth.domain.port.AuditLogPort? = null,
+    consentService: com.kauth.domain.service.ConsentService? = null,
 ) {
     route("/t/{slug}") {
         if (corsService != null) {
@@ -150,6 +151,16 @@ fun Route.authRoutes(
                 oauthService = oauthService,
                 encryptionService = encryptionService,
                 rateLimiter = passkeyRateLimiter,
+                ssoTtlSeconds = ssoTtlSeconds,
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
+            )
+        }
+
+        if (consentService != null) {
+            consentRoutes(
+                consentService = consentService,
+                oauthService = oauthService,
+                encryptionService = encryptionService,
                 ssoTtlSeconds = ssoTtlSeconds,
                 secure = baseUrl.startsWith("https://", ignoreCase = true),
             )

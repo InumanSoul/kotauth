@@ -12,6 +12,7 @@ object ResourceServersTable : Table("resource_servers") {
     val description = text("description").nullable()
     val enabled = bool("enabled").default(true)
     val scopes = jsonb("scopes").default("[]")
+    val scopeDescriptions = jsonb("scope_descriptions").default("{}")
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)

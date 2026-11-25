@@ -39,6 +39,8 @@ class ApplicationManagementService(
         redirectUris: List<String>,
         grantTypes: Set<GrantType>,
         audience: String? = null,
+        // New applications ask for consent unless the operator turns it off; V74 left existing ones off.
+        consentRequired: Boolean = true,
     ): AdminResult<CreatedApplication> {
         if (clientId.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Client ID is required."))
@@ -105,6 +107,7 @@ class ApplicationManagementService(
                 grantTypes = grantTypes,
                 clientSecretHash = secret?.let { passwordHasher.hash(it) },
                 audience = trimmedAudience,
+                consentRequired = consentRequired,
             )
 
         invalidateCors(tenantId)
@@ -139,6 +142,7 @@ class ApplicationManagementService(
         launcherDisplayOrder: Int? = null,
         audience: String? = null,
         tokenExpiryOverride: Int? = null,
+        consentRequired: Boolean? = null,
     ): AdminResult<Application> {
         val app =
             applicationRepository.findById(appId)
@@ -254,6 +258,7 @@ class ApplicationManagementService(
                 launcherDisplayOrder = resolvedLauncherDisplayOrder,
                 audience = resolvedAudience,
                 tokenExpiryOverride = resolvedTokenExpiry,
+                consentRequired = consentRequired ?: app.consentRequired,
             )
 
         invalidateCors(tenantId)

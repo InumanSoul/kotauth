@@ -38,6 +38,7 @@ import com.kauth.fakes.FakeWebhookSender
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -64,6 +65,7 @@ import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -87,6 +89,7 @@ class ApiUserRoutesTest {
     private val userAttributeRepo = FakeUserAttributeRepository()
     private val claimMapperRepo = FakeTenantClaimMapperRepository()
     private val hasher = FakePasswordHasher()
+    private val consents = com.kauth.fakes.FakeConsentRepository()
 
     private val tenant =
         Tenant(
@@ -259,6 +262,60 @@ class ApiUserRoutesTest {
             val subject = subjectOf(response)
             assertTrue(Regex("^[0-9a-f-]{36}$").matches(subject), subject)
             assertEquals(subject, userRepo.findByUsername(TenantId(1), "newbie")?.subject)
+        }
+
+    @Test
+    fun `a user's consents are listed and one can be revoked`() =
+        testApplication {
+            application { installTestApp() }
+            val user = seedUsers(1).single()
+            val app =
+                appRepo.add(
+                    com.kauth.domain.model.Application(
+                        id =
+                            com.kauth.domain.model
+                                .ApplicationId(0),
+                        tenantId = TenantId(1),
+                        clientId = "partner-app",
+                        name = "Partner Reports",
+                        description = null,
+                        accessType = com.kauth.domain.model.AccessType.PUBLIC,
+                        enabled = true,
+                        consentRequired = true,
+                    ),
+                )
+            consents.save(TenantId(1), user.id!!, app.id, setOf("openid", "email"), java.time.Instant.now())
+
+            val listed =
+                client.get("/t/acme/api/v1/users/${user.id!!.value}/consents") { bearerAuth(rawApiKey) }
+            assertEquals(HttpStatusCode.OK, listed.status)
+            val first =
+                jsonCodec
+                    .parseToJsonElement(listed.bodyAsText())
+                    .jsonArray
+                    .single()
+                    .jsonObject
+            assertEquals("partner-app", first["clientId"]!!.jsonPrimitive.content)
+            assertEquals(listOf("email", "openid"), first["scopes"]!!.jsonArray.map { it.jsonPrimitive.content })
+
+            val readOnly =
+                client.delete("/t/acme/api/v1/users/${user.id!!.value}/consents/${app.id.value}") {
+                    bearerAuth(rawApiKey)
+                }
+            assertEquals(HttpStatusCode.Forbidden, readOnly.status)
+
+            val revoked =
+                client.delete("/t/acme/api/v1/users/${user.id!!.value}/consents/${app.id.value}") {
+                    bearerAuth(writeKey)
+                }
+            assertEquals(HttpStatusCode.NoContent, revoked.status)
+            assertNull(consents.find(TenantId(1), user.id!!, app.id))
+
+            val again =
+                client.delete("/t/acme/api/v1/users/${user.id!!.value}/consents/${app.id.value}") {
+                    bearerAuth(writeKey)
+                }
+            assertEquals(HttpStatusCode.NotFound, again.status)
         }
 
     @Test
@@ -585,6 +642,9 @@ class ApiUserRoutesTest {
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
                 userRepository = userRepo,
                 transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
+                consentService =
+                    com.kauth.domain.service
+                        .ConsentService(consents, appRepo, sessionRepo, userRepo, auditLogPort),
             )
         }
     }

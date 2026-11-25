@@ -104,6 +104,7 @@ class PostgresApplicationRepository : ApplicationRepository {
         grantTypes: Set<GrantType>,
         clientSecretHash: String?,
         audience: String?,
+        consentRequired: Boolean,
     ): Application =
         transaction {
             val insertedPk =
@@ -115,6 +116,7 @@ class PostgresApplicationRepository : ApplicationRepository {
                     it[ClientsTable.accessType] = AccessType.fromValue(accessType)
                     it[ClientsTable.clientSecretHash] = clientSecretHash
                     it[ClientsTable.audience] = audience
+                    it[ClientsTable.consentRequired] = consentRequired
                 } get ClientsTable.id
 
             if (redirectUris.isNotEmpty()) {
@@ -143,6 +145,7 @@ class PostgresApplicationRepository : ApplicationRepository {
         launcherDisplayOrder: Int,
         audience: String?,
         tokenExpiryOverride: Int?,
+        consentRequired: Boolean,
     ): Application =
         transaction {
             ClientsTable.update({ ClientsTable.id eq appId.value }) {
@@ -155,6 +158,7 @@ class PostgresApplicationRepository : ApplicationRepository {
                 it[ClientsTable.launcherDisplayOrder] = launcherDisplayOrder
                 it[ClientsTable.audience] = audience
                 it[ClientsTable.tokenExpiryOverride] = tokenExpiryOverride
+                it[ClientsTable.consentRequired] = consentRequired
             }
             // Replace all redirect URIs atomically
             ClientRedirectUrisTable.deleteWhere { ClientRedirectUrisTable.clientId eq appId.value }
@@ -260,5 +264,6 @@ class PostgresApplicationRepository : ApplicationRepository {
             launcherVisible = this[ClientsTable.launcherVisible],
             launcherDisplayOrder = this[ClientsTable.launcherDisplayOrder],
             audience = this[ClientsTable.audience],
+            consentRequired = this[ClientsTable.consentRequired],
         )
 }

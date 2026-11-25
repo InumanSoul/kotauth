@@ -69,6 +69,7 @@ class FakeApplicationRepository : ApplicationRepository {
         grantTypes: Set<GrantType>,
         clientSecretHash: String?,
         audience: String?,
+        consentRequired: Boolean,
     ): Application {
         val app =
             Application(
@@ -82,6 +83,7 @@ class FakeApplicationRepository : ApplicationRepository {
                 redirectUris = redirectUris,
                 grantTypes = grantTypes,
                 audience = audience,
+                consentRequired = consentRequired,
             )
         store[app.id.value] = app
         if (clientSecretHash != null) secretHashes[app.id.value] = clientSecretHash
@@ -101,6 +103,7 @@ class FakeApplicationRepository : ApplicationRepository {
         launcherDisplayOrder: Int,
         audience: String?,
         tokenExpiryOverride: Int?,
+        consentRequired: Boolean,
     ): Application {
         val updated =
             store[appId.value]!!.copy(
@@ -115,6 +118,7 @@ class FakeApplicationRepository : ApplicationRepository {
                 launcherDisplayOrder = launcherDisplayOrder,
                 audience = audience,
                 tokenExpiryOverride = tokenExpiryOverride,
+                consentRequired = consentRequired,
             )
         store[appId.value] = updated
         return updated

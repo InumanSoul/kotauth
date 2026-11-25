@@ -29,6 +29,7 @@ interface ResourceServerRepository {
         name: String,
         description: String?,
         scopes: List<String> = emptyList(),
+        scopeDescriptions: Map<String, String> = emptyMap(),
     ): ResourceServer
 
     fun update(
@@ -37,6 +38,7 @@ interface ResourceServerRepository {
         name: String,
         description: String?,
         scopes: List<String> = emptyList(),
+        scopeDescriptions: Map<String, String>,
     ): ResourceServer
 
     fun setEnabled(

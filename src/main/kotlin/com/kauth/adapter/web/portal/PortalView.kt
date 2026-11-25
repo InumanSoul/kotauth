@@ -78,6 +78,11 @@ object PortalView {
                     labelKey = "PORTAL_NAV_SESSIONS",
                     href = { slug -> "/t/$slug/account/sessions" },
                 ),
+                PortalNavItem.Leaf(
+                    activeKey = "security/apps",
+                    labelKey = "PORTAL_NAV_APP_ACCESS",
+                    href = { slug -> "/t/$slug/account/apps" },
+                ),
             ),
         ),
     )

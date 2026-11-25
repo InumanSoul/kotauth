@@ -69,6 +69,7 @@ class AdminClientProvisioning(
                 launcherDisplayOrder = adminClient.launcherDisplayOrder,
                 audience = adminClient.audience,
                 tokenExpiryOverride = adminClient.tokenExpiryOverride,
+                consentRequired = false,
             )
         }
     }

@@ -2,11 +2,13 @@ package com.kauth.adapter.web.api
 
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.RoleGroupService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -22,6 +24,7 @@ internal fun Route.apiUserRoutes(
     roleGroupService: RoleGroupService,
     mfaService: com.kauth.domain.service.MfaService,
     sessionRepository: com.kauth.domain.port.SessionRepository,
+    consentService: com.kauth.domain.service.ConsentService? = null,
 ) {
     route("/users") {
         get {
@@ -249,6 +252,51 @@ internal fun Route.apiUserRoutes(
                         mfaService.disableMfa(userId, tenantId, byAdmin = true)
                         call.respond(HttpStatusCode.NoContent, "")
                     }
+                }
+            }
+
+            if (consentService != null) {
+                get("/consents") {
+                    requireScope(call, ApiScope.USERS_READ) ?: return@get
+                    val tenantId = call.attributes[TenantIdAttr]
+                    val userId = call.parseUserIdOr { return@get } ?: return@get
+                    if (adminUserService.getUser(userId, tenantId) is AdminResult.Failure) {
+                        return@get call.respondProblem(HttpStatusCode.NotFound, "Not Found", "User not found.")
+                    }
+                    call.respond(
+                        HttpStatusCode.OK,
+                        consentService.grantsFor(tenantId, userId).map { it.toApiDto() },
+                    )
+                }
+
+                /** Withdraws one application's access and ends its sessions for the user. */
+                delete("/consents/{appId}") {
+                    requireScope(call, ApiScope.USERS_WRITE) ?: return@delete
+                    val tenantId = call.attributes[TenantIdAttr]
+                    val userId = call.parseUserIdOr { return@delete } ?: return@delete
+                    val appId =
+                        call.parameters["appId"]?.toIntOrNull()?.let(::ApplicationId)
+                            ?: return@delete call.respondProblem(
+                                HttpStatusCode.BadRequest,
+                                "Invalid application ID",
+                                "appId must be an integer.",
+                            )
+                    val revoked =
+                        consentService.revokeByAdmin(
+                            tenantId = tenantId,
+                            userId = userId,
+                            applicationId = appId,
+                            actorId = null,
+                            ipAddress = call.request.origin.remoteAddress,
+                        )
+                    if (!revoked) {
+                        return@delete call.respondProblem(
+                            HttpStatusCode.NotFound,
+                            "Not Found",
+                            "This user has not approved that application.",
+                        )
+                    }
+                    call.respond(HttpStatusCode.NoContent, "")
                 }
             }
 

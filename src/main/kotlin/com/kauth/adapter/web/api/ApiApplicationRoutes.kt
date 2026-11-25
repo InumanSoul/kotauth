@@ -80,6 +80,7 @@ internal fun Route.apiApplicationRoutes(
                         redirectUris = body.redirectUris,
                         grantTypes = grantTypes,
                         audience = body.audience,
+                        consentRequired = body.consentRequired,
                     )
             ) {
                 is AdminResult.Failure -> call.respondAdminError(result.error)
@@ -120,6 +121,7 @@ internal fun Route.apiApplicationRoutes(
                         grantTypes = grantTypes,
                         audience = body.audience,
                         tokenExpiryOverride = body.tokenExpiryOverride,
+                        consentRequired = body.consentRequired,
                     )
             ) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.OK, result.value.toApiDto())

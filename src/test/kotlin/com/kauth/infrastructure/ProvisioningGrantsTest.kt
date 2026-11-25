@@ -65,6 +65,7 @@ class ProvisioningGrantsTest {
             launcherDisplayOrder = 3,
             audience = "https://api.example.com",
             tokenExpiryOverride = 900,
+            consentRequired = false,
         )
 
         provisioning(baseUrl = "https://new.example.com").provision()
@@ -117,6 +118,7 @@ class ProvisioningGrantsTest {
             launcherDisplayOrder = 0,
             audience = null,
             tokenExpiryOverride = null,
+            consentRequired = false,
         )
 
         provisioning(baseUrl = "https://new.example.com").provision()

@@ -75,6 +75,7 @@ fun Route.adminApplicationRoutes(
                     redirectUris = params["redirectUris"] ?: "",
                     grantTypes = grantTypes,
                     audience = audience ?: "",
+                    consentRequired = params["consentRequired"] == "true",
                 )
             when (
                 val result =
@@ -87,6 +88,7 @@ fun Route.adminApplicationRoutes(
                         redirectUris = redirectUris,
                         grantTypes = grantTypes,
                         audience = audience,
+                        consentRequired = params["consentRequired"] == "true",
                     )
             ) {
                 is AdminResult.Failure -> {
@@ -226,6 +228,11 @@ fun Route.adminApplicationRoutes(
                             launcherDisplayOrder = launcherDisplayOrder,
                             audience = audience,
                             tokenExpiryOverride = tokenExpiryOverride,
+                            consentRequired =
+                                (params["consentRequired"] == "true").takeUnless {
+                                    com.kauth.domain.service.ConsentService
+                                        .isBuiltIn(app.clientId)
+                                },
                         )
                 ) {
                     is AdminResult.Success ->
