@@ -126,14 +126,7 @@ class PostgresUserRepository : UserRepository {
                 UsersTable
                     .selectAll()
                     .where { UsersTable.tenantId eq tenantId.value }
-            if (!search.isNullOrBlank()) {
-                val term = "%${search.lowercase()}%"
-                query.andWhere {
-                    (UsersTable.username.lowerCase() like term) or
-                        (UsersTable.email.lowerCase() like term) or
-                        (UsersTable.fullName.lowerCase() like term)
-                }
-            }
+            if (!search.isNullOrBlank()) query.andWhere { matchesSearch(search) }
             query
                 .orderBy(UsersTable.id)
                 .limit(limit)
@@ -150,16 +143,18 @@ class PostgresUserRepository : UserRepository {
                 UsersTable
                     .selectAll()
                     .where { UsersTable.tenantId eq tenantId.value }
-            if (!search.isNullOrBlank()) {
-                val term = "%${search.lowercase()}%"
-                query.andWhere {
-                    (UsersTable.username.lowerCase() like term) or
-                        (UsersTable.email.lowerCase() like term) or
-                        (UsersTable.fullName.lowerCase() like term)
-                }
-            }
+            if (!search.isNullOrBlank()) query.andWhere { matchesSearch(search) }
             query.count()
         }
+
+    // A subject matches whole: it is an identifier, and a fragment of a UUID finds strangers.
+    private fun matchesSearch(search: String): Op<Boolean> {
+        val term = "%${search.lowercase()}%"
+        return (UsersTable.username.lowerCase() like term) or
+            (UsersTable.email.lowerCase() like term) or
+            (UsersTable.fullName.lowerCase() like term) or
+            (UsersTable.subject eq search.trim())
+    }
 
     override fun update(user: User): User =
         transaction {

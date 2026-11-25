@@ -522,6 +522,13 @@ internal fun DIV.userProfileReadFragment(
                     copyBtn(user.username)
                 }
             }
+            div("ov-card__row") {
+                span("ov-card__label") { +EnglishStrings.USER_SUBJECT_LABEL }
+                span("ov-card__value") {
+                    span("ov-card__value--mono") { +user.tokenSubject }
+                    copyBtn(user.tokenSubject)
+                }
+            }
             ovRow("Email") {
                 +user.email
                 copyBtn(user.email)
@@ -807,7 +814,7 @@ internal fun userListPageImpl(
                 div("filter-bar") {
                     inlineSvgIcon("search", "search", cssClass = "filter-bar__icon")
                     input(type = InputType.search, name = "q", classes = "filter-bar__input") {
-                        placeholder = "Filter by username, email, or name…"
+                        placeholder = EnglishStrings.ADMIN_USERS_FILTER_PLACEHOLDER
                         attributes["aria-label"] = EnglishStrings.ADMIN_USERS_FILTER_LABEL
                         value = search ?: ""
                         attributes["hx-get"] = "/admin/workspaces/${workspace.slug}/users"

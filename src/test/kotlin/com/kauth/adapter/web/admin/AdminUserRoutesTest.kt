@@ -162,6 +162,45 @@ class AdminUserRoutesTest {
         }
 
     @Test
+    fun `the user page shows the subject tokens carry, not the row id`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada", subject = "3f2b9c1e-7d4a-4e1b-9a8f-0c6d5e4b3a21")
+
+            val body = authed.get("/admin/workspaces/acme/users/${user.id!!.value}").bodyAsText()
+
+            assertTrue(body.contains(EnglishStrings.USER_SUBJECT_LABEL))
+            assertTrue(body.contains("data-copy=\"3f2b9c1e-7d4a-4e1b-9a8f-0c6d5e4b3a21\""))
+        }
+
+    @Test
+    fun `searching the user list by an exact subject finds that user`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            addWorkspaceUser("ada", subject = "sub-ada-0001")
+            addWorkspaceUser("bob", subject = "sub-bob-0002")
+
+            val exact = authed.get("/admin/workspaces/acme/users?q=sub-ada-0001").bodyAsText()
+            val partial = authed.get("/admin/workspaces/acme/users?q=sub-ada").bodyAsText()
+
+            assertTrue(exact.contains("/users/") && exact.contains(">ada<"))
+            assertFalse(exact.contains(">bob<"))
+            assertFalse(partial.contains(">ada<"), "a subject matches whole, never as a substring")
+        }
+
+    @Test
     fun `a locally created user shows no badge`() =
         testApplication {
             application { installTestApp() }
@@ -522,6 +561,7 @@ class AdminUserRoutesTest {
         externalId: String? = null,
         givenName: String? = null,
         familyName: String? = null,
+        subject: String? = null,
     ): User =
         userRepo.add(
             User(
@@ -534,6 +574,7 @@ class AdminUserRoutesTest {
                 externalId = externalId,
                 givenName = givenName,
                 familyName = familyName,
+                subject = subject,
             ),
         )
 

@@ -227,6 +227,7 @@ object EnglishStrings {
             "are not affected. Leave empty for no limit."
     const val ADMIN_TOPBAR_SEARCH_LABEL = "Search users"
     const val ADMIN_USERS_FILTER_LABEL = "Filter users"
+    const val ADMIN_USERS_FILTER_PLACEHOLDER = "Filter by username, email, name or exact subject…"
     const val ADMIN_AUDIT_EVENT_FILTER_LABEL = "Event type"
     const val ADMIN_ROLE_CHILD_PICKER_LABEL = "Child role to add"
     const val ADMIN_GROUP_ROLE_PICKER_LABEL = "Role to assign"
@@ -1194,6 +1195,7 @@ object EnglishStrings {
      * operator expecting one to rewrite the other.
      */
     const val USER_GIVEN_NAME_LABEL = "Given name"
+    const val USER_SUBJECT_LABEL = "Subject (sub)"
     const val USER_FAMILY_NAME_LABEL = "Family name"
     const val USER_NAME_PARTS_HINT =
         "Optional. Stored separately from the display name, so filling these in never rewrites Full Name."
