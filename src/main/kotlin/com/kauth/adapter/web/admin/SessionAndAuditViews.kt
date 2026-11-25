@@ -370,6 +370,8 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.PASSKEY_REVOKED,
         AuditEventType.PASSKEY_ADMIN_REVOKED,
         AuditEventType.PASSKEY_ADMIN_RESET_ALL,
+        AuditEventType.IDENTITY_UNLINKED,
+        AuditEventType.ADMIN_IDENTITY_UNLINKED,
         AuditEventType.MFA_ADMIN_RESET,
         AuditEventType.ADMIN_FORCED_PASSWORD_CHANGE,
         AuditEventType.ADMIN_IMPERSONATION_STARTED,

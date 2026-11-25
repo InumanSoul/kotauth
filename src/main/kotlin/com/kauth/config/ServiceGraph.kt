@@ -201,6 +201,7 @@ data class ServiceGraph(
     val backupEncryptionPort: BackupEncryptionPort,
     val auditLogPort: AuditLogPort,
     val webAuthnService: WebAuthnService,
+    val linkedIdentityService: com.kauth.domain.service.LinkedIdentityService,
     val usernameChangeService: com.kauth.domain.service.UsernameChangeService,
     val webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository,
     val securityMethodsService: SecurityMethodsService,
@@ -597,6 +598,16 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     factorChangeNotifier = factorChangeNotifier,
                 )
+            val linkedIdentityService =
+                com.kauth.domain.service.LinkedIdentityService(
+                    socialAccounts = socialAccountRepository,
+                    users = userRepository,
+                    tenants = tenantRepository,
+                    identityProviders = identityProviderRepository,
+                    passkeys = webAuthnCredentialRepository,
+                    auditLog = auditLogAdapter,
+                    factorChangeNotifier = factorChangeNotifier,
+                )
 
             // -- Key rotation -------------------------------------------------
             val keyRotationService =
@@ -797,6 +808,7 @@ data class ServiceGraph(
                 backupEncryptionPort = backupEncryptionPort,
                 auditLogPort = auditLogAdapter,
                 webAuthnService = webAuthnService,
+                linkedIdentityService = linkedIdentityService,
                 usernameChangeService = usernameChangeService,
                 webAuthnCredentialRepository = webAuthnCredentialRepository,
                 securityMethodsService =

@@ -40,6 +40,7 @@ object EnglishStrings {
     const val TOAST_USER_SESSIONS_REVOKED = "All sessions revoked."
     const val TOAST_VERIFICATION_SENT = "Verification email sent."
     const val TOAST_PASSKEY_REVOKED = "Passkey revoked."
+    const val TOAST_IDENTITY_UNLINKED = "Identity unlinked."
     const val TOAST_PASSKEYS_RESET = "All passkeys reset for this user."
     const val TOAST_MFA_RESET = "MFA reset for this user."
 
@@ -206,6 +207,12 @@ object EnglishStrings {
     const val CONNECTED_ACCOUNTS_TITLE = "Connected accounts"
     const val CONNECTED_ACCOUNTS_SUBTITLE = "Social providers linked to your account"
     const val CONNECTED_ACCOUNTS_EMPTY = "No social accounts connected."
+    const val CONNECTED_ACCOUNTS_DISCONNECT = "Disconnect"
+    const val CONNECTED_ACCOUNTS_DISCONNECTED = "Account disconnected."
+    const val CONNECTED_ACCOUNTS_DISCONNECT_CONFIRM =
+        "Disconnect this account? You won't be able to sign in with it any more."
+    const val CONNECTED_ACCOUNTS_ONLY_WAY =
+        "This is your only way to sign in, so it can't be disconnected. Add another way to sign in first."
 
     // Impersonation banner (portal) — shown when an admin acts as a tenant user
     const val IMPERSONATION_BANNER_LEAD = "Impersonating"
@@ -974,6 +981,15 @@ object EnglishStrings {
     const val EMAIL_BODY_FACTOR_PASSKEYS_RESET_BY_ADMIN =
         "An administrator removed all passkeys from your {0} account. None of them can be used to " +
             "sign in any more."
+    const val EMAIL_SUBJECT_FACTOR_IDENTITY_UNLINKED = "A connected account was removed from your account ({0})"
+    const val EMAIL_HEADING_FACTOR_IDENTITY_UNLINKED = "A connected account was removed"
+    const val EMAIL_BODY_FACTOR_IDENTITY_UNLINKED =
+        "A connected account was removed from your {0} account. You can no longer sign in through it."
+    const val EMAIL_SUBJECT_FACTOR_IDENTITY_UNLINKED_BY_ADMIN = "An administrator removed a connected account ({0})"
+    const val EMAIL_HEADING_FACTOR_IDENTITY_UNLINKED_BY_ADMIN = "A connected account was removed"
+    const val EMAIL_BODY_FACTOR_IDENTITY_UNLINKED_BY_ADMIN =
+        "An administrator removed a connected account from your {0} account. You can no longer sign " +
+            "in through it."
     const val EMAIL_BODY_FACTOR_NOT_YOU =
         "If this wasn't you, reset your password and contact your {0} administrator right away."
     const val EMAIL_FOOTER_FACTOR_CHANGED = "This happened on {0}."
@@ -1240,8 +1256,15 @@ object EnglishStrings {
     const val LINKED_IDENTITIES_COL_SUBJECT = "Subject"
     const val LINKED_IDENTITIES_COL_LINKED = "Linked"
     const val LINKED_IDENTITIES_HINT =
-        "A link is what lets this person sign in through that provider. Removing a provider leaves " +
-            "the link in place but unusable."
+        "A link is what lets this person sign in through that provider. Unlinking removes it, and the " +
+            "user is emailed. Removing a provider instead leaves the link in place but unusable."
+    const val LINKED_IDENTITIES_UNLINK = "Unlink"
+    const val LINKED_IDENTITIES_UNLINK_CONFIRM =
+        "Unlink this identity? The user can no longer sign in through it. If the provider links " +
+            "accounts by email, their next sign-in through it links it again."
+    const val LINKED_IDENTITIES_UNLINK_LAST_CONFIRM =
+        "This is the user's only way to sign in. After unlinking, they can't sign in until you set a " +
+            "temporary password or send a reset email. Unlink anyway?"
 
     const val IDP_PAGE_TITLE = "Identity Providers"
     const val IDP_PAGE_SUB = "Configure SSO. Users can sign in with their existing accounts."

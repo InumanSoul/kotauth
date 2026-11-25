@@ -7,6 +7,7 @@ import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.adapter.web.providerIconName
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.PortalLayout
@@ -182,6 +183,9 @@ object PortalView {
         email: String = "",
         fullName: String = "",
         connectedAccounts: List<SocialAccount> = emptyList(),
+        /** Accounts the user can't disconnect, because each is their last way to sign in. */
+        onlyWayIn: Set<ProviderKey> = emptySet(),
+        canDisconnect: Boolean = false,
         /** Null when the workspace keeps usernames to administrators. */
         usernameChange: UsernameChangeState? = null,
     ): HTML.() -> Unit =
@@ -189,12 +193,7 @@ object PortalView {
             head { portalPageHead("${ctx.t("PORTAL_PROFILE_TITLE")} — ${ctx.workspaceName}", ctx.theme, layout) }
             body {
                 if (successMsg != null) {
-                    attributes["data-toast-msg"] =
-                        if (successMsg == "username") {
-                            ctx.t("PORTAL_USERNAME_CHANGED")
-                        } else {
-                            EnglishStrings.TOAST_PROFILE_UPDATED
-                        }
+                    attributes["data-toast-msg"] = profileToast(successMsg, ctx)
                 }
                 portalShell(slug, ctx, session.username, "profile", layout) {
                     div(classes = "page-header") {
@@ -314,6 +313,36 @@ object PortalView {
                                                 if (!account.providerEmail.isNullOrBlank()) {
                                                     span(classes = "social-accounts-list__email") {
                                                         +account.providerEmail
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (canDisconnect) {
+                                            val blockedReason =
+                                                when {
+                                                    ctx.impersonation != null -> ctx.t("IMPERSONATION_DISABLED_TOOLTIP")
+                                                    account.provider in onlyWayIn -> ctx.t("CONNECTED_ACCOUNTS_ONLY_WAY")
+                                                    else -> null
+                                                }
+                                            if (blockedReason != null) {
+                                                span(classes = "tooltip-wrap") {
+                                                    attributes["data-tooltip"] = blockedReason
+                                                    button(type = ButtonType.button, classes = "btn btn--ghost btn--sm") {
+                                                        disabled = true
+                                                        +ctx.t("CONNECTED_ACCOUNTS_DISCONNECT")
+                                                    }
+                                                }
+                                            } else {
+                                                form(
+                                                    action =
+                                                        "/t/$slug/account/connected-accounts/" +
+                                                            "${account.provider.value}/disconnect",
+                                                    method = FormMethod.post,
+                                                ) {
+                                                    button(type = ButtonType.submit, classes = "btn btn--ghost btn--sm") {
+                                                        attributes["data-confirm"] =
+                                                            ctx.t("CONNECTED_ACCOUNTS_DISCONNECT_CONFIRM")
+                                                        +ctx.t("CONNECTED_ACCOUNTS_DISCONNECT")
                                                     }
                                                 }
                                             }
@@ -1287,3 +1316,13 @@ private fun FlowContent.usernameChangeForm(
         }
     }
 }
+
+private fun profileToast(
+    successMsg: String,
+    ctx: ViewContext,
+): String =
+    when (successMsg) {
+        "disconnected" -> ctx.t("CONNECTED_ACCOUNTS_DISCONNECTED")
+        "username" -> ctx.t("PORTAL_USERNAME_CHANGED")
+        else -> EnglishStrings.TOAST_PROFILE_UPDATED
+    }

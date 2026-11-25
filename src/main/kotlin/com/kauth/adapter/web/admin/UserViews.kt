@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.adapter.webauthn.AaguidLookup
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
@@ -77,6 +78,9 @@ internal fun userDetailPageImpl(
      */
     brokeredOrigin: Boolean = false,
     linkedIdentities: List<SocialAccount> = emptyList(),
+    /** Linked providers that are the user's last way to sign in; unlinking one warns first. */
+    onlyWayIn: Set<ProviderKey> = emptySet(),
+    canUnlink: Boolean = false,
     activeImpersonation: ActiveImpersonation? = null,
 ): HTML.() -> Unit =
     {
@@ -246,7 +250,12 @@ internal fun userDetailPageImpl(
             user.externalId?.let { idpManagedCard(it) }
 
             // ── Linked identities ────────────────────────────────────
-            linkedIdentitiesCard(linkedIdentities)
+            linkedIdentitiesCard(
+                linkedIdentities,
+                unlinkBase =
+                    if (canUnlink) "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/identities" else null,
+                onlyWayIn = onlyWayIn,
+            )
 
             // ── Profile (read mode — swapped via htmx) ──────────────
             userProfileReadFragment(user, roles = roles, groups = groups)
@@ -1359,7 +1368,11 @@ private fun encodeUriComponent(input: String): String =
  * The end user could already see this on their own portal; the administrator supporting them
  * could not, so "why can this person not sign in with SSO" had no answer on this page.
  */
-private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
+private fun FlowContent.linkedIdentitiesCard(
+    accounts: List<SocialAccount>,
+    unlinkBase: String?,
+    onlyWayIn: Set<ProviderKey>,
+) {
     div("ov-card") {
         h2("ov-card__section-label") { +EnglishStrings.LINKED_IDENTITIES_HEADING }
         if (accounts.isEmpty()) {
@@ -1374,6 +1387,7 @@ private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
                         th { +EnglishStrings.LINKED_IDENTITIES_COL_ACCOUNT }
                         th { +EnglishStrings.LINKED_IDENTITIES_COL_SUBJECT }
                         th { +EnglishStrings.LINKED_IDENTITIES_COL_LINKED }
+                        if (unlinkBase != null) th { span("sr-only") { +EnglishStrings.LINKED_IDENTITIES_UNLINK } }
                     }
                 }
                 tbody {
@@ -1389,6 +1403,22 @@ private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
                             // on; the email beside it can change without the link changing.
                             td { span("data-table__meta") { +account.providerUserId } }
                             td { span("data-table__meta") { +account.linkedAt.toDisplayString() } }
+                            if (unlinkBase != null) {
+                                td {
+                                    div("data-table__actions") {
+                                        postButton(
+                                            action = "$unlinkBase/${account.provider.value}/unlink",
+                                            label = EnglishStrings.LINKED_IDENTITIES_UNLINK,
+                                            confirmMessage =
+                                                if (account.provider in onlyWayIn) {
+                                                    EnglishStrings.LINKED_IDENTITIES_UNLINK_LAST_CONFIRM
+                                                } else {
+                                                    EnglishStrings.LINKED_IDENTITIES_UNLINK_CONFIRM
+                                                },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
