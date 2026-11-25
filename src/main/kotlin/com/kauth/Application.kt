@@ -510,6 +510,7 @@ fun Application.module(
             mfaService = s.mfaService,
             oauthService = s.oauthService,
             socialAccountRepository = s.socialAccountRepository,
+            usernameChangeService = s.usernameChangeService,
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
             translationPort = s.translationPort,

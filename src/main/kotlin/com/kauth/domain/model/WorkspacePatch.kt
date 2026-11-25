@@ -33,6 +33,7 @@ data class WorkspacePatch(
     val emailOtpLockoutThreshold: Int? = null,
     val corsAllowCredentials: Boolean? = null,
     val loginIdentifierMode: LoginIdentifierMode? = null,
+    val usernameChangeEnabled: Boolean? = null,
     val defaultLocale: String? = null,
     val smtp: SmtpPatch? = null,
     val maxConcurrentSessions: Int? = null,
@@ -72,6 +73,7 @@ data class WorkspacePatch(
             emailOtpLockoutThreshold = emailOtpLockoutThreshold ?: base.emailOtpLockoutThreshold,
             corsAllowCredentials = corsAllowCredentials ?: base.corsAllowCredentials,
             loginIdentifierMode = loginIdentifierMode ?: base.loginIdentifierMode,
+            usernameChangeEnabled = usernameChangeEnabled ?: base.usernameChangeEnabled,
             maxConcurrentSessions =
                 when (maxConcurrentSessions) {
                     null -> base.maxConcurrentSessions

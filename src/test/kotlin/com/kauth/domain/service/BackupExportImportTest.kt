@@ -606,6 +606,18 @@ class BackupExportImportTest {
     }
 
     @Test
+    fun `backup round-trips the self-service username switch`() {
+        val source = sourceTenants.findBySlug("acme")!!
+        sourceTenants.update(source.copy(securityConfig = source.securityConfig.copy(usernameChangeEnabled = true)))
+
+        val export = exportSuccessful(ExportOptions())
+        val r = importer().import(export, newSlug = "acme-rename", currentSchemaVersion = 38)
+        val restored = destTenants.findBySlug((r as BackupResult.Success).value.newTenantSlug)!!
+
+        assertTrue(restored.securityConfig.usernameChangeEnabled)
+    }
+
+    @Test
     fun `backup without loginIdentifierMode defaults to USERNAME`() {
         val legacy =
             SecurityConfigBackup(

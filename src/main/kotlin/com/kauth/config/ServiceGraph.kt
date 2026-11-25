@@ -201,6 +201,7 @@ data class ServiceGraph(
     val backupEncryptionPort: BackupEncryptionPort,
     val auditLogPort: AuditLogPort,
     val webAuthnService: WebAuthnService,
+    val usernameChangeService: com.kauth.domain.service.UsernameChangeService,
     val webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository,
     val securityMethodsService: SecurityMethodsService,
     val passkeyRateLimiter: RateLimiterPort,
@@ -650,6 +651,13 @@ data class ServiceGraph(
             val passkeyAuthLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "passkey_auth")
             // Two requests per sign-in attempt, both of which reach an issuer over the network.
             val socialLoginLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "social_login")
+            val usernameChangeService =
+                com.kauth.domain.service.UsernameChangeService(
+                    users = userRepository,
+                    tenants = tenantRepository,
+                    auditLog = auditLogAdapter,
+                    attemptLimiter = buildRateLimiter(max = 10, windowSecs = 3600, prefix = "username_change"),
+                )
             val apiWriteLimiter = buildRateLimiter(max = 60, windowSecs = 60, prefix = "api_write")
             // Reads are throttled far more generously than writes (300/min vs 60/min) and, unlike
             // every other limiter here, fail OPEN on a Redis outage: a rate limiter guards against
@@ -789,6 +797,7 @@ data class ServiceGraph(
                 backupEncryptionPort = backupEncryptionPort,
                 auditLogPort = auditLogAdapter,
                 webAuthnService = webAuthnService,
+                usernameChangeService = usernameChangeService,
                 webAuthnCredentialRepository = webAuthnCredentialRepository,
                 securityMethodsService =
                     SecurityMethodsService(

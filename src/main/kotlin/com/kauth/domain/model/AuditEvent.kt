@@ -71,6 +71,9 @@ enum class AuditEventType {
     PASSWORD_RESET_COMPLETED,
 
     USER_PROFILE_UPDATED,
+
+    /** A user renamed their own account; an administrator rename records ADMIN_USER_UPDATED. */
+    USER_USERNAME_CHANGED,
     USER_PASSWORD_CHANGED,
     USER_SESSION_REVOKED_SELF,
     USER_ACCOUNT_DISABLED_SELF,

@@ -39,6 +39,8 @@ data class SecurityConfig(
     val emailOtpLoginEnabled: Boolean = false,
     // Which identifier the hosted login form accepts. USERNAME preserves pre-1.24 behaviour.
     val loginIdentifierMode: LoginIdentifierMode = LoginIdentifierMode.USERNAME,
+    /** Users may change their own username in the account portal. Off: only administrators can. */
+    val usernameChangeEnabled: Boolean = false,
 ) {
     val isLockoutEnabled: Boolean get() = lockoutMaxAttempts > 0
 

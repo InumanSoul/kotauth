@@ -27,6 +27,7 @@ data class WorkspaceSettingsUpdate(
     val emailOtpLoginEnabled: Boolean,
     val passkeysEnabled: Boolean,
     val loginIdentifierMode: LoginIdentifierMode,
+    val usernameChangeEnabled: Boolean = false,
     /** Active sessions a user may hold in one application; null means no limit. */
     val maxConcurrentSessions: Int? = null,
     /** See [Tenant.publicBaseUrl]; null or blank clears it, so every caller must pass the current value. */
@@ -63,6 +64,7 @@ data class WorkspaceSettingsUpdate(
                 emailOtpLoginEnabled = s.emailOtpLoginEnabled,
                 passkeysEnabled = tenant.passkeysEnabled,
                 loginIdentifierMode = s.loginIdentifierMode,
+                usernameChangeEnabled = s.usernameChangeEnabled,
                 maxConcurrentSessions = tenant.maxConcurrentSessions,
             )
         }

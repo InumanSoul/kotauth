@@ -56,6 +56,8 @@ data class User(
      * predate V71 carry their row id. Never derived from the id after that.
      */
     val subject: String? = null,
+    /** When the user last renamed their own account; administrator renames leave it alone. */
+    val usernameSelfChangedAt: Instant? = null,
 ) {
     /** True when the account is currently locked out (lockout window has not yet expired). */
     val isLocked: Boolean get() = lockedUntil != null && lockedUntil.isAfter(Instant.now())

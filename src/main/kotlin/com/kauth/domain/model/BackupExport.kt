@@ -112,6 +112,7 @@ data class SecurityConfigBackup(
     val emailOtpLockoutThreshold: Int = 5,
     val emailOtpLoginEnabled: Boolean = false,
     val loginIdentifierMode: LoginIdentifierMode = LoginIdentifierMode.USERNAME,
+    val usernameChangeEnabled: Boolean = false,
 )
 
 @Serializable
