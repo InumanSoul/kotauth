@@ -300,6 +300,8 @@ class ApiIdentityProviderRoutesTest {
                 // for which domains. Neither can hold a secret — one is a flag, one a domain list.
                 "jitEnabled",
                 "jitAllowedDomains",
+                // A flag, readable so a client can tell why an Entra sign-in is or isn't accepted.
+                "trustEmailClaim",
                 "createdAt",
                 "updatedAt",
             ),
@@ -375,6 +377,58 @@ class ApiIdentityProviderRoutesTest {
             // now off for everyone", which no caller asked for and no response would announce.
             assertEquals(true, stored?.jitEnabled)
             assertEquals(listOf("acme.example"), stored?.jitAllowedDomains)
+        }
+
+    @Test
+    fun `PUT that omits trustEmailClaim keeps the switch the console turned on`() =
+        testApplication {
+            application { installTestApp() }
+            identityProviderService.save(
+                tenantId = TenantId(1),
+                key = ProviderKey.of("oriana")!!,
+                clientId = "oriana-client",
+                clientSecret = SECRET,
+                kind = ProviderKind.OIDC,
+                issuer = "https://example.oriana.com",
+                trustEmailClaim = true,
+            )
+
+            val response =
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
+                    bearerAuth(writeKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"clientId":"oriana-client-2","issuer":"https://example.oriana.com"}""")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!)
+            assertEquals("oriana-client-2", stored?.clientId)
+            // Entra never sends email_verified: losing this switch refuses every sign-in from it.
+            assertEquals(true, stored?.trustEmailClaim)
+        }
+
+    @Test
+    fun `PUT sets trustEmailClaim and a read carries it`() =
+        testApplication {
+            application { installTestApp() }
+            seedOriana()
+
+            val put =
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
+                    bearerAuth(writeKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"clientId":"oriana-client","issuer":"https://example.oriana.com","trustEmailClaim":true}""",
+                    )
+                }
+            val read = client.get("/t/acme/api/v1/identity-providers/oriana") { bearerAuth(readKey) }
+
+            assertEquals(HttpStatusCode.OK, put.status)
+            assertEquals(
+                true,
+                idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!)?.trustEmailClaim,
+            )
+            assertTrue(""""trustEmailClaim":true""" in read.bodyAsText(), read.bodyAsText())
         }
 
     @Test

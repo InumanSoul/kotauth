@@ -804,7 +804,7 @@ components:
         A configured identity provider. There is deliberately no `clientSecret` property:
         the secret is write-only and is never returned by any read.
       required:
-        [key, kind, clientId, enabled, scopes, jitEnabled, jitAllowedDomains, createdAt, updatedAt]
+        [key, kind, clientId, enabled, scopes, jitEnabled, jitAllowedDomains, trustEmailClaim, createdAt, updatedAt]
       properties:
         key:
           type: string
@@ -834,6 +834,12 @@ components:
             lower-cased and de-duplicated. **An empty list is the feature switched off, never a
             wildcard** — no account is created automatically, even when `jitEnabled` is true.
           items: { type: string, maxLength: 253 }
+        trustEmailClaim:
+          type: boolean
+          description: |
+            Whether the provider's `email` counts as verified when it sends no `email_verified`
+            claim, as Microsoft Entra ID does. Without it, linking and automatic account creation
+            refuse such a sign-in.
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -890,6 +896,12 @@ components:
             **Omit to leave the stored list unchanged. Send `[]` to clear it** — an empty list
             is the feature switched off, and that is a different request from not mentioning it.
           items: { type: string, maxLength: 253 }
+        trustEmailClaim:
+          type: boolean
+          description: |
+            Treat the provider's `email` as verified when it sends no `email_verified` claim
+            (Microsoft Entra ID). Only for a provider you trust to assert addresses its users
+            own. **Omit to leave the stored value unchanged**; a new provider starts with `false`.
 
     SendOtpRequest:
       type: object
@@ -2638,9 +2650,11 @@ paths:
         `google`/`github` keys must stay `oauth2`, and every entry in `jitAllowedDomains` must
         be a bare domain.
 
-        `jitEnabled` and `jitAllowedDomains` are omit-to-keep: a body that does not mention
-        them leaves the stored values alone, so an unrelated update cannot silently change
-        whether accounts are created automatically.
+        `scopes`, `jitEnabled`, `jitAllowedDomains` and `trustEmailClaim` are omit-to-keep: a
+        body that does not mention them leaves the stored values alone, so an unrelated update
+        cannot silently change whether accounts are created or linked. Every other field is
+        replaced: an omitted `displayName`, `issuer` or endpoint is cleared, and an omitted
+        `enabled` means `true`.
       tags: [Identity Providers]
       security: [{ bearerAuth: [identity_providers:write] }]
       parameters:
