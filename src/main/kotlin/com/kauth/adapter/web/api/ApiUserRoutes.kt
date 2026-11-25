@@ -27,6 +27,17 @@ internal fun Route.apiUserRoutes(
         get {
             requireScope(call, ApiScope.USERS_READ) ?: return@get
             val tenantId = call.attributes[TenantIdAttr]
+            // Exact `sub` lookup, for a relying party that only knows the user by the key OIDC gives it.
+            call.request.queryParameters["subject"]?.let { subject ->
+                val match = listOfNotNull(adminUserService.findBySubject(tenantId, subject))
+                return@get call.respond(
+                    HttpStatusCode.OK,
+                    ApiResponse(
+                        data = match.map { it.toApiDto() },
+                        meta = ApiMeta(total = match.size, offset = 0, limit = 1),
+                    ),
+                )
+            }
             val search = call.request.queryParameters["search"]
             val limit =
                 call.request.queryParameters["limit"]
@@ -62,6 +73,7 @@ internal fun Route.apiUserRoutes(
                         email = body.email,
                         fullName = body.fullName,
                         password = body.password,
+                        subject = body.subject,
                     )
             ) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.Created, result.value.toApiDto())
@@ -91,6 +103,7 @@ internal fun Route.apiUserRoutes(
                         password = null,
                         sendInvite = true,
                         baseUrl = baseUrl,
+                        subject = body.subject,
                     )
             ) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.Created, result.value.toApiDto())

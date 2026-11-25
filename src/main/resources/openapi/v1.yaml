@@ -127,9 +127,17 @@ components:
     # ---- Users ----
     UserDto:
       type: object
-      required: [id, username, email, fullName, emailVerified, enabled, mfaEnabled, requiredActions, isLocked]
+      required: [id, subject, username, email, fullName, emailVerified, enabled, mfaEnabled, requiredActions, isLocked]
       properties:
-        id:              { type: integer }
+        id:
+          type: integer
+          description: Kotauth's own key for the user, used in this API's paths. Not the `sub`.
+        subject:
+          type: string
+          description: |
+            The `sub` in this user's tokens, and the key a relying party should store. Users
+            created before v1.31.0 keep their row id here; newer ones have a UUID unless the
+            creator chose one. It never changes, and it survives an export and import.
         username:        { type: string }
         email:           { type: string, format: email }
         fullName:        { type: string }
@@ -171,6 +179,15 @@ components:
         email:    { type: string, format: email }
         fullName: { type: string }
         password: { type: string, minLength: 4 }
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: |
+            The user's `sub`, for seeds, fixtures and users migrated from another identity
+            provider with their existing `sub`. Omit to have Kotauth assign a random UUID. Must
+            be unique in the workspace (409 otherwise), must not start or end with whitespace,
+            and can't be changed later.
 
     UpdateUserRequest:
       type: object
@@ -199,6 +216,11 @@ components:
           description: Generated from the name and email when omitted or blank.
         email:    { type: string, format: email }
         fullName: { type: string }
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Same as on `CreateUserRequest`. Omit to have Kotauth assign a random UUID.
 
     TemporaryPasswordResponse:
       type: object
@@ -1059,6 +1081,12 @@ paths:
       tags: [Users]
       security: [{ bearerAuth: [] }]
       parameters:
+        - in: query
+          name: subject
+          schema: { type: string }
+          description: |
+            Exact match on the user's `sub`. Returns the one user with it, or an empty list;
+            `search`, `limit` and `offset` are ignored.
         - in: query
           name: search
           schema: { type: string }

@@ -785,21 +785,18 @@ private fun crossNamespaceCollisions(users: List<UserBackup>): List<String> {
     }
 }
 
-private const val MAX_SUBJECT_LENGTH = 255
-
-/** Subjects a restore can't write: blank, over [MAX_SUBJECT_LENGTH], or carried by two records. */
+/** Subjects a restore can't write: against [com.kauth.domain.model.UserSubject], or carried by two records. */
 private fun invalidSubjects(users: List<UserBackup>): List<String> {
     val counts = users.mapNotNull { it.subject }.groupingBy { it }.eachCount()
     return users.mapNotNull { ub ->
         val subject = ub.subject ?: return@mapNotNull null
-        when {
-            subject.isBlank() -> "user record for email '${ub.email}' has a blank subject"
-            subject.length > MAX_SUBJECT_LENGTH ->
-                "user record for email '${ub.email}' has a subject over $MAX_SUBJECT_LENGTH characters"
-            (counts[subject] ?: 0) > 1 -> "user record for email '${ub.email}' shares subject '${clip(
-                subject,
-            )}' with another record"
-            else -> null
+        com.kauth.domain.model.UserSubject.problemWith(subject)?.let {
+            return@mapNotNull "user record for email '${ub.email}': $it"
+        }
+        if ((counts[subject] ?: 0) > 1) {
+            "user record for email '${ub.email}' shares subject '${clip(subject)}' with another record"
+        } else {
+            null
         }
     }
 }

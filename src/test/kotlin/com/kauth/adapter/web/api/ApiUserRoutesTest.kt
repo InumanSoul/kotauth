@@ -39,8 +39,12 @@ import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -194,6 +198,14 @@ class ApiUserRoutesTest {
                     scopes = listOf(ApiScope.USERS_READ),
                 ) as ApiKeyResult.Success
             ).value.rawKey
+        writeKey =
+            (
+                apiKeyService.create(
+                    tenantId = TenantId(1),
+                    name = "Write Key",
+                    scopes = listOf(ApiScope.USERS_READ, ApiScope.USERS_WRITE),
+                ) as ApiKeyResult.Success
+            ).value.rawKey
     }
 
     private fun seedUsers(
@@ -215,6 +227,88 @@ class ApiUserRoutesTest {
     // =========================================================================
     // GET /users — pagination
     // =========================================================================
+
+    private var writeKey: String = ""
+
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.createUser(body: String) =
+        client.post("/t/acme/api/v1/users") {
+            bearerAuth(writeKey)
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+
+    private fun subjectOf(response: io.ktor.client.statement.HttpResponse) =
+        kotlinx.coroutines.runBlocking {
+            jsonCodec
+                .parseToJsonElement(response.bodyAsText())
+                .jsonObject["subject"]!!
+                .jsonPrimitive.content
+        }
+
+    @Test
+    fun `a created user's response carries the sub its tokens will have, a UUID by default`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                createUser(
+                    """{"username":"newbie","email":"newbie@acme.com","fullName":"New","password":"Correct-Horse-9!"}""",
+                )
+
+            assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+            val subject = subjectOf(response)
+            assertTrue(Regex("^[0-9a-f-]{36}$").matches(subject), subject)
+            assertEquals(subject, userRepo.findByUsername(TenantId(1), "newbie")?.subject)
+        }
+
+    @Test
+    fun `a caller can choose the sub, and a second user can't take it`() =
+        testApplication {
+            application { installTestApp() }
+
+            val first =
+                createUser(
+                    """{"username":"seeded","email":"seeded@acme.com","fullName":"S","password":"Correct-Horse-9!","subject":"seed-user-1"}""",
+                )
+            val clash =
+                createUser(
+                    """{"username":"other","email":"other@acme.com","fullName":"O","password":"Correct-Horse-9!","subject":"seed-user-1"}""",
+                )
+            val padded =
+                createUser(
+                    """{"username":"third","email":"third@acme.com","fullName":"T","password":"Correct-Horse-9!","subject":" x "}""",
+                )
+
+            assertEquals(HttpStatusCode.Created, first.status, first.bodyAsText())
+            assertEquals("seed-user-1", subjectOf(first))
+            assertEquals(HttpStatusCode.Conflict, clash.status)
+            assertEquals(HttpStatusCode.UnprocessableEntity, padded.status)
+            assertEquals(null, userRepo.findByUsername(TenantId(1), "other"))
+        }
+
+    @Test
+    fun `GET users by subject finds exactly that user, or nobody`() =
+        testApplication {
+            application { installTestApp() }
+            seedUsers(3)
+            createUser(
+                """{"username":"known","email":"known@acme.com","fullName":"K","password":"Correct-Horse-9!","subject":"rp-key-7"}""",
+            )
+
+            val hit = client.get("/t/acme/api/v1/users?subject=rp-key-7") { bearerAuth(rawApiKey) }
+            val miss = client.get("/t/acme/api/v1/users?subject=rp-key") { bearerAuth(rawApiKey) }
+
+            val data = jsonCodec.parseToJsonElement(hit.bodyAsText()).jsonObject["data"]!!.jsonArray
+            assertEquals(1, data.size)
+            assertEquals("known", data[0].jsonObject["username"]!!.jsonPrimitive.content)
+            assertEquals(
+                0,
+                jsonCodec
+                    .parseToJsonElement(miss.bodyAsText())
+                    .jsonObject["data"]!!
+                    .jsonArray.size,
+            )
+        }
 
     @Test
     fun `GET users returns first page with default limit when no params supplied`() =
