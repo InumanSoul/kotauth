@@ -139,6 +139,20 @@ abstract class UserRepositoryContract {
     }
 
     @Test
+    fun `renameBySelf writes the username and its time, and update leaves the time alone`() {
+        val tid = tenantId()
+        val saved = repo.save(newUser(tid))
+        val at = java.time.Instant.parse("2026-11-25T12:00:00Z")
+
+        repo.renameBySelf(saved.id!!, "self.renamed$seq", at)
+        repo.update(repo.findById(saved.id, tid)!!.copy(fullName = "Renamed", usernameSelfChangedAt = null))
+
+        val reread = repo.findById(saved.id, tid)!!
+        assertEquals("self.renamed$seq", reread.username)
+        assertEquals(at, reread.usernameSelfChangedAt)
+    }
+
+    @Test
     fun `update persists requiredActions`() {
         val tid = tenantId()
         val saved = repo.save(newUser(tid))

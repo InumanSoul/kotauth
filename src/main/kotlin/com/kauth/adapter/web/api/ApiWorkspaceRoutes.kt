@@ -87,6 +87,7 @@ internal data class UpdateWorkspaceRequest(
     val emailOtpLockoutThreshold: Int? = null,
     val corsAllowCredentials: Boolean? = null,
     val loginIdentifierMode: String? = null,
+    val usernameChangeEnabled: Boolean? = null,
     val defaultLocale: String? = null,
     val smtp: UpdateSmtpRequest? = null,
     /** Active sessions a user may hold in one application; 0 removes the limit. */
@@ -124,6 +125,7 @@ internal data class UpdateWorkspaceRequest(
             emailOtpLockoutThreshold = emailOtpLockoutThreshold,
             corsAllowCredentials = corsAllowCredentials,
             loginIdentifierMode = mode,
+            usernameChangeEnabled = usernameChangeEnabled,
             defaultLocale = defaultLocale,
             smtp = smtp?.toDomain(),
             maxConcurrentSessions = maxConcurrentSessions,

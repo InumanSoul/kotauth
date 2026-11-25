@@ -511,6 +511,7 @@ fun Application.module(
             oauthService = s.oauthService,
             socialAccountRepository = s.socialAccountRepository,
             linkedIdentityService = s.linkedIdentityService,
+            usernameChangeService = s.usernameChangeService,
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
             translationPort = s.translationPort,

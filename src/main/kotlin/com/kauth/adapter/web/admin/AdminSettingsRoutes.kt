@@ -458,6 +458,7 @@ fun Route.adminSettingsRoutes(
                 emailOtpLockoutThreshold =
                     params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
                 loginIdentifierMode = parsedLoginIdentifierMode ?: s.loginIdentifierMode,
+                usernameChangeEnabled = params["usernameChangeEnabled"] == "true",
                 maxConcurrentSessions =
                     params["maxConcurrentSessions"]?.trim().let { raw ->
                         when {

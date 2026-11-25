@@ -303,6 +303,7 @@ class WorkspaceSettingsService(
                     emailOtpLockoutThreshold = update.emailOtpLockoutThreshold.coerceIn(EMAIL_OTP_LOCKOUT_THRESHOLD),
                     emailOtpLoginEnabled = update.emailOtpLoginEnabled,
                     loginIdentifierMode = update.loginIdentifierMode,
+                    usernameChangeEnabled = update.usernameChangeEnabled,
                 ),
             passkeysEnabled = update.passkeysEnabled,
             maxConcurrentSessions = update.maxConcurrentSessions,

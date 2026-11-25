@@ -35,6 +35,7 @@ object UsersTable : Table("users") {
 
     val createdAt = timestampWithTimeZone("created_at")
     val subject = text("subject")
+    val usernameSelfChangedAt = timestampWithTimeZone("username_self_changed_at").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

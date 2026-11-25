@@ -136,6 +136,7 @@ class PostgresTenantRepository(
                     it[emailOtpSignupEnabled] = tenant.securityConfig.emailOtpSignupEnabled
                     it[emailOtpLockoutThreshold] = tenant.securityConfig.emailOtpLockoutThreshold
                     it[emailOtpLoginEnabled] = tenant.securityConfig.emailOtpLoginEnabled
+                    it[usernameChangeEnabled] = tenant.securityConfig.usernameChangeEnabled
                     it[loginIdentifierMode] = tenant.securityConfig.loginIdentifierMode.name
                 }
             if (updatedRows == 0) {
@@ -159,6 +160,7 @@ class PostgresTenantRepository(
                     it[emailOtpSignupEnabled] = tenant.securityConfig.emailOtpSignupEnabled
                     it[emailOtpLockoutThreshold] = tenant.securityConfig.emailOtpLockoutThreshold
                     it[emailOtpLoginEnabled] = tenant.securityConfig.emailOtpLoginEnabled
+                    it[usernameChangeEnabled] = tenant.securityConfig.usernameChangeEnabled
                     it[loginIdentifierMode] = tenant.securityConfig.loginIdentifierMode.name
                 }
             }
@@ -252,6 +254,7 @@ class PostgresTenantRepository(
             emailOtpSignupEnabled = this[TenantSecurityConfigTable.emailOtpSignupEnabled],
             emailOtpLockoutThreshold = this[TenantSecurityConfigTable.emailOtpLockoutThreshold],
             emailOtpLoginEnabled = this[TenantSecurityConfigTable.emailOtpLoginEnabled],
+            usernameChangeEnabled = this[TenantSecurityConfigTable.usernameChangeEnabled],
             loginIdentifierMode =
                 LoginIdentifierMode.fromStorage(this[TenantSecurityConfigTable.loginIdentifierMode]),
         )

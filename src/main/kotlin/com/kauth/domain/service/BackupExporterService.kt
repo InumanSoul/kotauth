@@ -126,6 +126,7 @@ class BackupExporterService(
                             emailOtpLockoutThreshold = emailOtpLockoutThreshold,
                             emailOtpLoginEnabled = emailOtpLoginEnabled,
                             loginIdentifierMode = loginIdentifierMode,
+                            usernameChangeEnabled = usernameChangeEnabled,
                         )
                     },
                 theme =

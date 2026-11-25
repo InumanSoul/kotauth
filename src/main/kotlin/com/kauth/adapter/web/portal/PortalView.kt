@@ -186,17 +186,14 @@ object PortalView {
         /** Accounts the user can't disconnect, because each is their last way to sign in. */
         onlyWayIn: Set<ProviderKey> = emptySet(),
         canDisconnect: Boolean = false,
+        /** Null when the workspace keeps usernames to administrators. */
+        usernameChange: UsernameChangeState? = null,
     ): HTML.() -> Unit =
         {
             head { portalPageHead("${ctx.t("PORTAL_PROFILE_TITLE")} — ${ctx.workspaceName}", ctx.theme, layout) }
             body {
                 if (successMsg != null) {
-                    attributes["data-toast-msg"] =
-                        if (successMsg == "disconnected") {
-                            ctx.t("CONNECTED_ACCOUNTS_DISCONNECTED")
-                        } else {
-                            EnglishStrings.TOAST_PROFILE_UPDATED
-                        }
+                    attributes["data-toast-msg"] = profileToast(successMsg, ctx)
                 }
                 portalShell(slug, ctx, session.username, "profile", layout) {
                     div(classes = "page-header") {
@@ -218,25 +215,28 @@ object PortalView {
                             }
                         }
                         div(classes = "portal-section__body") {
+                            if (usernameChange != null) usernameChangeForm(slug, session, ctx, usernameChange)
                             form(
                                 action = "/t/$slug/account/profile",
                                 encType = FormEncType.applicationXWwwFormUrlEncoded,
                                 method = FormMethod.post,
                                 classes = "portal-form",
                             ) {
-                                div(classes = "edit-field") {
-                                    label(classes = "edit-field__label") {
-                                        htmlFor = "username"
-                                        +ctx.t("PORTAL_PROFILE_USERNAME")
+                                if (usernameChange == null) {
+                                    div(classes = "edit-field") {
+                                        label(classes = "edit-field__label") {
+                                            htmlFor = "username"
+                                            +ctx.t("PORTAL_PROFILE_USERNAME")
+                                        }
+                                        input(type = InputType.text, name = "username") {
+                                            classes = setOf("edit-field__input", "edit-field__input--mono", "edit-field__input--disabled")
+                                            id = "username"
+                                            value = session.username
+                                            disabled = true
+                                            title = ctx.t("PORTAL_PROFILE_USERNAME_HINT")
+                                        }
+                                        p(classes = "edit-field__hint") { +ctx.t("PORTAL_PROFILE_USERNAME_HINT") }
                                     }
-                                    input(type = InputType.text, name = "username") {
-                                        classes = setOf("edit-field__input", "edit-field__input--mono", "edit-field__input--disabled")
-                                        id = "username"
-                                        value = session.username
-                                        disabled = true
-                                        title = ctx.t("PORTAL_PROFILE_USERNAME_HINT")
-                                    }
-                                    p(classes = "edit-field__hint") { +ctx.t("PORTAL_PROFILE_USERNAME_HINT") }
                                 }
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
@@ -1265,3 +1265,64 @@ object PortalView {
         }
     }
 }
+
+/** The portal's view of self-service rename: [nextAllowedAt] is set while the cooldown runs. */
+data class UsernameChangeState(
+    val nextAllowedAt: java.time.Instant?,
+) {
+    companion object {
+        fun dayOf(instant: java.time.Instant): String =
+            java.time.LocalDate.ofInstant(instant, java.time.ZoneOffset.UTC).toString()
+    }
+}
+
+private fun FlowContent.usernameChangeForm(
+    slug: String,
+    session: PortalSession,
+    ctx: ViewContext,
+    state: UsernameChangeState,
+) {
+    val blocked = state.nextAllowedAt != null || ctx.impersonation != null
+    form(action = "/t/$slug/account/username", method = FormMethod.post, classes = "portal-form") {
+        div(classes = "edit-field") {
+            label(classes = "edit-field__label") {
+                htmlFor = "username"
+                +ctx.t("PORTAL_PROFILE_USERNAME")
+            }
+            input(type = InputType.text, name = "username") {
+                classes = setOf("edit-field__input", "edit-field__input--mono")
+                id = "username"
+                value = session.username
+                required = true
+                disabled = blocked
+                attributes["autocomplete"] = "username"
+                attributes["maxlength"] = com.kauth.domain.service.UsernamePolicy.MAX_LENGTH.toString()
+            }
+            p(classes = "edit-field__hint") {
+                +when {
+                    state.nextAllowedAt != null ->
+                        ctx.t("PORTAL_USERNAME_COOLDOWN", UsernameChangeState.dayOf(state.nextAllowedAt))
+                    ctx.impersonation != null -> ctx.t("IMPERSONATION_DISABLED_TOOLTIP")
+                    else -> ctx.t("PORTAL_USERNAME_HINT")
+                }
+            }
+        }
+        div(classes = "edit-actions") {
+            button(type = ButtonType.submit, classes = "btn btn--ghost") {
+                disabled = blocked
+                attributes["data-confirm"] = ctx.t("PORTAL_USERNAME_CONFIRM")
+                +ctx.t("PORTAL_USERNAME_SAVE")
+            }
+        }
+    }
+}
+
+private fun profileToast(
+    successMsg: String,
+    ctx: ViewContext,
+): String =
+    when (successMsg) {
+        "disconnected" -> ctx.t("CONNECTED_ACCOUNTS_DISCONNECTED")
+        "username" -> ctx.t("PORTAL_USERNAME_CHANGED")
+        else -> EnglishStrings.TOAST_PROFILE_UPDATED
+    }
