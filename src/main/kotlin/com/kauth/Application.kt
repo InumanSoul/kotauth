@@ -501,6 +501,7 @@ fun Application.module(
             passkeyRateLimiter = s.passkeyRateLimiter,
             socialRateLimiter = s.socialRateLimiter,
             auditLogPort = s.auditLogPort,
+            consentService = s.consentService,
         )
 
         portalRoutes(
@@ -512,6 +513,7 @@ fun Application.module(
             socialAccountRepository = s.socialAccountRepository,
             linkedIdentityService = s.linkedIdentityService,
             usernameChangeService = s.usernameChangeService,
+            consentService = s.consentService,
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
             translationPort = s.translationPort,
@@ -566,6 +568,7 @@ fun Application.module(
             workspacePatchService = s.workspacePatchService,
             encryptionService = s.encryptionService,
             mfaRateLimiter = s.mfaRateLimiter,
+            consentService = s.consentService,
         )
 
         adminBackupRoutes(
@@ -632,6 +635,7 @@ fun Application.module(
             auditLogPort = s.auditLogPort,
             securityMethodsService = s.securityMethodsService,
             identityProviderProbeService = s.identityProviderProbeService,
+            consentService = s.consentService,
         )
     }
 }

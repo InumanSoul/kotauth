@@ -43,6 +43,7 @@ object EnglishStrings {
     const val TOAST_IDENTITY_UNLINKED = "Identity unlinked."
     const val TOAST_PASSKEYS_RESET = "All passkeys reset for this user."
     const val TOAST_MFA_RESET = "MFA reset for this user."
+    const val TOAST_CONSENT_REVOKED = "Application access revoked."
 
     // Sign-in errors
     const val SIGN_IN_WRONG_WORKSPACE =
@@ -78,6 +79,17 @@ object EnglishStrings {
     const val PORTAL_NAV_SECURITY_OVERVIEW = "Overview"
     const val PORTAL_NAV_MFA = "Two-Factor Auth"
     const val PORTAL_NAV_SESSIONS = "Sessions"
+    const val PORTAL_NAV_APP_ACCESS = "App access"
+    const val PORTAL_APP_ACCESS_TITLE = "App access"
+    const val PORTAL_APP_ACCESS_SUBTITLE = "Applications you allowed to access your account."
+    const val PORTAL_APP_ACCESS_EMPTY = "You haven't allowed any application to access your account."
+    const val PORTAL_APP_ACCESS_COL_APP = "Application"
+    const val PORTAL_APP_ACCESS_COL_CAN = "Can"
+    const val PORTAL_APP_ACCESS_APPROVED = "Allowed on {0}"
+    const val PORTAL_APP_ACCESS_REVOKE = "Remove access"
+    const val PORTAL_APP_ACCESS_REVOKE_CONFIRM =
+        "Remove {0}'s access? You'll be signed out of it, and it will ask for your permission again next time."
+    const val PORTAL_APP_ACCESS_REVOKED = "Access removed."
     const val PORTAL_TOPBAR_TITLE = "Account settings"
 
     // Portal — profile page
@@ -352,7 +364,8 @@ object EnglishStrings {
     // neither should be softened into the other's voice.
     const val RESOURCE_SERVER_SCOPES_HINT =
         "Tokens issued for this API are narrowed to the scopes in this list. An empty list " +
-            "applies no narrowing: a token keeps every scope the client asked for."
+            "applies no narrowing: a token keeps every scope the client asked for. Text after a scope, " +
+            "on the same line, is what the consent screen shows users for it."
     const val RESOURCE_SERVER_SCOPES_NONE =
         "No scopes listed, so tokens for this API are not narrowed. Every scope a client asks " +
             "for is issued."
@@ -373,6 +386,13 @@ object EnglishStrings {
     const val AUTHORIZED_APIS_CARD_ACTION = "Manage Authorized APIs"
 
     // Application forms — token audience
+    const val APPLICATION_CONSENT_LABEL = "Ask users for consent"
+    const val APPLICATION_CONSENT_DESC =
+        "Users approve the scopes this application asks for before it signs them in, once per new scope. " +
+            "Turn it off for your own applications."
+    const val APPLICATION_CONSENT_ON = "Asks for consent"
+    const val APPLICATION_CONSENT_OFF = "No consent screen"
+    const val APPLICATION_CONSENT_ROW = "Consent"
     const val APPLICATION_AUDIENCE_LABEL = "Token Audience"
     const val APPLICATION_AUDIENCE_PLACEHOLDER = "https://api.example.com"
     const val APPLICATION_AUDIENCE_HINT_PREFIX = "Sets the "
@@ -829,6 +849,20 @@ object EnglishStrings {
     const val SOCIAL_REG_USERNAME_PLACEHOLDER = "letters, numbers, underscores"
     const val SOCIAL_REG_SUBMIT = "Create account"
 
+    // Consent screen
+    const val CONSENT_PAGE_TITLE = "Allow {0}"
+    const val CONSENT_TITLE = "{0} wants to access your account"
+    const val CONSENT_SIGNED_IN_AS = "Signed in as {0}"
+    const val CONSENT_WILL_ALLOW = "This will let {0}:"
+    const val CONSENT_SCOPE_OPENID = "Confirm who you are"
+    const val CONSENT_SCOPE_PROFILE = "See your name and username"
+    const val CONSENT_SCOPE_EMAIL = "See your email address"
+    const val CONSENT_ALLOW = "Allow"
+    const val CONSENT_DENY = "Deny"
+    const val CONSENT_NOTE = "You can remove this access at any time from your account."
+    const val CONSENT_EXPIRED_TITLE = "This request has expired"
+    const val CONSENT_EXPIRED_BODY = "Go back to the application and sign in again."
+
     // MFA challenge page
     const val MFA_TAGLINE = "Two-factor authentication"
     const val MFA_VERIFY_IDENTITY = "Verify your identity"
@@ -1248,6 +1282,18 @@ object EnglishStrings {
 
     // ── Identity providers ──────────────────────────────────────────────────
 
+    const val APP_ACCESS_HEADING = "Application access"
+    const val APP_ACCESS_EMPTY = "This user hasn't approved any application on a consent screen."
+    const val APP_ACCESS_COL_APP = "Application"
+    const val APP_ACCESS_COL_SCOPES = "Scopes"
+    const val APP_ACCESS_COL_UPDATED = "Last approved"
+    const val APP_ACCESS_REVOKE = "Revoke"
+    const val APP_ACCESS_REVOKE_CONFIRM =
+        "Revoke this application's access? Its sessions for this user end now, and the user sees " +
+            "the consent screen again at their next sign-in to it."
+    const val APP_ACCESS_HINT =
+        "Applications that ask for consent, and what this user allowed them. Revoking ends that " +
+            "application's sessions for the user."
     const val LINKED_IDENTITIES_HEADING = "Linked identities"
     const val LINKED_IDENTITIES_EMPTY =
         "This account signs in with its own credentials. Nothing is linked to an identity provider."

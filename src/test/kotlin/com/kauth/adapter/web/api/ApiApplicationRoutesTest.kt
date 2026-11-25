@@ -462,6 +462,40 @@ class ApiApplicationRoutesTest {
     // =========================================================================
 
     @Test
+    fun `a new application asks for consent unless the caller says otherwise, and PUT can turn it off`() =
+        testApplication {
+            application { installTestApp() }
+
+            val created =
+                client.post("/t/acme/api/v1/applications") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createAppBody(clientId = "consenting-app"))
+                }
+            val application = jsonCodec.parseToJsonElement(created.bodyAsText()).jsonObject["application"]!!.jsonObject
+            assertEquals("true", application["consentRequired"]!!.jsonPrimitive.content)
+            val id = application["id"]!!.jsonPrimitive.content
+
+            val renamed =
+                client.put("/t/acme/api/v1/applications/$id") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"name":"Renamed"}""")
+                }
+            assertEquals(
+                "true",
+                jsonCodec.parseToJsonElement(renamed.bodyAsText()).jsonObject["consentRequired"].toString(),
+            )
+
+            client.put("/t/acme/api/v1/applications/$id") {
+                bearerAuth(rawApiKey)
+                contentType(ContentType.Application.Json)
+                setBody("""{"consentRequired":false}""")
+            }
+            assertEquals(false, appRepo.findByClientId(TenantId(1), "consenting-app")!!.consentRequired)
+        }
+
+    @Test
     fun `PUT applications omitting grantTypes leaves the existing grants unchanged`() =
         testApplication {
             application { installTestApp() }

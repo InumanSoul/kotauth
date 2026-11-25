@@ -171,6 +171,8 @@ data class ApplicationBackup(
     val iconUrl: String? = null,
     val launcherVisible: Boolean = true,
     val launcherDisplayOrder: Int = 0,
+    /** False for backups taken before 1.32, the same value V74 gave every existing application. */
+    val consentRequired: Boolean = false,
     /** Which APIs this client may request tokens for, and which of their scopes it may ask for. */
     val authorizedResources: List<AuthorizedResourceBackup> = emptyList(),
 )
@@ -200,6 +202,7 @@ data class ResourceServerBackup(
     val description: String? = null,
     val enabled: Boolean = true,
     val scopes: List<String> = emptyList(),
+    val scopeDescriptions: Map<String, String> = emptyMap(),
 )
 
 @Serializable

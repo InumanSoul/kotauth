@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.ProviderKey
@@ -68,6 +69,7 @@ fun Route.adminUserRoutes(
     mfaService: MfaService? = null,
     auditLogPort: AuditLogPort? = null,
     socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
+    consentService: com.kauth.domain.service.ConsentService? = null,
     linkedIdentityService: com.kauth.domain.service.LinkedIdentityService? = null,
     flash: FlashCookies,
 ) {
@@ -207,6 +209,7 @@ fun Route.adminUserRoutes(
                         "identity_unlinked" -> EnglishStrings.TOAST_IDENTITY_UNLINKED
                         "passkeys_reset" -> EnglishStrings.TOAST_PASSKEYS_RESET
                         "mfa_reset" -> EnglishStrings.TOAST_MFA_RESET
+                        "consent_revoked" -> EnglishStrings.TOAST_CONSENT_REVOKED
                         else -> null
                     }
                 val errorParam =
@@ -273,6 +276,7 @@ fun Route.adminUserRoutes(
                         recentImpersonations = recentImpersonations,
                         passkeys = passkeys,
                         brokeredOrigin = brokeredOrigin,
+                        appAccess = consentService?.grantsFor(ctx.workspace.id, userId),
                         linkedIdentities = linkedIdentities,
                         onlyWayIn = onlyWayIn,
                         canUnlink = linkedIdentityService != null,
@@ -682,6 +686,28 @@ fun Route.adminUserRoutes(
                 call.respondRedirect(
                     "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=attribute_deleted",
                 )
+            }
+
+            if (consentService != null) {
+                post("/app-access/{appId}/revoke") {
+                    val ctx = call.adminContext()
+                    val userId =
+                        call.parameters.typedId("userId", ::UserId)
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val appId =
+                        call.parameters.typedId("appId", ::ApplicationId)
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val revoked =
+                        consentService.revokeByAdmin(
+                            tenantId = ctx.workspace.id,
+                            userId = userId,
+                            applicationId = appId,
+                            actorId = UserId(ctx.session.userId),
+                            ipAddress = call.request.origin.remoteAddress,
+                        )
+                    if (!revoked) return@post call.respond(HttpStatusCode.NotFound)
+                    call.respondRedirect("/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=consent_revoked")
+                }
             }
 
             if (linkedIdentityService != null) {

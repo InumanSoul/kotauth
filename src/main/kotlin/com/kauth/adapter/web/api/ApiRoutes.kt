@@ -87,6 +87,7 @@ fun Route.apiRoutes(
         ),
     // Absent in tests that only read the workspace; PATCH /workspace is then not mounted.
     workspacePatchService: WorkspacePatchService? = null,
+    consentService: com.kauth.domain.service.ConsentService? = null,
 ) {
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
@@ -199,7 +200,14 @@ fun Route.apiRoutes(
             install(writeRateLimitPlugin)
             install(readRateLimitPlugin)
 
-            apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
+            apiUserRoutes(
+                accountService,
+                adminUserService,
+                roleGroupService,
+                mfaService,
+                sessionRepository,
+                consentService,
+            )
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
             apiWorkspaceRoutes(tenantRepository, workspacePatchService)
             apiWebhookRoutes(webhookService)

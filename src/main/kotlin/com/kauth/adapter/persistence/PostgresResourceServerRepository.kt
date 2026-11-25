@@ -71,6 +71,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
         name: String,
         description: String?,
         scopes: List<String>,
+        scopeDescriptions: Map<String, String>,
     ): ResourceServer =
         transaction {
             val now = OffsetDateTime.now(ZoneOffset.UTC)
@@ -81,6 +82,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                     it[ResourceServersTable.name] = name
                     it[ResourceServersTable.description] = description
                     it[ResourceServersTable.scopes] = Json.encodeToString(scopes)
+                    it[ResourceServersTable.scopeDescriptions] = Json.encodeToString(scopeDescriptions)
                     it[ResourceServersTable.enabled] = true
                     it[ResourceServersTable.createdAt] = now
                 } get ResourceServersTable.id
@@ -92,6 +94,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                 name = name,
                 description = description,
                 scopes = scopes,
+                scopeDescriptions = scopeDescriptions,
                 enabled = true,
                 createdAt = now.toInstant(),
             )
@@ -103,6 +106,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
         name: String,
         description: String?,
         scopes: List<String>,
+        scopeDescriptions: Map<String, String>,
     ): ResourceServer =
         transaction {
             ResourceServersTable.update(
@@ -111,6 +115,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                 it[ResourceServersTable.name] = name
                 it[ResourceServersTable.description] = description
                 it[ResourceServersTable.scopes] = Json.encodeToString(scopes)
+                it[ResourceServersTable.scopeDescriptions] = Json.encodeToString(scopeDescriptions)
             }
             findById(tenantId, id) ?: error("ResourceServer $id not found after update")
         }
@@ -238,6 +243,8 @@ class PostgresResourceServerRepository : ResourceServerRepository {
             description = this[ResourceServersTable.description],
             enabled = this[ResourceServersTable.enabled],
             scopes = Json.decodeFromString(this[ResourceServersTable.scopes].ifBlank { "[]" }),
+            scopeDescriptions =
+                Json.decodeFromString(this[ResourceServersTable.scopeDescriptions].ifBlank { "{}" }),
             createdAt = this[ResourceServersTable.createdAt].toInstant(),
         )
 

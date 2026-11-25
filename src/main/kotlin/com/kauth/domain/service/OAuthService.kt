@@ -70,6 +70,7 @@ class OAuthService(
      * Default returns empty — preserves pre-feature token shape.
      */
     private val claimMappersFor: (TenantId) -> List<TenantClaimMapper> = { _ -> emptyList() },
+    private val consentService: ConsentService? = null,
 ) {
     /**
      * Resolves the custom claim maps (access + id) for a user's issued token.
@@ -194,6 +195,7 @@ class OAuthService(
         authTime: Instant = Instant.now(),
         resources: List<String> = emptyList(),
         amr: List<String> = emptyList(),
+        forceConsent: Boolean = false,
     ): OAuthResult<AuthorizationCode> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -232,6 +234,11 @@ class OAuthService(
             if (codeChallengeMethod != null && codeChallengeMethod != "S256") {
                 return OAuthResult.Failure(OAuthError.InvalidRequest("Only S256 code_challenge_method is supported"))
             }
+        }
+
+        // Last, so a request that would fail anyway never reaches the consent screen.
+        if (consentService?.isRequired(tenant.id, userId, client, scopes, forceConsent) == true) {
+            return OAuthResult.Failure(OAuthError.ConsentRequired(client))
         }
 
         val code =
@@ -1209,6 +1216,11 @@ sealed class OAuthError {
 
     data class InvalidScope(
         val rejected: List<String>,
+    ) : OAuthError()
+
+    /** The application asks for consent and the user hasn't given it for these scopes. */
+    data class ConsentRequired(
+        val client: Application,
     ) : OAuthError()
 }
 

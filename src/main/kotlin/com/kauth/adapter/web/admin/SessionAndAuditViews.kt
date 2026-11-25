@@ -321,6 +321,7 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.TOKEN_REFRESHED,
         AuditEventType.AUTHORIZATION_CODE_ISSUED,
         AuditEventType.AUTHORIZATION_CODE_USED,
+        AuditEventType.CONSENT_GRANTED,
         AuditEventType.SESSION_CREATED,
         AuditEventType.EMAIL_VERIFIED,
         AuditEventType.PASSWORD_RESET_COMPLETED,
@@ -376,6 +377,9 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.ADMIN_FORCED_PASSWORD_CHANGE,
         AuditEventType.ADMIN_IMPERSONATION_STARTED,
         AuditEventType.ADMIN_KEY_RETIRED,
+        AuditEventType.CONSENT_DENIED,
+        AuditEventType.CONSENT_REVOKED,
+        AuditEventType.ADMIN_CONSENT_REVOKED,
         -> "badge--warn"
 
         AuditEventType.EMAIL_VERIFICATION_SENT,

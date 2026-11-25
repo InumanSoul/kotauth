@@ -406,8 +406,14 @@ internal fun resourceServerFormPageImpl(
                                     id = "scopes"
                                     attributes["name"] = "scopes"
                                     attributes["rows"] = "6"
-                                    placeholder = "read:invoices\nwrite:invoices"
-                                    +(prefill?.scopes?.joinToString("\n").orEmpty())
+                                    placeholder = "read:invoices See your invoices\nwrite:invoices Create and pay invoices"
+                                    +(
+                                        prefill
+                                            ?.scopes
+                                            ?.joinToString("\n") { sc ->
+                                                prefill.scopeDescriptions[sc]?.let { "$sc $it" } ?: sc
+                                            }.orEmpty()
+                                    )
                                 }
                                 div("edit-row__hint") { +EnglishStrings.RESOURCE_SERVER_SCOPES_HINT }
                             }

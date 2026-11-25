@@ -317,6 +317,8 @@ data class ProblemDetail(
     val redirectUris: List<String>,
     val grantTypes: List<String>? = null,
     val audience: String? = null,
+    /** Show users a consent screen before this application signs them in. */
+    val consentRequired: Boolean = true,
 )
 
 @Serializable data class UpdateApplicationRequest(
@@ -329,6 +331,7 @@ data class ProblemDetail(
     val audience: String? = null,
     /** Access-token lifetime in seconds for this client. Omit to keep it; `0` clears it. */
     val tokenExpiryOverride: Int? = null,
+    val consentRequired: Boolean? = null,
 )
 
 @Serializable data class SetDefaultRolesRequest(
@@ -382,12 +385,16 @@ data class ProblemDetail(
     val name: String,
     val description: String? = null,
     val scopes: List<String> = emptyList(),
+    /** Consent-screen text per declared scope. */
+    val scopeDescriptions: Map<String, String> = emptyMap(),
 )
 
 @Serializable data class UpdateResourceServerRequest(
     val name: String,
     val description: String? = null,
     val scopes: List<String> = emptyList(),
+    /** Omit to keep the descriptions of the scopes that remain. */
+    val scopeDescriptions: Map<String, String>? = null,
 )
 
 @Serializable data class SetAuthorizedResourceServersRequest(
@@ -453,6 +460,7 @@ data class ProblemDetail(
     val grantTypes: List<String>,
     val audience: String? = null,
     val tokenExpiryOverride: Int? = null,
+    val consentRequired: Boolean = false,
 )
 
 /**
@@ -595,7 +603,18 @@ data class ProblemDetail(
     val description: String? = null,
     val enabled: Boolean,
     val scopes: List<String>,
+    val scopeDescriptions: Map<String, String> = emptyMap(),
     val createdAt: String,
+)
+
+/** One application a user allowed on the consent screen. */
+@Serializable data class UserConsentDto(
+    val applicationId: Int,
+    val clientId: String,
+    val applicationName: String,
+    val scopes: List<String>,
+    val createdAt: String,
+    val updatedAt: String,
 )
 
 @Serializable data class ApiKeyDto(
@@ -685,6 +704,7 @@ internal fun com.kauth.domain.model.Application.toApiDto() =
         grantTypes = grantTypes.map { it.value },
         audience = audience,
         tokenExpiryOverride = tokenExpiryOverride,
+        consentRequired = consentRequired,
     )
 
 internal fun com.kauth.domain.model.Session.toApiDto() =
@@ -734,7 +754,18 @@ internal fun com.kauth.domain.model.ResourceServer.toApiDto(): ResourceServerDto
         description = description,
         enabled = enabled,
         scopes = scopes,
+        scopeDescriptions = scopeDescriptions,
         createdAt = isoFormatter.format(createdAt),
+    )
+
+internal fun com.kauth.domain.service.ConsentedApplication.toApiDto(): UserConsentDto =
+    UserConsentDto(
+        applicationId = application.id.value,
+        clientId = application.clientId,
+        applicationName = application.name,
+        scopes = consent.scopes.sorted(),
+        createdAt = isoFormatter.format(consent.createdAt),
+        updatedAt = isoFormatter.format(consent.updatedAt),
     )
 
 internal fun com.kauth.domain.model.ApiKey.toApiDto(): ApiKeyDto =

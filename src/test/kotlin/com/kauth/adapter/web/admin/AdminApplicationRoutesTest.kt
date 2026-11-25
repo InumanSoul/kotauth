@@ -335,6 +335,47 @@ class AdminApplicationRoutesTest {
         }
 
     @Test
+    fun `the create form asks for consent by default, and an unticked box creates an app that doesn't`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val form = authed.get("/admin/workspaces/$tenantSlug/applications/new").bodyAsText()
+            assertTrue(
+                Regex("""<input[^>]*name="consentRequired"[^>]*checked""").containsMatchIn(form),
+                "the consent box starts ticked",
+            )
+
+            authed.submitForm(
+                url = "/admin/workspaces/$tenantSlug/applications",
+                formParameters =
+                    Parameters.build {
+                        append("clientId", "own-spa")
+                        append("name", "Own SPA")
+                        append("accessType", "public")
+                        append("redirectUris", "https://own.example.com/callback")
+                        append("grantTypes", "authorization_code")
+                    },
+            )
+            authed.submitForm(
+                url = "/admin/workspaces/$tenantSlug/applications",
+                formParameters =
+                    Parameters.build {
+                        append("clientId", "partner-spa")
+                        append("name", "Partner SPA")
+                        append("accessType", "public")
+                        append("redirectUris", "https://partner.example.com/callback")
+                        append("grantTypes", "authorization_code")
+                        append("consentRequired", "true")
+                    },
+            )
+
+            assertEquals(false, appRepo.findByClientId(tenantId, "own-spa")?.consentRequired)
+            assertEquals(true, appRepo.findByClientId(tenantId, "partner-spa")?.consentRequired)
+        }
+
+    @Test
     fun `the create form constrains client id to the server regex`() =
         testApplication {
             application { installTestApp() }

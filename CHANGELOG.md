@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A consent screen.** An application can ask users to approve the scopes it requests before it
+  signs them in. The switch is on each application (**Ask users for consent**, or
+  `consentRequired` in the admin API). It is on for new applications and off for every
+  application that existed before the upgrade, and Kotauth's own portal and console never ask.
+  Kotauth remembers what a user allowed and asks again only for a new scope or `prompt=consent`.
+  Deny returns `access_denied` to the application, and `prompt=none` returns `consent_required`.
+  An API's scopes can carry the text the screen shows (`scopeDescriptions`, or after the scope
+  in the console). Users remove an application's access under Security → **App access** in the
+  account portal, and administrators on the user's page or with
+  `DELETE /users/{userId}/consents/{appId}`. Revoking also ends that application's sessions. The
+  audit log records `CONSENT_GRANTED`, `CONSENT_DENIED`, `CONSENT_REVOKED` and
+  `ADMIN_CONSENT_REVOKED`. Comes with migration V74. See `docs/guides/consent.md`.
+
 - **A linked identity can be removed.** The admin console's user page has an **Unlink** button on
   each linked identity, and the account portal a **Disconnect** button on each connected account.
   Either way, the user is emailed (when the workspace has SMTP) and the audit log records it
@@ -28,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   change. The audit log records it as `USER_USERNAME_CHANGED`, apart from an administrator's
   `ADMIN_USER_UPDATED`. Backups carry the setting. Comes with migration V73. See
   `docs/guides/sign-in-identifier.md`. Closes #139.
+
+### Changed
+
+- **`prompt=consent` no longer signs the user in again.** It now shows the consent screen, as
+  OpenID Connect defines it, and does nothing for an application that doesn't ask for consent.
+  Send `prompt=login` to require a fresh sign-in.
 
 ## [1.31.0] - 2026-11-24
 

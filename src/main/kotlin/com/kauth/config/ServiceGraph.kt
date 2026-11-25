@@ -203,6 +203,7 @@ data class ServiceGraph(
     val webAuthnService: WebAuthnService,
     val linkedIdentityService: com.kauth.domain.service.LinkedIdentityService,
     val usernameChangeService: com.kauth.domain.service.UsernameChangeService,
+    val consentService: com.kauth.domain.service.ConsentService,
     val webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository,
     val securityMethodsService: SecurityMethodsService,
     val passkeyRateLimiter: RateLimiterPort,
@@ -388,6 +389,17 @@ data class ServiceGraph(
                     mapperRepository = tenantClaimMapperRepository,
                 )
 
+            val consentService =
+                com.kauth.domain.service.ConsentService(
+                    consents =
+                        com.kauth.adapter.persistence
+                            .PostgresConsentRepository(),
+                    applications = applicationRepository,
+                    sessions = sessionRepository,
+                    users = userRepository,
+                    auditLog = auditLogAdapter,
+                    resourceServers = resourceServerRepository,
+                )
             val oauthService =
                 OAuthService(
                     tenantRepository = tenantRepository,
@@ -402,6 +414,7 @@ data class ServiceGraph(
                     roleRepository = roleRepository,
                     userAttributeRepository = userAttributeRepository,
                     claimMappersFor = claimMapperService::list,
+                    consentService = consentService,
                 )
             val emailOtpService =
                 EmailOtpService(
@@ -810,6 +823,7 @@ data class ServiceGraph(
                 webAuthnService = webAuthnService,
                 linkedIdentityService = linkedIdentityService,
                 usernameChangeService = usernameChangeService,
+                consentService = consentService,
                 webAuthnCredentialRepository = webAuthnCredentialRepository,
                 securityMethodsService =
                     SecurityMethodsService(

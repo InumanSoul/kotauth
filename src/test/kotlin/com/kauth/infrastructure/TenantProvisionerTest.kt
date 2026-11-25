@@ -102,6 +102,7 @@ class TenantProvisionerTest {
             launcherDisplayOrder = 7,
             audience = "https://api.acme.example",
             tokenExpiryOverride = 900,
+            consentRequired = false,
         )
 
         provisioner.provision(tenant)

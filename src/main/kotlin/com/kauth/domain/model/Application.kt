@@ -38,6 +38,8 @@ data class Application(
      * identifier differs from the client_id.
      */
     val audience: String? = null,
+    /** Users approve the scopes on a consent screen before this application gets a code. */
+    val consentRequired: Boolean = false,
 )
 
 enum class AccessType(

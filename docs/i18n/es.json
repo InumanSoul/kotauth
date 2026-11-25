@@ -318,5 +318,29 @@
   "EMAIL_FOOTER_TEST": "Enviado por KotAuth para verificar la configuración SMTP.",
   "EMAIL_FOOTER_INVITE": "Si no esperabas este correo, puedes ignorarlo sin problema. Ninguna cuenta se activará sin pulsar el enlace de arriba.",
   "EMAIL_FOOTER_MAGIC_LINK": "Si no solicitaste este enlace, puedes ignorar este correo sin problema.",
-  "EMAIL_FOOTER_OTP": "Si no solicitaste un código, puedes ignorar este correo sin problema."
+  "EMAIL_FOOTER_OTP": "Si no solicitaste un código, puedes ignorar este correo sin problema.",
+
+  "CONSENT_PAGE_TITLE": "Permitir {0}",
+  "CONSENT_TITLE": "{0} quiere acceder a tu cuenta",
+  "CONSENT_SIGNED_IN_AS": "Sesión iniciada como {0}",
+  "CONSENT_WILL_ALLOW": "Esto permitirá a {0}:",
+  "CONSENT_SCOPE_OPENID": "Confirmar quién eres",
+  "CONSENT_SCOPE_PROFILE": "Ver tu nombre y tu nombre de usuario",
+  "CONSENT_SCOPE_EMAIL": "Ver tu dirección de correo electrónico",
+  "CONSENT_ALLOW": "Permitir",
+  "CONSENT_DENY": "Denegar",
+  "CONSENT_NOTE": "Puedes quitar este acceso cuando quieras desde tu cuenta.",
+  "CONSENT_EXPIRED_TITLE": "Esta solicitud ha caducado",
+  "CONSENT_EXPIRED_BODY": "Vuelve a la aplicación e inicia sesión de nuevo.",
+
+  "PORTAL_NAV_APP_ACCESS": "Acceso de aplicaciones",
+  "PORTAL_APP_ACCESS_TITLE": "Acceso de aplicaciones",
+  "PORTAL_APP_ACCESS_SUBTITLE": "Aplicaciones a las que permitiste acceder a tu cuenta.",
+  "PORTAL_APP_ACCESS_EMPTY": "No has permitido que ninguna aplicación acceda a tu cuenta.",
+  "PORTAL_APP_ACCESS_COL_APP": "Aplicación",
+  "PORTAL_APP_ACCESS_COL_CAN": "Puede",
+  "PORTAL_APP_ACCESS_APPROVED": "Permitido el {0}",
+  "PORTAL_APP_ACCESS_REVOKE": "Quitar acceso",
+  "PORTAL_APP_ACCESS_REVOKE_CONFIRM": "¿Quitar el acceso de {0}? Se cerrará tu sesión en ella y te volverá a pedir permiso la próxima vez.",
+  "PORTAL_APP_ACCESS_REVOKED": "Acceso quitado."
 }

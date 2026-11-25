@@ -99,6 +99,8 @@ object AuthView {
         val nonce: String? = null,
         val resources: List<String> = emptyList(),
         val acrValues: String? = null,
+        /** The client sent `prompt=consent`: ask again even when the user already allowed these scopes. */
+        val forceConsent: Boolean = false,
     ) {
         val isOAuthFlow: Boolean get() = !responseType.isNullOrBlank()
 
@@ -124,6 +126,7 @@ object AuthView {
             add("nonce", nonce)
             resources.forEach { add("resource", it) }
             add("acr_values", acrValues)
+            if (forceConsent) add("prompt", "consent")
             return if (parts.isEmpty()) "" else "?" + parts.joinToString("&")
         }
     }
@@ -1571,6 +1574,85 @@ object AuthView {
     // -------------------------------------------------------------------------
     // MFA Challenge page
     // -------------------------------------------------------------------------
+
+    /** The consent screen: what [request]'s application asks for, with Allow and Deny. */
+    fun consentPage(
+        tenantSlug: String,
+        ctx: ViewContext,
+        request: com.kauth.domain.service.ConsentRequest,
+        nonce: String,
+    ): HTML.() -> Unit =
+        {
+            val app = request.application
+            head { authHead(ctx.t("CONSENT_PAGE_TITLE", app.name), ctx.theme) }
+            body {
+                demoBanner()
+                authShell(ctx.workspaceName, ctx.theme) {
+                    div("card") {
+                        div("consent-app") {
+                            val icon = app.iconUrl
+                            if (icon != null) {
+                                img(alt = "", src = icon, classes = "consent-app-icon")
+                            } else {
+                                span("consent-app-icon") { +app.name.take(1).uppercase() }
+                            }
+                            h1("card-title") { +ctx.t("CONSENT_TITLE", app.name) }
+                        }
+                        p("card-subtitle") {
+                            +ctx.t("CONSENT_SIGNED_IN_AS", request.user.email.ifBlank { request.user.username })
+                        }
+                        p("consent-lead") { +ctx.t("CONSENT_WILL_ALLOW", app.name) }
+                        ul("consent-scopes") {
+                            request.scopes.forEach { item ->
+                                li("consent-scope") {
+                                    when {
+                                        item.isIdentity -> +ctx.t("CONSENT_SCOPE_${item.scope.uppercase()}")
+                                        item.description != null -> +item.description
+                                        else -> code { +item.scope }
+                                    }
+                                    item.apiName?.let { span("consent-scope-api") { +it } }
+                                }
+                            }
+                        }
+                        form(action = "/t/$tenantSlug/consent", method = FormMethod.post) {
+                            input(type = InputType.hidden, name = "nonce") { value = nonce }
+                            div("consent-actions") {
+                                button(type = ButtonType.submit, classes = "btn btn--ghost") {
+                                    name = "decision"
+                                    value = "deny"
+                                    +ctx.t("CONSENT_DENY")
+                                }
+                                button(type = ButtonType.submit, classes = "btn") {
+                                    name = "decision"
+                                    value = "allow"
+                                    +ctx.t("CONSENT_ALLOW")
+                                }
+                            }
+                        }
+                        p("consent-note") { +ctx.t("CONSENT_NOTE") }
+                    }
+                }
+            }
+        }
+
+    /** The consent request is gone: it expired, was already answered, or its application was disabled. */
+    fun consentExpiredPage(
+        ctx: ViewContext,
+        detail: String? = null,
+    ): HTML.() -> Unit =
+        {
+            head { authHead(ctx.t("CONSENT_EXPIRED_TITLE"), ctx.theme) }
+            body {
+                demoBanner()
+                authShell(ctx.workspaceName, ctx.theme) {
+                    div("card") {
+                        h1("card-title") { +ctx.t("CONSENT_EXPIRED_TITLE") }
+                        p("card-subtitle") { +ctx.t("CONSENT_EXPIRED_BODY") }
+                        if (detail != null) div("alert alert-error") { +detail }
+                    }
+                }
+            }
+        }
 
     fun mfaChallengePage(
         tenantSlug: String,

@@ -84,6 +84,7 @@ internal fun Parameters.toOAuthParams() =
         nonce = this["nonce"],
         resources = getAll("resource").orEmpty().map { it.trim() }.filter { it.isNotBlank() },
         acrValues = this["acr_values"]?.takeIf { it.isNotBlank() },
+        forceConsent = this["prompt"] == "consent",
     )
 
 // -- Server-side OAuth context cookie ------------------------------------------
@@ -104,6 +105,7 @@ private const val AUTH_CTX_OTP_CHALLENGE_ID = 9
 private const val AUTH_CTX_OTP_EMAIL = 10
 private const val AUTH_CTX_RESOURCES = 11
 private const val AUTH_CTX_ACR_VALUES = 12
+private const val AUTH_CTX_FORCE_CONSENT = 13
 
 private const val AUTH_CTX_MIN_FIELDS = AUTH_CTX_TIMESTAMP + 1 // base OAuth params
 private const val AUTH_CTX_MIN_OTP_FIELDS = AUTH_CTX_OTP_EMAIL + 1 // OTP context required
@@ -135,6 +137,7 @@ internal fun ApplicationCall.setAuthContextCookie(
             otpEmail ?: "",
             params.resources.joinToString(","),
             params.acrValues.orEmpty(),
+            if (params.forceConsent) "1" else "",
         ).joinToString("|")
     response.cookies.append(
         name = AUTH_CONTEXT_COOKIE,
@@ -172,6 +175,7 @@ internal fun ApplicationCall.getAuthContext(encryptionService: EncryptionService
             nonce = parts[AUTH_CTX_NONCE].ifBlank { null },
             resources = resources,
             acrValues = parts.getOrNull(AUTH_CTX_ACR_VALUES)?.ifBlank { null },
+            forceConsent = parts.getOrNull(AUTH_CTX_FORCE_CONSENT) == "1",
         )
     return if (params.isOAuthFlow) params else null
 }
@@ -323,6 +327,7 @@ internal fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
         nonce = map["nonce"],
         resources = pairs.filter { it.first == "resource" && it.second.isNotBlank() }.map { it.second },
         acrValues = map["acr_values"]?.takeIf { it.isNotBlank() },
+        forceConsent = map["prompt"] == "consent",
     )
 }
 
@@ -342,6 +347,7 @@ internal fun OAuthError.toErrorCode(): String =
         is OAuthError.UnsupportedGrantType -> "unsupported_grant_type"
         is OAuthError.InvalidTarget -> "invalid_target"
         is OAuthError.InvalidScope -> "invalid_scope"
+        is OAuthError.ConsentRequired -> "consent_required"
     }
 
 internal fun OAuthError.toDescription(): String =
@@ -356,6 +362,7 @@ internal fun OAuthError.toDescription(): String =
         is OAuthError.UnsupportedGrantType -> "Unsupported grant type"
         is OAuthError.InvalidTarget -> this.reason
         is OAuthError.InvalidScope -> "scopes ${this.rejected} are not declared by the targeted APIs"
+        is OAuthError.ConsentRequired -> "The user has not approved this application"
     }
 
 internal fun AuthError.toMessage(): String =
@@ -548,6 +555,7 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
                 authTime = authTime,
                 resources = oauthParams.resources,
                 amr = amr,
+                forceConsent = oauthParams.forceConsent,
             )
     ) {
         is OAuthResult.Success -> {
@@ -575,6 +583,23 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
             }
         }
         is OAuthResult.Failure -> {
+            if (codeResult.error is OAuthError.ConsentRequired) {
+                // The sign-in succeeded against a validated client, so the session starts now even
+                // if the user goes on to deny the application.
+                setSsoCookie(
+                    SsoCookieData(
+                        userId = userId.value,
+                        tenantId = tenantId.value,
+                        authTime = authTime,
+                        amr = amr,
+                        expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
+                    ),
+                    slug = slug,
+                    encryptionService = encryptionService,
+                    secure = secure,
+                )
+                return startConsent(slug, userId, oauthParams, authTime, amr, encryptionService, secure)
+            }
             renderError(codeResult.error.toDescription())
             null
         }

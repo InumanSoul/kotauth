@@ -14,6 +14,7 @@ import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.ResourceServerBackup
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.SecurityConfig
@@ -636,6 +637,22 @@ class BackupExportImportTest {
                 magicLinkEnabled = false,
             )
         assertEquals(LoginIdentifierMode.USERNAME, legacy.loginIdentifierMode)
+    }
+
+    @Test
+    fun `a pre-1_32 application and API decode with consent off and no scope descriptions`() {
+        val app =
+            backupJson().decodeFromString<ApplicationBackup>(
+                """{"clientId":"spa","name":"SPA","description":null,"accessType":"public","enabled":true,""" +
+                    """"redirectUris":["https://spa.example.com/cb"],"tokenExpiryOverride":null}""",
+            )
+        val api =
+            backupJson().decodeFromString<ResourceServerBackup>(
+                """{"identifier":"https://api.example.com","name":"API","scopes":["orders:read"]}""",
+            )
+
+        assertFalse(app.consentRequired, "the same value V74 gave every existing application")
+        assertTrue(api.scopeDescriptions.isEmpty())
     }
 
     @Test

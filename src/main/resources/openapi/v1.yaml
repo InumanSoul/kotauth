@@ -308,7 +308,7 @@ components:
 
     ApplicationDto:
       type: object
-      required: [id, clientId, name, accessType, enabled, redirectUris, grantTypes]
+      required: [id, clientId, name, accessType, enabled, redirectUris, grantTypes, consentRequired]
       properties:
         id:           { type: integer }
         clientId:     { type: string }
@@ -328,6 +328,9 @@ components:
           type: integer
           nullable: true
           description: Access-token lifetime in seconds for this client. Null means the workspace's applies.
+        consentRequired:
+          type: boolean
+          description: Users approve the requested scopes on a consent screen before this client gets a code.
 
     UpdateApplicationRequest:
       type: object
@@ -353,6 +356,9 @@ components:
           description: |
             Access-token lifetime in seconds for this client, 60 to 86400. Omit to keep the current
             value; `0` clears it, so the workspace's `tokenExpirySeconds` applies again.
+        consentRequired:
+          type: boolean
+          description: Omit to keep the current value.
 
     CreateApplicationRequest:
       type: object
@@ -389,6 +395,12 @@ components:
           description: |
             The default `aud` of this client's access tokens when no `resource` is requested.
             Defaults to the client id. ID tokens are always addressed to the client id.
+        consentRequired:
+          type: boolean
+          default: true
+          description: |
+            Show users a consent screen before this client signs them in. They see it again only
+            when the client asks for a scope they haven't allowed, or sends `prompt=consent`.
 
     CreateApplicationResponse:
       type: object
@@ -646,6 +658,10 @@ components:
         description: { type: string, nullable: true }
         enabled:     { type: boolean }
         scopes:      { type: array, items: { type: string } }
+        scopeDescriptions:
+          type: object
+          additionalProperties: { type: string }
+          description: Consent-screen text per declared scope.
         createdAt:   { type: string, format: date-time }
 
     CreateResourceServerRequest:
@@ -664,6 +680,12 @@ components:
           type: array
           items: { type: string }
           default: []
+        scopeDescriptions:
+          type: object
+          additionalProperties: { type: string, maxLength: 200 }
+          description: |
+            What the consent screen shows for each scope, keyed by scope. Entries for undeclared
+            scopes are dropped. A scope without one is shown by name.
 
     UpdateResourceServerRequest:
       type: object
@@ -675,6 +697,21 @@ components:
           type: array
           items: { type: string }
           default: []
+        scopeDescriptions:
+          type: object
+          additionalProperties: { type: string, maxLength: 200 }
+          description: Omit to keep the descriptions of the scopes that remain.
+
+    UserConsent:
+      type: object
+      required: [applicationId, clientId, applicationName, scopes, createdAt, updatedAt]
+      properties:
+        applicationId:   { type: integer }
+        clientId:        { type: string }
+        applicationName: { type: string }
+        scopes:          { type: array, items: { type: string } }
+        createdAt:       { type: string, format: date-time }
+        updatedAt:       { type: string, format: date-time }
 
     AllowedScopes:
       type: object
@@ -1352,6 +1389,54 @@ paths:
         "204": { description: MFA reset }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /users/{userId}/consents:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: listUserConsents
+      summary: List the applications a user allowed
+      description: What the user approved on the consent screen, one entry per application.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: The user's grants
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserConsent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/consents/{appId}:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+      - in: path
+        name: appId
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: revokeUserConsent
+      summary: Revoke an application's access for a user
+      description: |
+        Deletes the grant and ends the application's sessions for the user, so its refresh tokens
+        stop working. The user sees the consent screen again at their next sign-in to it.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Access revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /users/{userId}/revoke-sessions:
     parameters:

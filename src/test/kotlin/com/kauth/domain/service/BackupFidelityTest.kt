@@ -120,6 +120,7 @@ class BackupFidelityTest {
                     launcherVisible = false,
                     launcherDisplayOrder = 7,
                     tokenExpiryOverride = 900,
+                    consentRequired = true,
                 ),
             )
 
@@ -135,6 +136,7 @@ class BackupFidelityTest {
                     description = "Public data API",
                     enabled = true,
                     scopes = listOf("assistant:ingest", "assistant:keys", "assistant:handoff"),
+                    scopeDescriptions = mapOf("assistant:ingest" to "Send documents to the assistant"),
                 ),
             )
         sourceResourceServers.setAuthorizedResources(app.id, listOf(api.id!!))
@@ -220,6 +222,7 @@ class BackupFidelityTest {
         assertFalse(app.launcherVisible)
         assertEquals(7, app.launcherDisplayOrder)
         assertEquals(900, app.tokenExpiryOverride)
+        assertTrue(app.consentRequired)
     }
 
     @Test
@@ -249,6 +252,7 @@ class BackupFidelityTest {
         assertEquals("Public data API", api.description)
         assertTrue(api.enabled)
         assertEquals(listOf("assistant:ingest", "assistant:keys", "assistant:handoff"), api.scopes)
+        assertEquals(mapOf("assistant:ingest" to "Send documents to the assistant"), api.scopeDescriptions)
     }
 
     @Test

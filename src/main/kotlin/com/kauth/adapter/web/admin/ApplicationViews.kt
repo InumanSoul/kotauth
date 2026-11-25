@@ -8,6 +8,7 @@ import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.service.ConsentService
 import kotlinx.html.*
 
 /**
@@ -21,7 +22,25 @@ data class ApplicationPrefill(
     val redirectUris: String = "", // newline-separated URIs
     val grantTypes: Set<GrantType> = setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN),
     val audience: String = "",
+    val consentRequired: Boolean = true,
 )
+
+private fun DIV.consentCheckRow(
+    formId: String,
+    checked: Boolean,
+) {
+    label("check-row") {
+        input(type = InputType.checkBox, name = "consentRequired") {
+            attributes["form"] = formId
+            attributes["value"] = "true"
+            if (checked) this.checked = true
+        }
+        div("check-row__body") {
+            span("check-row__label") { +EnglishStrings.APPLICATION_CONSENT_LABEL }
+            span("check-row__desc") { +EnglishStrings.APPLICATION_CONSENT_DESC }
+        }
+    }
+}
 
 private fun grantTypeHint(grant: GrantType): String =
     when (grant) {
@@ -178,6 +197,18 @@ internal fun applicationDetailPageImpl(
                 }
                 if (!interactive) {
                     ovRowMuted(EnglishStrings.APP_SIGN_IN_LABEL, EnglishStrings.APP_NO_INTERACTIVE_SIGN_IN)
+                }
+                if (GrantType.AUTHORIZATION_CODE in application.grantTypes &&
+                    !ConsentService.isBuiltIn(application.clientId)
+                ) {
+                    ovRowText(
+                        EnglishStrings.APPLICATION_CONSENT_ROW,
+                        if (application.consentRequired) {
+                            EnglishStrings.APPLICATION_CONSENT_ON
+                        } else {
+                            EnglishStrings.APPLICATION_CONSENT_OFF
+                        },
+                    )
                 }
                 ovRow("Workspace") {
                     a(
@@ -607,6 +638,7 @@ internal fun createApplicationPageImpl(
                     formId = "create-app-form",
                     selected = prefill.grantTypes,
                 )
+                consentCheckRow(formId = "create-app-form", checked = prefill.consentRequired)
                 div("edit-row") {
                     label("edit-row__label") {
                         htmlFor = "audience"
@@ -801,6 +833,9 @@ internal fun editApplicationPageImpl(
                     formId = "edit-app-form",
                     selected = application.grantTypes,
                 )
+                if (!ConsentService.isBuiltIn(application.clientId)) {
+                    consentCheckRow(formId = "edit-app-form", checked = application.consentRequired)
+                }
                 div("edit-row") {
                     label("edit-row__label") {
                         htmlFor = "audience"

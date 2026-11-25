@@ -15,5 +15,7 @@ data class ResourceServer(
     val description: String? = null,
     val enabled: Boolean = true,
     val scopes: List<String> = emptyList(),
+    /** Text the consent screen shows for a declared scope, keyed by the scope. */
+    val scopeDescriptions: Map<String, String> = emptyMap(),
     val createdAt: Instant = Instant.now(),
 )

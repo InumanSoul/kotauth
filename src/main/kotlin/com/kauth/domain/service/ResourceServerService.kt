@@ -8,6 +8,9 @@ import com.kauth.domain.port.ResourceAuthorizationError
 import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.util.validateResourceIdentifier
 
+/** The longest text a scope's consent-screen description may hold. */
+const val MAX_SCOPE_DESCRIPTION = 200
+
 class ResourceServerService(
     private val repo: ResourceServerRepository,
 ) {
@@ -24,6 +27,7 @@ class ResourceServerService(
         name: String,
         description: String?,
         scopes: List<String> = emptyList(),
+        scopeDescriptions: Map<String, String> = emptyMap(),
     ): ResourceServerResult<ResourceServer> {
         val trimmedIdentifier = identifier.trim()
         val trimmedName = name.trim()
@@ -35,7 +39,14 @@ class ResourceServerService(
             return ResourceServerResult.Failure(ResourceServerError.IdentifierAlreadyExists)
         }
         return ResourceServerResult.Success(
-            repo.create(tenantId, trimmedIdentifier, trimmedName, description?.trim()?.ifBlank { null }, scopes),
+            repo.create(
+                tenantId,
+                trimmedIdentifier,
+                trimmedName,
+                description?.trim()?.ifBlank { null },
+                scopes,
+                describedScopes(scopes, scopeDescriptions),
+            ),
         )
     }
 
@@ -45,16 +56,35 @@ class ResourceServerService(
         name: String,
         description: String?,
         scopes: List<String> = emptyList(),
+        /** Null keeps the stored descriptions of the scopes that remain. */
+        scopeDescriptions: Map<String, String>? = null,
     ): ResourceServerResult<ResourceServer> {
         val trimmedName = name.trim()
         if (trimmedName.isBlank()) return ResourceServerResult.Failure(ResourceServerError.InvalidName)
-        if (repo.findById(tenantId, id) == null) {
-            return ResourceServerResult.Failure(ResourceServerError.NotFound)
-        }
+        val existing =
+            repo.findById(tenantId, id)
+                ?: return ResourceServerResult.Failure(ResourceServerError.NotFound)
         return ResourceServerResult.Success(
-            repo.update(tenantId, id, trimmedName, description?.trim()?.ifBlank { null }, scopes),
+            repo.update(
+                tenantId,
+                id,
+                trimmedName,
+                description?.trim()?.ifBlank { null },
+                scopes,
+                describedScopes(scopes, scopeDescriptions ?: existing.scopeDescriptions),
+            ),
         )
     }
+
+    // Only declared scopes keep a description, so removing a scope drops its text too.
+    private fun describedScopes(
+        scopes: List<String>,
+        descriptions: Map<String, String>,
+    ): Map<String, String> =
+        descriptions
+            .filterKeys { it in scopes }
+            .mapValues { (_, text) -> text.trim().take(MAX_SCOPE_DESCRIPTION) }
+            .filterValues { it.isNotEmpty() }
 
     fun setEnabled(
         tenantId: TenantId,
