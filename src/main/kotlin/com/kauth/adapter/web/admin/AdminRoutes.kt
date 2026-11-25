@@ -101,6 +101,7 @@ fun Route.adminRoutes(
     identityProviderProbeService: com.kauth.domain.service.IdentityProviderProbeService? = null,
     socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
     consentService: com.kauth.domain.service.ConsentService? = null,
+    linkedIdentityService: com.kauth.domain.service.LinkedIdentityService? = null,
 ) {
     val flash = FlashCookies(encryptionService, secure = baseUrl.startsWith("https://", ignoreCase = true))
     AdminView.setShellAppInfo(appInfo)
@@ -568,6 +569,7 @@ fun Route.adminRoutes(
                     auditLogPort = auditLogPort,
                     socialAccountRepository = socialAccountRepository,
                     consentService = consentService,
+                    linkedIdentityService = linkedIdentityService,
                     flash = flash,
                 )
 
