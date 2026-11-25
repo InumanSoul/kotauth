@@ -206,6 +206,8 @@ object AdminView {
         passkeys: List<com.kauth.domain.model.WebAuthnCredential> = emptyList(),
         brokeredOrigin: Boolean = false,
         linkedIdentities: List<com.kauth.domain.model.SocialAccount> = emptyList(),
+        onlyWayIn: Set<com.kauth.domain.model.ProviderKey> = emptySet(),
+        canUnlink: Boolean = false,
         activeImpersonation: ActiveImpersonation? = null,
     ): HTML.() -> Unit =
         userDetailPageImpl(
@@ -227,6 +229,8 @@ object AdminView {
             passkeys,
             brokeredOrigin,
             linkedIdentities = linkedIdentities,
+            onlyWayIn = onlyWayIn,
+            canUnlink = canUnlink,
             activeImpersonation = activeImpersonation,
         )
 

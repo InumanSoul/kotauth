@@ -8,6 +8,7 @@ import com.kauth.adapter.web.auth.resolveLocale
 import com.kauth.adapter.web.decodeJwtPayload
 import com.kauth.adapter.web.generatePkceChallenge
 import com.kauth.adapter.web.generatePkceVerifier
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -24,6 +25,7 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
+import com.kauth.domain.service.UnlinkResult
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
@@ -78,6 +80,7 @@ fun Route.portalRoutes(
     mfaService: MfaService? = null,
     oauthService: OAuthService? = null,
     socialAccountRepository: SocialAccountRepository? = null,
+    linkedIdentityService: com.kauth.domain.service.LinkedIdentityService? = null,
     baseUrl: String = "",
     encryptionService: EncryptionService,
     translationPort: TranslationPort,
@@ -384,6 +387,14 @@ fun Route.portalRoutes(
                 }
 
             val connectedAccounts = socialAccountRepository?.findByUserId(UserId(session.userId)) ?: emptyList()
+            val onlyWayIn =
+                linkedIdentityService
+                    ?.let { service ->
+                        connectedAccounts
+                            .map { it.provider }
+                            .filter { service.isOnlyWayToSignIn(tenant.id, UserId(session.userId), it) }
+                            .toSet()
+                    }.orEmpty()
 
             call.respondHtml(
                 HttpStatusCode.OK,
@@ -397,6 +408,8 @@ fun Route.portalRoutes(
                     email = user?.email ?: "",
                     fullName = user?.fullName ?: "",
                     connectedAccounts = connectedAccounts,
+                    onlyWayIn = onlyWayIn,
+                    canDisconnect = linkedIdentityService != null,
                 ),
             )
         }
@@ -421,6 +434,33 @@ fun Route.portalRoutes(
                     call.respondRedirect("/t/$slug/account/profile?saved=true")
                 is SelfServiceResult.Failure ->
                     call.respondRedirect("/t/$slug/account/profile?error=${encodeParam(result.error.message)}")
+            }
+        }
+
+        post("/connected-accounts/{provider}/disconnect") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            if (session.isImpersonation || linkedIdentityService == null) {
+                return@post call.respond(HttpStatusCode.Forbidden)
+            }
+            val tenant = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+            val provider =
+                call.parameters["provider"]?.let(ProviderKey::of)
+                    ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val result =
+                linkedIdentityService.unlinkOwn(
+                    tenantId = TenantId(session.tenantId),
+                    userId = UserId(session.userId),
+                    provider = provider,
+                    ipAddress = call.request.origin.remoteAddress,
+                )
+            when (result) {
+                UnlinkResult.Unlinked -> call.respondRedirect("/t/$slug/account/profile?saved=disconnected")
+                UnlinkResult.OnlyWayToSignIn -> {
+                    val message = call.portalViewContext(tenant).t("CONNECTED_ACCOUNTS_ONLY_WAY")
+                    call.respondRedirect("/t/$slug/account/profile?error=${encodeParam(message)}")
+                }
+                UnlinkResult.NotLinked -> call.respond(HttpStatusCode.NotFound)
             }
         }
 

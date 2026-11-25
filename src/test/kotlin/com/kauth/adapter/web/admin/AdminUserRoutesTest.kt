@@ -37,6 +37,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
@@ -81,6 +82,17 @@ class AdminUserRoutesTest {
     private val auditLogPort = FakeAuditLogPort()
     private val apiKeyRepo = FakeApiKeyRepository()
     private val hasher = FakePasswordHasher()
+    private val socialRepo = com.kauth.fakes.FakeSocialAccountRepository()
+    private val idpRepo = com.kauth.fakes.FakeIdentityProviderRepository()
+    private val linkedIdentityService =
+        com.kauth.domain.service.LinkedIdentityService(
+            socialAccounts = socialRepo,
+            users = userRepo,
+            tenants = tenantRepo,
+            identityProviders = idpRepo,
+            passkeys = com.kauth.fakes.FakeWebAuthnCredentialRepository(),
+            auditLog = auditLogPort,
+        )
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
     private val encryptionService = EncryptionService("test-secret-key")
@@ -133,6 +145,8 @@ class AdminUserRoutesTest {
         apiKeyRepo.clear()
         auditLogPort.clear()
         auditLogRepo.clear()
+        socialRepo.clear()
+        idpRepo.clear()
         tenantRepo.add(masterTenant)
         tenantRepo.add(workspace)
         userRepo.add(adminUser)
@@ -198,6 +212,54 @@ class AdminUserRoutesTest {
             assertTrue(exact.contains("/users/") && exact.contains(">ada<"))
             assertFalse(exact.contains(">bob<"))
             assertFalse(partial.contains(">ada<"), "a subject matches whole, never as a substring")
+        }
+
+    @Test
+    fun `an administrator unlinks a user's only identity, after a warning that says so`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada")
+            idpRepo.seed(workspace.id, "google")
+            linkGoogle(user)
+            // Password sign-in on, but the account has no password: the link is its only way in.
+            userRepo.update(user.copy(passwordHash = User.SENTINEL_PASSWORD_HASH))
+            val unlink = "/admin/workspaces/acme/users/${user.id!!.value}/identities/google/unlink"
+
+            val page = authed.get("/admin/workspaces/acme/users/${user.id.value}").bodyAsText()
+            assertTrue(page.contains("action=\"$unlink\""))
+            assertTrue(page.contains("only way to sign in"))
+
+            val response = authed.post(unlink)
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(socialRepo.findByUserId(user.id).isEmpty())
+            val event = auditLogPort.events.single { it.eventType == AuditEventType.ADMIN_IDENTITY_UNLINKED }
+            assertEquals(user.id.value.toString(), event.details["targetUser"])
+        }
+
+    @Test
+    fun `unlinking a user of another workspace changes nothing`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val outsider = userRepo.add(adminUser.copy(id = null, username = "outsider", email = "o@m.test"))
+            linkGoogle(outsider)
+
+            val response = authed.post("/admin/workspaces/acme/users/${outsider.id!!.value}/identities/google/unlink")
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+            assertEquals(1, socialRepo.findByUserId(outsider.id).size)
         }
 
     @Test
@@ -578,6 +640,18 @@ class AdminUserRoutesTest {
             ),
         )
 
+    private fun linkGoogle(user: User) =
+        socialRepo.save(
+            com.kauth.domain.model.SocialAccount(
+                userId = user.id!!,
+                tenantId = user.tenantId,
+                provider = com.kauth.domain.model.ProviderKey.GOOGLE,
+                providerUserId = "g-${user.username}",
+                providerEmail = user.email,
+                providerName = user.username,
+            ),
+        )
+
     private suspend fun login(client: HttpClient) {
         client.submitForm(url = "/test-admin-login", formParameters = Parameters.build { })
     }
@@ -645,6 +719,8 @@ class AdminUserRoutesTest {
                     ),
                 claimMapperService =
                     CachingClaimMapperService(mapperRepository = FakeTenantClaimMapperRepository()),
+                socialAccountRepository = socialRepo,
+                linkedIdentityService = linkedIdentityService,
             )
         }
     }

@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
@@ -16,6 +17,7 @@ import com.kauth.domain.service.AttributeResult
 import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.UnlinkResult
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebAuthnError
 import com.kauth.domain.service.WebAuthnResult
@@ -66,6 +68,7 @@ fun Route.adminUserRoutes(
     mfaService: MfaService? = null,
     auditLogPort: AuditLogPort? = null,
     socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
+    linkedIdentityService: com.kauth.domain.service.LinkedIdentityService? = null,
     flash: FlashCookies,
 ) {
     route("/users") {
@@ -201,6 +204,7 @@ fun Route.adminUserRoutes(
                         "attribute_deleted" -> "Attribute deleted."
                         "impersonation_ended" -> "Impersonation session ended."
                         "passkey_revoked" -> EnglishStrings.TOAST_PASSKEY_REVOKED
+                        "identity_unlinked" -> EnglishStrings.TOAST_IDENTITY_UNLINKED
                         "passkeys_reset" -> EnglishStrings.TOAST_PASSKEYS_RESET
                         "mfa_reset" -> EnglishStrings.TOAST_MFA_RESET
                         else -> null
@@ -242,6 +246,15 @@ fun Route.adminUserRoutes(
                 val passkeys =
                     webAuthnService?.listForUser(userId, ctx.workspace.id) ?: emptyList()
                 val brokeredOrigin = auditLogRepository.recordedJitProvisioning(ctx.workspace.id, userId)
+                val linkedIdentities = socialAccountRepository?.findByUserId(userId).orEmpty()
+                val onlyWayIn =
+                    linkedIdentityService
+                        ?.let { service ->
+                            linkedIdentities
+                                .map { it.provider }
+                                .filter { service.isOnlyWayToSignIn(ctx.workspace.id, userId, it) }
+                                .toSet()
+                        }.orEmpty()
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.userDetailPage(
@@ -260,7 +273,9 @@ fun Route.adminUserRoutes(
                         recentImpersonations = recentImpersonations,
                         passkeys = passkeys,
                         brokeredOrigin = brokeredOrigin,
-                        linkedIdentities = socialAccountRepository?.findByUserId(userId).orEmpty(),
+                        linkedIdentities = linkedIdentities,
+                        onlyWayIn = onlyWayIn,
+                        canUnlink = linkedIdentityService != null,
                         activeImpersonation = call.activeImpersonation(sessionRepository, userRepository),
                     ),
                 )
@@ -667,6 +682,28 @@ fun Route.adminUserRoutes(
                 call.respondRedirect(
                     "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=attribute_deleted",
                 )
+            }
+
+            if (linkedIdentityService != null) {
+                post("/identities/{provider}/unlink") {
+                    val ctx = call.adminContext()
+                    val userId =
+                        call.parameters.typedId("userId", ::UserId)
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val provider =
+                        call.parameters["provider"]?.let(ProviderKey::of)
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val result =
+                        linkedIdentityService.unlinkByAdmin(
+                            tenantId = ctx.workspace.id,
+                            userId = userId,
+                            provider = provider,
+                            actorId = UserId(ctx.session.userId),
+                            ipAddress = call.request.origin.remoteAddress,
+                        )
+                    if (result != UnlinkResult.Unlinked) return@post call.respond(HttpStatusCode.NotFound)
+                    call.respondRedirect("/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=identity_unlinked")
+                }
             }
 
             // ── Passkeys: revoke single credential ──────────────────────

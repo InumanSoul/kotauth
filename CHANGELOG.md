@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A linked identity can be removed.** The admin console's user page has an **Unlink** button on
+  each linked identity, and the account portal a **Disconnect** button on each connected account.
+  Either way, the user is emailed (when the workspace has SMTP) and the audit log records it
+  (`IDENTITY_UNLINKED`, or `ADMIN_IDENTITY_UNLINKED` with the administrator and target user). A user can't disconnect
+  their last way to sign in, the same rule as for their last passkey. Another way in is a
+  password, a passkey, email sign-in, or another account linked through an enabled provider.
+  An administrator can unlink it anyway, after a warning, and then set a temporary password or
+  send a reset email. If the provider links accounts by email, the next sign-in through it links
+  the account again. Closes #131.
+
 ## [1.31.0] - 2026-11-24
 
 ### Added
